@@ -1,10 +1,10 @@
 # Implementation Plan
 
-## Phase 1: Environment Worktree Management
-- [ ] Task: Add worktree management to EvalEnvironment
-    - [ ] Create `tests/core/environment.test.ts` (or update existing) and write failing tests for `createWorktree` and `removeWorktree`.
-    - [ ] Implement `createWorktree` and `removeWorktree` in `src/core/environment.ts`.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Environment Worktree Management' (Protocol in workflow.md)
+## Phase 1: Environment Worktree Management [checkpoint: 025cd8e]
+- [x] Task: Add worktree management to EvalEnvironment (59d130f)
+    - [x] Create `tests/core/environment.test.ts` (or update existing) and write failing tests for `createWorktree` and `removeWorktree`.
+    - [x] Implement `createWorktree` and `removeWorktree` in `src/core/environment.ts`.
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Environment Worktree Management' (025cd8e)
 
 ## Phase 2: Runner Directory Support & JSON Resilience
 - [ ] Task: Update AgentRunner interface
