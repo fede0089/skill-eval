@@ -6,7 +6,7 @@ class Evaluator {
     /**
      * Evaluator handles boolean verification of whether the skill activated or not.
      * `targetToolKeys` can be the skill_name directly, or specific tool names exposed by the skill,
-     * since `geminiOutput.tools?.byName` groups usages by the precise native tool name that was called.
+     * since `output.stats?.tools?.byName` groups usages by the precise native tool name that was called.
      */
     constructor(skillName) {
         // A simplistic heuristic: the main tool name usually shares the skill's name 

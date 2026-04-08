@@ -1,22 +1,16 @@
 import { spawnSync } from 'child_process';
-import { GeminiOutput } from '../types';
+import { AgentOutput } from '../../types';
+import { AgentRunner } from './runner.interface';
 
-export class HeadlessRunner {
-  constructor(private agent: string) {}
-
+export class GeminiCliRunner implements AgentRunner {
   /**
    * Runs the prompt through a headless isolated gemini instance in auto_edit mode.
    * Auto Edit mode automatically allows tools meant for modifying files, falling back interactively
-   * only for severe system-level actions (which we assume tests shouldn't invoke, or will fail if they do in non-interactive).
+   * only for severe system-level actions.
    * @param prompt The evaluation prompt text
    * @returns Parsed JSON output from Gemini
    */
-  public runPrompt(prompt: string): GeminiOutput | null {
-    if (this.agent !== 'gemini-cli') {
-      console.error(`\n[Runner] Agent '${this.agent}' is not supported yet.`);
-      return null;
-    }
-
+  public runPrompt(prompt: string): AgentOutput | null {
     // Escaping the prompt just in case. spawnSync handles formatting but better safe.
     try {
       const child = spawnSync('gemini', [
@@ -49,9 +43,7 @@ export class HeadlessRunner {
         return null;
       }
 
-      // We need to safely extract the JSON part because Gemini CLI might emit 
-      // non-JSON warnings like "MCP issues detected. Run /mcp list for status." to stdout. 
-      // We'll search for the first '{' to begin our JSON payload.
+      // Extract JSON part from output
       let jsonPart = rawOutput.trim();
       const firstBraceIndex = jsonPart.indexOf('{');
       if (firstBraceIndex > 0) {
@@ -60,7 +52,7 @@ export class HeadlessRunner {
 
       try {
         const parsed = JSON.parse(jsonPart);
-        return parsed as GeminiOutput;
+        return parsed as AgentOutput;
       } catch (parseError) {
         console.error(`\n[Runner] Failed to parse JSON output: ${parseError}`);
         // Dump first 300 chars of raw to debug

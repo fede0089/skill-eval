@@ -37,7 +37,7 @@ exports.triggerCommand = triggerCommand;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const environment_1 = require("../core/environment");
-const runner_1 = require("../core/runner");
+const runners_1 = require("../core/runners");
 const evaluator_1 = require("../core/evaluator");
 async function triggerCommand(agent, skillPath) {
     const evalsPath = path.resolve(process.cwd(), skillPath, 'evals', 'evals.json');
@@ -65,8 +65,16 @@ async function triggerCommand(agent, skillPath) {
     console.log(`Found ${evals.length} evals.\n`);
     // Setup Environment
     const env = new environment_1.EvalEnvironment({ skillPath });
-    const runner = new runner_1.HeadlessRunner(agent);
     const evaluator = new evaluator_1.Evaluator(skill_name);
+    let runner;
+    try {
+        runner = runners_1.RunnerFactory.create(agent);
+    }
+    catch (err) {
+        console.error(`\n[Runner] ${err.message}`);
+        process.exit(1);
+        return; // For TS
+    }
     await env.setup();
     // Setup Artifacts Directory
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

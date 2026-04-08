@@ -1,0 +1,89 @@
+{
+  "session_id": "20830b51-6502-4649-8eb2-706eefe2f7dd",
+  "response": "Today is Wednesday, April 8, 2026.",
+  "stats": {
+    "models": {
+      "gemini-2.5-flash-lite": {
+        "api": {
+          "totalRequests": 1,
+          "totalErrors": 0,
+          "totalLatencyMs": 1744
+        },
+        "tokens": {
+          "input": 1363,
+          "prompt": 1363,
+          "candidates": 48,
+          "total": 1564,
+          "cached": 0,
+          "thoughts": 153,
+          "tool": 0
+        },
+        "roles": {
+          "utility_router": {
+            "totalRequests": 1,
+            "totalErrors": 0,
+            "totalLatencyMs": 1744,
+            "tokens": {
+              "input": 1363,
+              "prompt": 1363,
+              "candidates": 48,
+              "total": 1564,
+              "cached": 0,
+              "thoughts": 153,
+              "tool": 0
+            }
+          }
+        }
+      },
+      "gemini-3-flash-preview": {
+        "api": {
+          "totalRequests": 1,
+          "totalErrors": 0,
+          "totalLatencyMs": 3859
+        },
+        "tokens": {
+          "input": 9407,
+          "prompt": 9407,
+          "candidates": 14,
+          "total": 9496,
+          "cached": 0,
+          "thoughts": 75,
+          "tool": 0
+        },
+        "roles": {
+          "main": {
+            "totalRequests": 1,
+            "totalErrors": 0,
+            "totalLatencyMs": 3859,
+            "tokens": {
+              "input": 9407,
+              "prompt": 9407,
+              "candidates": 14,
+              "total": 9496,
+              "cached": 0,
+              "thoughts": 75,
+              "tool": 0
+            }
+          }
+        }
+      }
+    },
+    "tools": {
+      "totalCalls": 0,
+      "totalSuccess": 0,
+      "totalFail": 0,
+      "totalDurationMs": 0,
+      "totalDecisions": {
+        "accept": 0,
+        "reject": 0,
+        "modify": 0,
+        "auto_accept": 0
+      },
+      "byName": {}
+    },
+    "files": {
+      "totalLinesAdded": 0,
+      "totalLinesRemoved": 0
+    }
+  }
+}

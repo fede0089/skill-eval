@@ -11,7 +11,7 @@ export interface EvalFile {
   evals: Eval[];
 }
 
-export interface GeminiOutputTools {
+export interface AgentOutputTools {
   totalCalls: number;
   totalSuccess: number;
   totalFail: number;
@@ -19,11 +19,11 @@ export interface GeminiOutputTools {
   byName: Record<string, any>;
 }
 
-export interface GeminiOutput {
+export interface AgentOutput {
   session_id?: string;
   response?: string;
   stats?: {
-    tools?: GeminiOutputTools;
+    tools?: AgentOutputTools;
     [key: string]: any;
   };
   [key: string]: any;

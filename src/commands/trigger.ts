@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { EvalEnvironment } from '../core/environment';
-import { HeadlessRunner } from '../core/runner';
+import { RunnerFactory } from '../core/runners';
 import { Evaluator } from '../core/evaluator';
 import { EvalFile } from '../types';
 
@@ -35,8 +35,16 @@ export async function triggerCommand(agent: string, skillPath: string): Promise<
 
   // Setup Environment
   const env = new EvalEnvironment({ skillPath });
-  const runner = new HeadlessRunner(agent);
   const evaluator = new Evaluator(skill_name);
+
+  let runner;
+  try {
+    runner = RunnerFactory.create(agent);
+  } catch (err: any) {
+    console.error(`\n[Runner] ${err.message}`);
+    process.exit(1);
+    return; // For TS
+  }
 
   await env.setup();
 

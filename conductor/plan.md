@@ -1,35 +1,47 @@
-# Implementation Plan: Extensible Agent Parameter
+# Implementation Plan: Extensible Runner using Strategy Pattern
 
 ## Objective
-Make the `skill-eval trigger` command extensible by allowing an optional `[agent]` parameter. This paves the way for supporting multiple agents while defaulting to `gemini-cli`.
+Refactor the current `HeadlessRunner` implementation to use a Strategy and Factory pattern. This makes the code robust, adheres to the Open/Closed Principle, and easily extensible to other agents without modifying existing classes.
 
 ## Key Files & Context
-- `src/index.ts`: The main CLI entrypoint defining the `trigger` command using Commander.js.
-- `src/commands/trigger.ts`: Contains the business logic for the `trigger` command.
-- `src/core/runner.ts`: The runner executing the evaluation via a subprocess.
+- `src/types/index.ts`: Rename agent-specific types (`GeminiOutput`) to agent-agnostic types (`AgentOutput`).
+- `src/core/runners/runner.interface.ts`: The common interface for all agent runners.
+- `src/core/runners/gemini-cli.runner.ts`: The concrete implementation for `gemini-cli`.
+- `src/core/runners/factory.ts`: The factory responsible for instantiating the correct runner.
+- `src/core/evaluator.ts`: Update type references.
+- `src/commands/trigger.ts`: Integrate the `RunnerFactory`.
+- `src/core/runner.ts`: To be deleted.
 
 ## Implementation Steps
 
-1. **Update `src/index.ts`**
-   - Modify the `trigger` command definition to accept an optional `[agent]` parameter before the required option.
-   - Extract the `agent` parameter in the action handler (defaulting to `'gemini-cli'` if omitted).
-   - Pass the resolved `agent` to `triggerCommand(agent, options.skill)`.
+1. **Update `src/types/index.ts`**
+   - Rename `GeminiOutput` to `AgentOutput`.
+   - Rename `GeminiOutputTools` to `AgentOutputTools`.
 
-2. **Update `src/commands/trigger.ts`**
-   - Update `triggerCommand`'s signature to `export async function triggerCommand(agent: string, skillPath: string): Promise<void>`.
-   - Update the instantiation of the `HeadlessRunner` to include the `agent`: `new HeadlessRunner(agent)`.
-   - Add a console log indicating which agent is being used for the current evaluation run.
+2. **Create Strategy Interface: `src/core/runners/runner.interface.ts`**
+   - Define `AgentRunner` interface with a `runPrompt(prompt: string): AgentOutput | null` method.
 
-3. **Update `src/core/runner.ts`**
-   - Modify the `HeadlessRunner` class constructor to accept `agent: string`.
-   - Inside the `runPrompt` method, add a check against `this.agent`.
-   - If `this.agent` is `'gemini-cli'`, execute the existing subprocess logic.
-   - Otherwise, print an error (`[Runner] Agent '${this.agent}' is not supported yet.`) and return `null`.
+3. **Create Concrete Strategy: `src/core/runners/gemini-cli.runner.ts`**
+   - Move the existing logic from `HeadlessRunner` into `GeminiCliRunner implements AgentRunner`.
+
+4. **Create Factory: `src/core/runners/factory.ts`**
+   - Implement `RunnerFactory.create(agent: string): AgentRunner`.
+   - Return a new `GeminiCliRunner` for `'gemini-cli'`.
+   - Throw an `Error` for unsupported agents.
+
+5. **Update `src/core/evaluator.ts`**
+   - Update imports and signatures to use `AgentOutput`.
+
+6. **Update `src/commands/trigger.ts`**
+   - Replace the instantiation of `HeadlessRunner` with `RunnerFactory.create(agent)`.
+   - Wrap the instantiation in a try-catch to cleanly handle the `Error` for unsupported agents and exit cleanly.
+
+7. **Cleanup**
+   - Delete `src/core/runner.ts`.
 
 ## Verification & Testing
-1. Ensure the TypeScript compiler builds the project cleanly via `npm run build`.
-2. Ensure `npm test` still passes.
-3. Test locally with the mock skill using three configurations:
-   - `node dist/index.js trigger --skill ./mock-skill` (Uses default: gemini-cli)
-   - `node dist/index.js trigger gemini-cli --skill ./mock-skill` (Explicitly uses gemini-cli)
-   - `node dist/index.js trigger unknown-agent --skill ./mock-skill` (Fails gracefully indicating unsupported agent)
+1. Run `npm run build` to ensure the project compiles.
+2. Run `npm test` to verify default behavior.
+3. Test locally using:
+   - `node dist/index.js trigger --skill ./mock-skill` (Default gemini-cli)
+   - `node dist/index.js trigger other-agent --skill ./mock-skill` (Should fail cleanly with the Factory error)

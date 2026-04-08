@@ -1,4 +1,4 @@
-import { GeminiOutput } from '../types';
+import { AgentOutput } from '../types';
 
 export class Evaluator {
   private targetToolKeys: string[];
@@ -6,7 +6,7 @@ export class Evaluator {
   /**
    * Evaluator handles boolean verification of whether the skill activated or not.
    * `targetToolKeys` can be the skill_name directly, or specific tool names exposed by the skill,
-   * since `geminiOutput.tools?.byName` groups usages by the precise native tool name that was called.
+   * since `output.stats?.tools?.byName` groups usages by the precise native tool name that was called.
    */
   constructor(skillName: string) {
     // A simplistic heuristic: the main tool name usually shares the skill's name 
@@ -17,7 +17,7 @@ export class Evaluator {
     ];
   }
 
-  public isSkillTriggered(output: GeminiOutput): boolean {
+  public isSkillTriggered(output: AgentOutput): boolean {
     if (!output?.stats?.tools?.byName) {
       return false; // If there are no tool stats, nothing was triggered remotely
     }
