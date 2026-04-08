@@ -17,12 +17,12 @@ export class EvalEnvironment {
   }
 
   public async setup(): Promise<void> {
-    Logger.info(`\n[Environment] Linking skill from: ${this.absoluteSkillPath}`);
+    Logger.debug(`Linking skill from: ${this.absoluteSkillPath}`);
     
     // Link the target skill and auto-confirm the prompt
     const child = spawnSync('gemini', ['skills', 'link', this.absoluteSkillPath], {
       input: 'Y\n',
-      stdio: ['pipe', 'inherit', 'inherit'],
+      stdio: ['pipe', 'ignore', 'ignore'],
       encoding: 'utf-8'
     });
 
@@ -32,22 +32,22 @@ export class EvalEnvironment {
       throw new ExecutionError(errorMsg);
     }
 
-    Logger.info(`[Environment] Skill linked successfully.\n`);
+    Logger.debug(`Skill linked successfully.`);
   }
 
   public async teardown(): Promise<void> {
     const skillName = path.basename(this.absoluteSkillPath);
-    Logger.info(`\n[Environment] Tearing down skill link for '${skillName}'...`);
+    Logger.debug(`Tearing down skill link for '${skillName}'...`);
     
     const child = spawnSync('gemini', ['skills', 'uninstall', skillName], {
-      stdio: 'inherit',
+      stdio: 'ignore',
       encoding: 'utf-8'
     });
 
     if (child.status !== 0) {
-      Logger.warn(`Failed to uninstall skill during teardown (it might already be uninstalled). Status code: ${child.status}`);
+      Logger.debug(`Failed to uninstall skill during teardown (it might already be uninstalled). Status code: ${child.status}`);
     } else {
-      Logger.info(`[Environment] Teardown complete.\n`);
+      Logger.debug(`Teardown complete.`);
     }
   }
 
@@ -58,10 +58,14 @@ export class EvalEnvironment {
   public createWorktree(evalId: string): string {
     const worktreePath = path.resolve(process.cwd(), '.project-skill-evals', 'worktrees', evalId);
     
-    Logger.info(`[Environment] Creating worktree at: ${worktreePath}`);
+    Logger.debug(`Creating worktree at: ${worktreePath}`);
+    
+    // Ensure the path is clean before adding a worktree
+    // We try to remove it first in case a previous run crashed
+    spawnSync('git', ['worktree', 'remove', '--force', worktreePath], { stdio: 'ignore' });
     
     const child = spawnSync('git', ['worktree', 'add', worktreePath, '-f'], {
-      stdio: 'inherit',
+      stdio: 'ignore',
       encoding: 'utf-8'
     });
 
@@ -76,15 +80,15 @@ export class EvalEnvironment {
    * Removes a previously created git worktree.
    */
   public removeWorktree(worktreePath: string): void {
-    Logger.info(`[Environment] Removing worktree: ${worktreePath}`);
+    Logger.debug(`Removing worktree: ${worktreePath}`);
     
     const child = spawnSync('git', ['worktree', 'remove', '--force', worktreePath], {
-      stdio: 'inherit',
+      stdio: 'ignore',
       encoding: 'utf-8'
     });
 
     if (child.status !== 0) {
-      Logger.warn(`Failed to remove worktree at ${worktreePath}. Process exited with code ${child.status}`);
+      Logger.debug(`Failed to remove worktree at ${worktreePath}. Process exited with code ${child.status}`);
     }
   }
 }

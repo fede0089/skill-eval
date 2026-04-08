@@ -4,7 +4,7 @@ import { execSync } from 'child_process';
 import { EvalEnvironment } from '../core/environment';
 import { RunnerFactory } from '../core/runners';
 import { FunctionalEvaluator } from '../core/evaluator';
-import { EvalFile, FunctionalEvalResult, EvalSummaryReport, ExpectationResult } from '../types';
+import { EvalFile, FunctionalEvalResult, EvalSummaryReport, ExpectationResult, AgentOutput } from '../types';
 import { Logger } from '../utils/logger';
 import { ConfigError } from '../core/errors';
 
@@ -28,9 +28,9 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
     throw new ConfigError(`Invalid evals.json format. Expected 'skill_name' and a non-empty 'evals' array.`);
   }
 
-  Logger.info(`\nStarting functional evaluation for skill: ${skill_name}`);
-  Logger.info(`Agent: ${agent}`);
-  Logger.info(`Found ${evals.length} evals.\n`);
+  Logger.debug(`\nStarting functional evaluation for skill: ${skill_name}`);
+  Logger.debug(`Agent: ${agent}`);
+  Logger.debug(`Found ${evals.length} evals.\n`);
 
   const env = new EvalEnvironment({ skillPath });
   const evaluator = new FunctionalEvaluator(skill_name);
@@ -42,11 +42,13 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
   const runDir = path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
-  Logger.info(`[Artifacts] Saving to: ${runDir}\n`);
+  Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
 
   const summaryResults: FunctionalEvalResult[] = [];
   let triggeredCount = 0;
   let functionalPassCount = 0;
+  let passedExpectationsCount = 0;
+  const totalExpectationsCount = evals.reduce((acc, e) => acc + (e.expectations?.length || 0), 0);
 
   try {
     for (let i = 0; i < evals.length; i++) {
@@ -54,7 +56,7 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
       const resultFileName = `eval_${i}_${evalSpec.id || 'unnamed'}.json`;
       const resultPath = path.join(runDir, resultFileName);
 
-      Logger.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n  ... `);
+      Logger.write(`=> Eval ${i + 1}/${evals.length} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n`);
 
       let worktreePath: string | undefined;
       let rawOutput: AgentOutput | null = null;
@@ -64,7 +66,19 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
         worktreePath = env.createWorktree(`eval-${i}`);
 
         // 1. Run target skill strictly inside the worktree
-        rawOutput = runner.runPrompt(evalSpec.prompt, worktreePath);
+        Logger.write(`   Running agent... `);
+        
+        // Use a simple interval to show progress
+        const interval = setInterval(() => {
+          Logger.write('.');
+        }, 2000);
+
+        try {
+          rawOutput = runner.runPrompt(evalSpec.prompt, worktreePath);
+        } finally {
+          clearInterval(interval);
+          Logger.write(` Done.\n`);
+        }
       } finally {
         // We'll cleanup worktree later to capture diff
       }
@@ -76,7 +90,7 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
       let expectationsResults: ExpectationResult[] = [];
       let allPassed = true;
 
-      if (rawOutput) {
+      if (rawOutput && !rawOutput.error) {
         triggered = evaluator.isSkillTriggered(rawOutput);
         const metrics = evaluator.extractMetrics(rawOutput);
         latencyMs = metrics.latencyMs;
@@ -102,7 +116,7 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
 
         // 3. Evaluate Expectations if any
         if (evalSpec.expectations && evalSpec.expectations.length > 0) {
-          Logger.write(`Evaluating ${evalSpec.expectations.length} expectations... `);
+          Logger.debug(`   Evaluating ${evalSpec.expectations.length} expectations...`);
           expectationsResults = await evaluator.evaluateFunctional(
             evalSpec.prompt,
             rawOutput,
@@ -110,6 +124,7 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
             context
           );
           allPassed = expectationsResults.every(r => r.passed);
+          passedExpectationsCount += expectationsResults.filter(r => r.passed).length;
         } else {
           allPassed = false; // No expectations = Not passed functionally
         }
@@ -125,10 +140,19 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
         };
         fs.writeFileSync(resultPath, JSON.stringify(augmentedOutput, null, 2), 'utf-8');
       } else {
-        response = 'Error: No JSON output was produced';
-        // Runner returned null (process crash / JSON parse fail / Auth required)
-        fs.writeFileSync(resultPath, JSON.stringify({ error: response }, null, 2), 'utf-8');
+        response = rawOutput?.error || 'Error: No JSON output was produced';
+        // Runner returned error (process crash / JSON parse fail / Auth required)
+        fs.writeFileSync(resultPath, JSON.stringify({ error: response, raw_output: rawOutput?.raw_output }, null, 2), 'utf-8');
         allPassed = false;
+        
+        // Map missing expectations as failed
+        if (evalSpec.expectations) {
+          expectationsResults = evalSpec.expectations.map(e => ({
+            expectation: e,
+            passed: false,
+            reason: triggered ? 'Failed to evaluate' : 'Agent did not trigger'
+          }));
+        }
       }
 
       // Cleanup worktree after diff capture and evaluation
@@ -151,11 +175,13 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
       const hasExpectations = evalSpec.expectations && evalSpec.expectations.length > 0;
       if (triggered && allPassed && hasExpectations) functionalPassCount++;
 
+      // Detailed logging for this eval
+      const triggerEmoji = triggered ? '✅' : '❌';
       let resultStatus = '';
       if (triggered) {
         resultStatus = hasExpectations ? (allPassed ? 'PASSED' : 'FAILED EXPECTATIONS') : 'NO EXPECTATIONS';
       } else {
-        // Check for specific error reasons in response if runner returned null
+        // Check for specific error reasons in response if runner returned error
         if (response.includes('Opening authentication page')) {
           resultStatus = 'AUTH REQUIRED';
         } else if (response.includes('Error:')) {
@@ -165,7 +191,23 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
         }
       }
 
-      Logger.info(`[Result: ${resultStatus} | ${latencyMs}ms | ${tokens} tokens]`);
+      Logger.info(`   Trigger: ${triggerEmoji} (${latencyMs}ms | ${tokens} tokens)`);
+      if (hasExpectations) {
+        const passedCount = expectationsResults.filter(r => r.passed).length;
+        const totalCount = expectationsResults.length;
+        const statusEmoji = (allPassed && triggered) ? '✅' : '❌';
+        Logger.info(`   Expectations (${passedCount}/${totalCount} Passed) ${statusEmoji}:`);
+        for (const exp of expectationsResults) {
+          const expEmoji = exp.passed ? '✅' : '❌';
+          const reason = exp.passed ? '' : ` -> (Reason: ${exp.reason})`;
+          Logger.info(`      ${expEmoji} "${exp.expectation}"${reason}`);
+        }
+      } else if (!triggered) {
+        Logger.info(`   Result: ${resultStatus}`);
+      } else {
+        Logger.info(`   Result: NO EXPECTATIONS`);
+      }
+      Logger.write('\n');
     }
 
     const triggerPercentage = Math.round((triggeredCount / evals.length) * 100);
@@ -173,6 +215,9 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
 
     const functionalPercentage = totalWithExpectations > 0 
       ? Math.round((functionalPassCount / totalWithExpectations) * 100)
+      : 0;
+    const expectationsMetPercentage = totalExpectationsCount > 0
+      ? Math.round((passedExpectationsCount / totalExpectationsCount) * 100)
       : 0;
     const totalTokens = summaryResults.reduce((acc, r) => acc + r.tokens, 0);
     const avgLatency = summaryResults.length > 0 
@@ -193,18 +238,23 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
       functional_metrics: {
         passRate: `${functionalPercentage}%`,
         passedCount: functionalPassCount,
-        totalTriggered: triggeredCount
+        totalTriggered: triggeredCount,
+        totalWithExpectations,
+        totalExpectations: totalExpectationsCount,
+        passedExpectations: passedExpectationsCount,
+        expectationsPassRate: `${expectationsMetPercentage}%`
       },
       results: summaryResults
     };
 
     fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
 
-    Logger.info(`\nResumen final:`);
-    Logger.info(`Trigger Rate:    ${triggeredCount}/${evals.length} (${triggerPercentage}%)`);
-    Logger.info(`Functional Rate: ${functionalPassCount}/${triggeredCount} (${functionalPercentage}%)`);
-    Logger.info(`Avg Latency:     ${avgLatency}ms`);
-    Logger.info(`Total Tokens:    ${totalTokens}\n`);
+    Logger.info(`Resumen final:`);
+    Logger.info(`--------------------------------------------------`);
+    Logger.info(`Functional Rate:   ${functionalPassCount} / ${totalWithExpectations} Evals (${functionalPercentage}%)`);
+    Logger.info(`Expectations Met:  ${passedExpectationsCount} / ${totalExpectationsCount} Total (${expectationsMetPercentage}%)`);
+    Logger.info(`Avg Latency:       ${avgLatency}ms`);
+    Logger.info(`Total Tokens:      ${totalTokens}\n`);
 
   } finally {
     await env.teardown();

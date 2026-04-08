@@ -3,7 +3,7 @@ import * as path from 'path';
 import { EvalEnvironment } from '../core/environment';
 import { RunnerFactory } from '../core/runners';
 import { Evaluator } from '../core/evaluator';
-import { EvalFile, EvalSummaryReport, EvalSummaryResult } from '../types';
+import { EvalFile, EvalSummaryReport, EvalSummaryResult, AgentOutput } from '../types';
 import { Logger } from '../utils/logger';
 import { ConfigError } from '../core/errors';
 
@@ -27,9 +27,9 @@ export async function triggerCommand(agent: string, skillPath: string): Promise<
     throw new ConfigError(`Invalid evals.json format. Expected 'skill_name' and a non-empty 'evals' array.`);
   }
 
-  Logger.info(`\nStarting evaluation for skill: ${skill_name}`);
-  Logger.info(`Agent: ${agent}`);
-  Logger.info(`Found ${evals.length} evals.\n`);
+  Logger.debug(`\nStarting evaluation for skill: ${skill_name}`);
+  Logger.debug(`Agent: ${agent}`);
+  Logger.debug(`Found ${evals.length} evals.\n`);
 
   // Setup Environment
   const env = new EvalEnvironment({ skillPath });
@@ -44,7 +44,7 @@ export async function triggerCommand(agent: string, skillPath: string): Promise<
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
   const runDir = path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
-  Logger.info(`[Artifacts] Saving to: ${runDir}\n`);
+  Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
 
   const summaryResults: EvalSummaryResult[] = [];
   let triggeredCount = 0;
@@ -55,7 +55,7 @@ export async function triggerCommand(agent: string, skillPath: string): Promise<
       const resultFileName = `eval_${i}_${evalSpec.id || 'unnamed'}.json`;
       const resultPath = path.join(runDir, resultFileName);
 
-      Logger.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n  ... `);
+      Logger.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n`);
 
       let worktreePath: string | undefined;
       let rawOutput: AgentOutput | null = null;
@@ -65,7 +65,19 @@ export async function triggerCommand(agent: string, skillPath: string): Promise<
         worktreePath = env.createWorktree(`eval-${i}`);
 
         // Run agent strictly inside the worktree
-        rawOutput = runner.runPrompt(evalSpec.prompt, worktreePath);
+        Logger.write(`   Running agent... `);
+        
+        // Use a simple interval to show progress
+        const interval = setInterval(() => {
+          Logger.write('.');
+        }, 2000);
+
+        try {
+          rawOutput = runner.runPrompt(evalSpec.prompt, worktreePath);
+        } finally {
+          clearInterval(interval);
+          Logger.write(` Done.\n`);
+        }
       } finally {
         // Cleanup worktree immediately after run
         if (worktreePath) {
