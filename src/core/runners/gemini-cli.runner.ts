@@ -9,9 +9,10 @@ export class GeminiCliRunner implements AgentRunner {
    * Auto Edit mode automatically allows tools meant for modifying files, falling back interactively
    * only for severe system-level actions.
    * @param prompt The evaluation prompt text
+   * @param cwd Optional execution directory
    * @returns Parsed JSON output from Gemini
    */
-  public runPrompt(prompt: string): AgentOutput | null {
+  public runPrompt(prompt: string, cwd?: string): AgentOutput | null {
     try {
       const child = spawnSync('gemini', [
         '-p', prompt,
