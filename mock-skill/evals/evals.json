@@ -1,0 +1,13 @@
+{
+  "skill_name": "mock-skill",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Say hi to my friend"
+    },
+    {
+      "id": 2,
+      "prompt": "What is the date today?"
+    }
+  ]
+}

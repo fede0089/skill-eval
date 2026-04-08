@@ -1,0 +1,30 @@
+{
+  "name": "skill-eval",
+  "version": "1.0.0",
+  "description": "CLI to evaluate agent skills triggering",
+  "main": "dist/index.js",
+  "bin": {
+    "skill-eval": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "npm run build && node ./dist/index.js trigger --skill /tmp/skill-eval-test-dummy"
+  },
+  "keywords": [
+    "skill",
+    "eval",
+    "agent",
+    "llm",
+    "gemini"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "typescript": "^5.8.2"
+  }
+}
