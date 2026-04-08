@@ -50,4 +50,41 @@ export class EvalEnvironment {
       Logger.info(`[Environment] Teardown complete.\n`);
     }
   }
+
+  /**
+   * Creates a temporary git worktree for a specific evaluation.
+   * This provides isolation by ensuring each test runs in its own clean copy of the repo.
+   */
+  public createWorktree(evalId: string): string {
+    const worktreePath = path.resolve(process.cwd(), '.project-skill-evals', 'worktrees', evalId);
+    
+    Logger.info(`[Environment] Creating worktree at: ${worktreePath}`);
+    
+    const child = spawnSync('git', ['worktree', 'add', worktreePath, '-f'], {
+      stdio: 'inherit',
+      encoding: 'utf-8'
+    });
+
+    if (child.status !== 0) {
+      throw new ExecutionError(`Failed to create git worktree at ${worktreePath}. Process exited with code ${child.status}`);
+    }
+
+    return worktreePath;
+  }
+
+  /**
+   * Removes a previously created git worktree.
+   */
+  public removeWorktree(worktreePath: string): void {
+    Logger.info(`[Environment] Removing worktree: ${worktreePath}`);
+    
+    const child = spawnSync('git', ['worktree', 'remove', '--force', worktreePath], {
+      stdio: 'inherit',
+      encoding: 'utf-8'
+    });
+
+    if (child.status !== 0) {
+      Logger.warn(`Failed to remove worktree at ${worktreePath}. Process exited with code ${child.status}`);
+    }
+  }
 }
