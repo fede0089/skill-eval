@@ -169,3 +169,27 @@ INSTRUCTIONS:
 Do not include any other text in your response, only the JSON array.`;
   }
 }
+
+/**
+ * Validates a single expectation against the actual output.
+ * Supported types: contains, not_contains, regex, json.
+ */
+export function validateExpectation(expectation: { type: string; value: string }, actualOutput: string): boolean {
+  switch (expectation.type) {
+    case 'contains':
+      return actualOutput.includes(expectation.value);
+    case 'not_contains':
+      return !actualOutput.includes(expectation.value);
+    case 'regex':
+      return new RegExp(expectation.value).test(actualOutput);
+    case 'json':
+      try {
+        JSON.parse(actualOutput);
+        return true;
+      } catch {
+        return false;
+      }
+    default:
+      return false;
+  }
+}

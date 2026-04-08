@@ -20,7 +20,8 @@ export class GeminiCliRunner implements AgentRunner {
         '--approval-mode', 'auto_edit'
       ], {
         encoding: 'utf-8',
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
+        cwd: cwd
       });
 
       if (child.error) {
@@ -41,12 +42,18 @@ export class GeminiCliRunner implements AgentRunner {
         return null;
       }
 
-      // Extract JSON part from output
+      // Extract JSON part from output (handles leading/trailing logs)
       let jsonPart = rawOutput.trim();
       const firstBraceIndex = jsonPart.indexOf('{');
-      if (firstBraceIndex > 0) {
-        jsonPart = jsonPart.substring(firstBraceIndex);
+      const lastBraceIndex = jsonPart.lastIndexOf('}');
+      
+      if (firstBraceIndex === -1 || lastBraceIndex === -1 || firstBraceIndex > lastBraceIndex) {
+        Logger.error(`Could not find a valid JSON object in Gemini CLI output.`);
+        Logger.debug(`Raw Output: ${rawOutput}`);
+        return null;
       }
+
+      jsonPart = jsonPart.substring(firstBraceIndex, lastBraceIndex + 1);
 
       try {
         const parsed = JSON.parse(jsonPart);
