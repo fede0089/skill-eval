@@ -6,3 +6,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: Worktree-Based Evaluator & Runner Robustness Plan**
 *Link: [./](./)*
+
+---
+
+- [ ] **Track: Refactor functional command CLI output**
+*Link: [./](./)*

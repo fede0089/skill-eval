@@ -1,4 +1,4 @@
-# Track worktree_evaluator_20260408 Context
+# Track refactor_functional_output_20260408 Context
 
 - [Specification](./spec.md)
 - [Implementation Plan](./plan.md)
