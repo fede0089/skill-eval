@@ -56,8 +56,18 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
 
       Logger.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n  ... `);
 
-      // 1. Run target skill
-      const rawOutput = runner.runPrompt(evalSpec.prompt);
+      let worktreePath: string | undefined;
+      let rawOutput: AgentOutput | null = null;
+
+      try {
+        // Create isolated worktree for this evaluation
+        worktreePath = env.createWorktree(`eval-${i}`);
+
+        // 1. Run target skill strictly inside the worktree
+        rawOutput = runner.runPrompt(evalSpec.prompt, worktreePath);
+      } finally {
+        // We'll cleanup worktree later to capture diff
+      }
 
       let triggered = false;
       let latencyMs = 0;
@@ -73,13 +83,21 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
         tokens = metrics.tokens;
         response = rawOutput.response || '';
 
-        // 2. Capture Workspace Context (Simplified)
+        // 2. Capture Workspace Context (Rich Diff)
         let context = 'No changes detected or git not available.';
         try {
-          context = execSync('git status --porcelain', { encoding: 'utf-8' });
-          if (!context) context = 'No changes detected (clean workspace).';
+          if (worktreePath) {
+            const diff = execSync('git diff HEAD', { encoding: 'utf-8', cwd: worktreePath });
+            const untracked = execSync('git ls-files --others --exclude-standard', { encoding: 'utf-8', cwd: worktreePath });
+            
+            if (diff || untracked) {
+              context = `[DIFF]\n${diff}\n\n[UNTRACKED FILES]\n${untracked}`;
+            } else {
+              context = 'No changes detected (clean workspace).';
+            }
+          }
         } catch (e) {
-          // Git might not be available or not a repo
+          // Git might not be available or error running diff
         }
 
         // 3. Evaluate Expectations if any
@@ -92,6 +110,8 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
             context
           );
           allPassed = expectationsResults.every(r => r.passed);
+        } else {
+          allPassed = false; // No expectations = Not passed functionally
         }
 
         // Persist the output (augmented with expectations)
@@ -109,6 +129,11 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
         fs.writeFileSync(resultPath, JSON.stringify({ error: response }, null, 2), 'utf-8');
       }
 
+      // Cleanup worktree after diff capture and evaluation
+      if (worktreePath) {
+        env.removeWorktree(worktreePath);
+      }
+
       summaryResults.push({
         id: evalSpec.id || `eval-${i}`,
         prompt: evalSpec.prompt,
@@ -121,15 +146,23 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
       });
 
       if (triggered) triggeredCount++;
-      if (triggered && allPassed) functionalPassCount++;
+      const hasExpectations = evalSpec.expectations && evalSpec.expectations.length > 0;
+      if (triggered && allPassed && hasExpectations) functionalPassCount++;
 
-      const resultStatus = triggered ? (allPassed ? 'PASSED' : 'FAILED EXPECTATIONS') : 'NOT TRIGGERED';
+      const resultStatus = triggered 
+        ? (hasExpectations ? (allPassed ? 'PASSED' : 'FAILED EXPECTATIONS') : 'NO EXPECTATIONS') 
+        : 'NOT TRIGGERED';
       Logger.info(`[Result: ${resultStatus} | ${latencyMs}ms | ${tokens} tokens]`);
     }
 
     const triggerPercentage = Math.round((triggeredCount / evals.length) * 100);
-    const functionalPercentage = triggeredCount > 0 
-      ? Math.round((functionalPassCount / triggeredCount) * 100)
+    const totalWithExpectations = summaryResults.filter(r => {
+      const spec = evals.find(e => (e.id || `eval-${summaryResults.indexOf(r)}`) === r.id);
+      return spec && spec.expectations && spec.expectations.length > 0;
+    }).length;
+
+    const functionalPercentage = totalWithExpectations > 0 
+      ? Math.round((functionalPassCount / totalWithExpectations) * 100)
       : 0;
     const totalTokens = summaryResults.reduce((acc, r) => acc + r.tokens, 0);
     const avgLatency = summaryResults.length > 0 
