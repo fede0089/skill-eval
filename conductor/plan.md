@@ -16,18 +16,18 @@
     - [x] Implement `cwd` propagation to `spawnSync` in `GeminiCliRunner`.
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Runner Directory Support & JSON Resilience' (d4034ed)
 
-## Phase 3: Evaluator Loop & Functional Judge Enrichment
-- [ ] Task: Update Trigger Command Loop
-    - [ ] Write failing tests for sequential worktree creation/removal inside `src/commands/trigger.ts`.
-    - [ ] Implement the `trigger.ts` evaluation loop with worktree logic.
-- [ ] Task: Update Functional Command Loop
-    - [ ] Write failing tests for sequential worktree creation/removal inside `src/commands/functional.ts`.
-    - [ ] Implement the `functional.ts` evaluation loop with worktree logic.
-- [ ] Task: Enhance Functional Judge Context
-    - [ ] Write failing tests to verify `git diff HEAD` is captured inside the worktree in `functional.ts`.
-    - [ ] Implement running `git diff HEAD` and `git ls-files --others --exclude-standard` specifically inside the worktree's `cwd`.
-    - [ ] Inject the enriched git diff output as `context` into `evaluator.evaluateFunctional`.
-- [ ] Task: Handle Strict Functional Expectations
-    - [ ] Write failing tests to ensure empty expectations skip functional evaluation.
-    - [ ] Implement logic in `functional.ts` to log missing expectations without artificially boosting the pass rate.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Evaluator Loop & Functional Judge Enrichment' (Protocol in workflow.md)
+## Phase 3: Evaluator Loop & Functional Judge Enrichment [checkpoint: 6bbb3de]
+- [x] Task: Update Trigger Command Loop (e6975d7)
+    - [x] Write failing tests for sequential worktree creation/removal inside `src/commands/trigger.ts`.
+    - [x] Implement the `trigger.ts` evaluation loop with worktree logic.
+- [x] Task: Update Functional Command Loop (0485c54)
+    - [x] Write failing tests for sequential worktree creation/removal inside `src/commands/functional.ts`.
+    - [x] Implement the `functional.ts` evaluation loop with worktree logic.
+- [x] Task: Enhance Functional Judge Context (0485c54)
+    - [x] Write failing tests to verify `git diff HEAD` is captured inside the worktree in `functional.ts`.
+    - [x] Implement running `git diff HEAD` and `git ls-files --others --exclude-standard` specifically inside the worktree's `cwd`.
+    - [x] Inject the enriched git diff output as `context` into `evaluator.evaluateFunctional`.
+- [x] Task: Handle Strict Functional Expectations (6bbb3de)
+    - [x] Write failing tests to ensure empty expectations skip functional evaluation.
+    - [x] Implement logic in `functional.ts` to log missing expectations without artificially boosting the pass rate.
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Evaluator Loop & Functional Judge Enrichment' (6bbb3de)
