@@ -1,5 +1,5 @@
 {
-  "session_id": "6dc34efd-e99d-4c3d-9a6b-26bb05992dd9",
+  "session_id": "000032ae-3b38-492e-ab45-c5a8e261b433",
   "response": "hi user!",
   "stats": {
     "models": {
@@ -7,29 +7,29 @@
         "api": {
           "totalRequests": 1,
           "totalErrors": 0,
-          "totalLatencyMs": 1681
+          "totalLatencyMs": 1620
         },
         "tokens": {
-          "input": 1360,
-          "prompt": 1360,
-          "candidates": 35,
-          "total": 1533,
+          "input": 1052,
+          "prompt": 1052,
+          "candidates": 40,
+          "total": 1150,
           "cached": 0,
-          "thoughts": 138,
+          "thoughts": 58,
           "tool": 0
         },
         "roles": {
           "utility_router": {
             "totalRequests": 1,
             "totalErrors": 0,
-            "totalLatencyMs": 1681,
+            "totalLatencyMs": 1620,
             "tokens": {
-              "input": 1360,
-              "prompt": 1360,
-              "candidates": 35,
-              "total": 1533,
+              "input": 1052,
+              "prompt": 1052,
+              "candidates": 40,
+              "total": 1150,
               "cached": 0,
-              "thoughts": 138,
+              "thoughts": 58,
               "tool": 0
             }
           }
@@ -39,29 +39,29 @@
         "api": {
           "totalRequests": 3,
           "totalErrors": 0,
-          "totalLatencyMs": 11349
+          "totalLatencyMs": 15598
         },
         "tokens": {
-          "input": 13573,
-          "prompt": 26509,
-          "candidates": 67,
-          "total": 27050,
-          "cached": 12936,
-          "thoughts": 474,
+          "input": 12950,
+          "prompt": 25594,
+          "candidates": 78,
+          "total": 26460,
+          "cached": 12644,
+          "thoughts": 788,
           "tool": 0
         },
         "roles": {
           "main": {
             "totalRequests": 3,
             "totalErrors": 0,
-            "totalLatencyMs": 11349,
+            "totalLatencyMs": 15598,
             "tokens": {
-              "input": 13573,
-              "prompt": 26509,
-              "candidates": 67,
-              "total": 27050,
-              "cached": 12936,
-              "thoughts": 474,
+              "input": 12950,
+              "prompt": 25594,
+              "candidates": 78,
+              "total": 26460,
+              "cached": 12644,
+              "thoughts": 788,
               "tool": 0
             }
           }
@@ -72,7 +72,7 @@
       "totalCalls": 2,
       "totalSuccess": 1,
       "totalFail": 1,
-      "totalDurationMs": 3,
+      "totalDurationMs": 5,
       "totalDecisions": {
         "accept": 1,
         "reject": 0,
@@ -96,7 +96,7 @@
           "count": 1,
           "success": 1,
           "fail": 0,
-          "durationMs": 3,
+          "durationMs": 5,
           "decisions": {
             "accept": 1,
             "reject": 0,

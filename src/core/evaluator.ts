@@ -1,4 +1,4 @@
-import { AgentOutput, ToolMetrics } from '../types';
+import { AgentOutput, ToolMetrics, ModelMetrics } from '../types';
 import { Logger } from '../utils/logger';
 
 export class Evaluator {
@@ -51,5 +51,28 @@ export class Evaluator {
     }
 
     return false;
+  }
+
+  /**
+   * Safely extracts total tokens and latency across all model calls in the output.
+   */
+  public extractMetrics(output: AgentOutput): { latencyMs: number; tokens: number } {
+    let latencyMs = 0;
+    let tokens = 0;
+
+    const models = output?.stats?.models;
+    if (models) {
+      for (const modelId in models) {
+        const m = models[modelId] as ModelMetrics;
+        if (m.api?.totalLatencyMs) {
+          latencyMs += m.api.totalLatencyMs;
+        }
+        if (m.tokens?.total) {
+          tokens += m.tokens.total;
+        }
+      }
+    }
+
+    return { latencyMs, tokens };
   }
 }

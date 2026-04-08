@@ -28,12 +28,55 @@ export interface AgentOutputTools {
   byName: Record<string, ToolMetrics>;
 }
 
+export interface ModelMetrics {
+  api: {
+    totalRequests: number;
+    totalErrors: number;
+    totalLatencyMs: number;
+  };
+  tokens: {
+    input: number;
+    prompt: number;
+    candidates: number;
+    total: number;
+    cached: number;
+    thoughts: number;
+    tool: number;
+  };
+  [key: string]: unknown;
+}
+
 export interface AgentOutput {
-  session_id?: string;
+  session_id: string;
   response?: string;
   stats?: {
     tools?: AgentOutputTools;
+    models?: Record<string, ModelMetrics>;
     [key: string]: unknown;
   };
   [key: string]: unknown;
 }
+
+export interface EvalSummaryResult {
+  id: string;
+  prompt: string;
+  triggered: boolean;
+  latencyMs: number;
+  tokens: number;
+  response: string;
+}
+
+export interface EvalSummaryReport {
+  timestamp: string;
+  skill_name: string;
+  agent: string;
+  metrics: {
+    avgLatencyMs: number;
+    totalTokens: number;
+    passRate: string;
+    triggeredCount: number;
+    totalCount: number;
+  };
+  results: EvalSummaryResult[];
+}
+

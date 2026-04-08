@@ -1,35 +1,35 @@
 {
-  "session_id": "20830b51-6502-4649-8eb2-706eefe2f7dd",
-  "response": "Today is Wednesday, April 8, 2026.",
+  "session_id": "dee09f95-0d40-4361-a7e3-606f6bb84f13",
+  "response": "Today's date is Wednesday, April 8, 2026.",
   "stats": {
     "models": {
       "gemini-2.5-flash-lite": {
         "api": {
           "totalRequests": 1,
           "totalErrors": 0,
-          "totalLatencyMs": 1744
+          "totalLatencyMs": 1358
         },
         "tokens": {
-          "input": 1363,
-          "prompt": 1363,
-          "candidates": 48,
-          "total": 1564,
+          "input": 1065,
+          "prompt": 1065,
+          "candidates": 39,
+          "total": 1194,
           "cached": 0,
-          "thoughts": 153,
+          "thoughts": 90,
           "tool": 0
         },
         "roles": {
           "utility_router": {
             "totalRequests": 1,
             "totalErrors": 0,
-            "totalLatencyMs": 1744,
+            "totalLatencyMs": 1358,
             "tokens": {
-              "input": 1363,
-              "prompt": 1363,
-              "candidates": 48,
-              "total": 1564,
+              "input": 1065,
+              "prompt": 1065,
+              "candidates": 39,
+              "total": 1194,
               "cached": 0,
-              "thoughts": 153,
+              "thoughts": 90,
               "tool": 0
             }
           }
@@ -39,29 +39,29 @@
         "api": {
           "totalRequests": 1,
           "totalErrors": 0,
-          "totalLatencyMs": 3859
+          "totalLatencyMs": 3938
         },
         "tokens": {
-          "input": 9407,
-          "prompt": 9407,
-          "candidates": 14,
-          "total": 9496,
+          "input": 8481,
+          "prompt": 8481,
+          "candidates": 17,
+          "total": 8580,
           "cached": 0,
-          "thoughts": 75,
+          "thoughts": 82,
           "tool": 0
         },
         "roles": {
           "main": {
             "totalRequests": 1,
             "totalErrors": 0,
-            "totalLatencyMs": 3859,
+            "totalLatencyMs": 3938,
             "tokens": {
-              "input": 9407,
-              "prompt": 9407,
-              "candidates": 14,
-              "total": 9496,
+              "input": 8481,
+              "prompt": 8481,
+              "candidates": 17,
+              "total": 8580,
               "cached": 0,
-              "thoughts": 75,
+              "thoughts": 82,
               "tool": 0
             }
           }

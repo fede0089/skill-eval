@@ -67,10 +67,12 @@ async function triggerCommand(agent, skillPath) {
     const runner = runners_1.RunnerFactory.create(agent);
     await env.setup();
     // Setup Artifacts Directory
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const startTime = new Date();
+    const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
     const runDir = path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp);
     fs.mkdirSync(runDir, { recursive: true });
     logger_1.Logger.info(`[Artifacts] Saving to: ${runDir}\n`);
+    const summaryResults = [];
     let triggeredCount = 0;
     try {
         for (let i = 0; i < evals.length; i++) {
@@ -81,25 +83,62 @@ async function triggerCommand(agent, skillPath) {
             // Run and determine parsing output
             const rawOutput = runner.runPrompt(evalSpec.prompt);
             let triggered = false;
+            let latencyMs = 0;
+            let tokens = 0;
+            let response = '';
             if (rawOutput) {
                 triggered = evaluator.isSkillTriggered(rawOutput);
+                const metrics = evaluator.extractMetrics(rawOutput);
+                latencyMs = metrics.latencyMs;
+                tokens = metrics.tokens;
+                response = rawOutput.response || '';
                 // Persist the output
                 fs.writeFileSync(resultPath, JSON.stringify(rawOutput, null, 2), 'utf-8');
             }
             else {
                 // Runner returned null (process crash / JSON parse fail)
-                fs.writeFileSync(resultPath, JSON.stringify({ error: "No JSON output was produced" }, null, 2), 'utf-8');
+                response = 'Error: No JSON output was produced';
+                fs.writeFileSync(resultPath, JSON.stringify({ error: response }, null, 2), 'utf-8');
             }
+            summaryResults.push({
+                id: evalSpec.id || `eval-${i}`,
+                prompt: evalSpec.prompt,
+                triggered,
+                latencyMs,
+                tokens,
+                response
+            });
             if (triggered) {
                 triggeredCount++;
-                logger_1.Logger.info(`[Result: Triggered]`);
+                logger_1.Logger.info(`[Result: Triggered | ${latencyMs}ms | ${tokens} tokens]`);
             }
             else {
-                logger_1.Logger.info(`[Result: Not Triggered]`);
+                logger_1.Logger.info(`[Result: Not Triggered | ${latencyMs}ms | ${tokens} tokens]`);
             }
         }
         const percentage = Math.round((triggeredCount / evals.length) * 100);
-        logger_1.Logger.info(`\nResumen final: ${triggeredCount}/${evals.length}  ${percentage}%\n`);
+        const totalTokens = summaryResults.reduce((acc, r) => acc + r.tokens, 0);
+        const avgLatency = summaryResults.length > 0
+            ? Math.round(summaryResults.reduce((acc, r) => acc + r.latencyMs, 0) / summaryResults.length)
+            : 0;
+        const report = {
+            timestamp: startTime.toISOString(),
+            skill_name,
+            agent,
+            metrics: {
+                avgLatencyMs: avgLatency,
+                totalTokens: totalTokens,
+                passRate: `${percentage}%`,
+                triggeredCount,
+                totalCount: evals.length
+            },
+            results: summaryResults
+        };
+        fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
+        logger_1.Logger.info(`\nResumen final:`);
+        logger_1.Logger.info(`Success Rate: ${triggeredCount}/${evals.length} (${percentage}%)`);
+        logger_1.Logger.info(`Avg Latency:  ${avgLatency}ms`);
+        logger_1.Logger.info(`Total Tokens: ${totalTokens}\n`);
     }
     finally {
         await env.teardown();
