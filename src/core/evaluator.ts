@@ -1,13 +1,10 @@
-import { AgentOutput, ToolMetrics, ModelMetrics } from '../types';
+import { AgentOutput, ToolMetrics, ModelMetrics, ExpectationResult, FunctionalEvalResult, EvalSummaryResult } from '../types';
 import { Logger } from '../utils/logger';
+import { RunnerFactory } from './runners/factory';
 
 export class Evaluator {
   private targetToolKeys: string[];
 
-  /**
-   * Evaluator handles boolean verification of whether the skill activated or not.
-   * `targetToolKeys` can be the skill_name directly, or specific tool names exposed by the skill.
-   */
   constructor(skillName: string) {
     this.targetToolKeys = [
       skillName,
@@ -53,9 +50,6 @@ export class Evaluator {
     return false;
   }
 
-  /**
-   * Safely extracts total tokens and latency across all model calls in the output.
-   */
   public extractMetrics(output: AgentOutput): { latencyMs: number; tokens: number } {
     let latencyMs = 0;
     let tokens = 0;
@@ -74,5 +68,86 @@ export class Evaluator {
     }
 
     return { latencyMs, tokens };
+  }
+}
+
+export class FunctionalEvaluator extends Evaluator {
+  constructor(skillName: string) {
+    super(skillName);
+  }
+
+  /**
+   * Invokes the Judge agent (Gemini CLI) to evaluate expectations based on output and workspace context.
+   */
+  public async evaluateFunctional(
+    prompt: string,
+    output: AgentOutput,
+    expectations: string[],
+    workspaceContext: string
+  ): Promise<ExpectationResult[]> {
+    if (!expectations || expectations.length === 0) {
+      return [];
+    }
+
+    const judgePrompt = this.buildJudgePrompt(prompt, output.response || '', expectations, workspaceContext);
+    const runner = RunnerFactory.create('gemini-cli');
+    
+    // We run the prompt and expect a JSON response
+    const judgeRawOutput = runner.runPrompt(judgePrompt);
+    
+    if (!judgeRawOutput || !judgeRawOutput.response) {
+      return expectations.map(e => ({
+        expectation: e,
+        passed: false,
+        reason: 'Judge agent failed to provide a response.'
+      }));
+    }
+
+    try {
+      // Find JSON block in response
+      const jsonMatch = judgeRawOutput.response.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      return JSON.parse(judgeRawOutput.response);
+    } catch (err) {
+      Logger.error(`Failed to parse Judge JSON response: ${err instanceof Error ? err.message : String(err)}`);
+      Logger.debug(`Raw Judge response: ${judgeRawOutput.response}`);
+      return expectations.map(e => ({
+        expectation: e,
+        passed: false,
+        reason: 'Judge agent response was not valid JSON.'
+      }));
+    }
+  }
+
+  private buildJudgePrompt(prompt: string, response: string, expectations: string[], context: string): string {
+    return `You are a Functional Quality Judge for AI Agent Skills.
+Your task is to evaluate if a skill execution met its functional expectations.
+
+Original Prompt: "${prompt}"
+Agent Response: "${response}"
+
+Workspace Context (Changes detected):
+${context}
+
+Expectations to evaluate:
+${expectations.map((e, i) => `${i + 1}. ${e}`).join('\n')}
+
+INSTRUCTIONS:
+1. Analyze the Response and the Workspace Context.
+2. For each expectation, determine if it was met (passed: true) or not (passed: false).
+3. Provide a brief reasoning for your judgment.
+4. Output your evaluation ONLY as a JSON array of objects with the following structure:
+[
+  {
+    "expectation": "the exact text of expectation 1",
+    "passed": true,
+    "reason": "why it passed or failed"
+  },
+  ...
+]
+
+Do not include any other text in your response, only the JSON array.`;
   }
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { triggerCommand } from './commands/trigger';
+import { functionalCommand } from './commands/functional';
 import { Logger } from './utils/logger';
 import { AppError } from './core/errors';
 
@@ -19,7 +20,7 @@ const errorHandler = (err: unknown) => {
 
 program
   .name('skill-eval')
-  .description('CLI to evaluate agent skills triggering')
+  .description('CLI to evaluate agent skills triggering and functionality')
   .version('1.0.0');
 
 program
@@ -29,6 +30,15 @@ program
   .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
     triggerCommand(selectedAgent, options.skill).catch(errorHandler);
+  });
+
+program
+  .command('functional [agent]')
+  .description('Evaluate functional correctness of an agent skill based on expectations')
+  .requiredOption('--skill <path>', 'Path to the skill directory')
+  .action((agent, options) => {
+    const selectedAgent = agent || 'gemini-cli';
+    functionalCommand(selectedAgent, options.skill).catch(errorHandler);
   });
 
 program.parse(process.argv);

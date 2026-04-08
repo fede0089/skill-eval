@@ -2,8 +2,20 @@ export interface Eval {
   id: string;
   prompt: string;
   expected_output?: string;
-  expectations?: unknown[];
+  expectations?: string[];
   files?: string[];
+}
+
+export interface ExpectationResult {
+  expectation: string;
+  passed: boolean;
+  reason: string;
+}
+
+export interface FunctionalEvalResult extends EvalSummaryResult {
+  expectationsResults: ExpectationResult[];
+  allExpectationsPassed: boolean;
+  judgeReasoning?: string;
 }
 
 export interface EvalFile {
