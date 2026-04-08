@@ -57,8 +57,21 @@ export async function triggerCommand(agent: string, skillPath: string): Promise<
 
       Logger.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n  ... `);
 
-      // Run and determine parsing output
-      const rawOutput = runner.runPrompt(evalSpec.prompt);
+      let worktreePath: string | undefined;
+      let rawOutput: AgentOutput | null = null;
+
+      try {
+        // Create isolated worktree for this evaluation
+        worktreePath = env.createWorktree(`eval-${i}`);
+
+        // Run agent strictly inside the worktree
+        rawOutput = runner.runPrompt(evalSpec.prompt, worktreePath);
+      } finally {
+        // Cleanup worktree immediately after run
+        if (worktreePath) {
+          env.removeWorktree(worktreePath);
+        }
+      }
 
       let triggered = false;
       let latencyMs = 0;
