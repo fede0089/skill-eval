@@ -78,7 +78,7 @@ export async function triggerCommand(agent: string, skillPath: string): Promise<
       let tokens = 0;
       let response = '';
 
-      if (rawOutput) {
+      if (rawOutput && !rawOutput.error) {
         triggered = evaluator.isSkillTriggered(rawOutput);
         const metrics = evaluator.extractMetrics(rawOutput);
         latencyMs = metrics.latencyMs;
@@ -88,9 +88,9 @@ export async function triggerCommand(agent: string, skillPath: string): Promise<
         // Persist the output
         fs.writeFileSync(resultPath, JSON.stringify(rawOutput, null, 2), 'utf-8');
       } else {
-        // Runner returned null (process crash / JSON parse fail)
-        response = 'Error: No JSON output was produced';
-        fs.writeFileSync(resultPath, JSON.stringify({ error: response }, null, 2), 'utf-8');
+        // Runner returned error (process crash / JSON parse fail / Auth required)
+        response = rawOutput?.error || 'Error: No JSON output was produced';
+        fs.writeFileSync(resultPath, JSON.stringify({ error: response, raw_output: rawOutput?.raw_output }, null, 2), 'utf-8');
       }
 
       summaryResults.push({
@@ -106,7 +106,15 @@ export async function triggerCommand(agent: string, skillPath: string): Promise<
         triggeredCount++;
         Logger.info(`[Result: Triggered | ${latencyMs}ms | ${tokens} tokens]`);
       } else {
-        Logger.info(`[Result: Not Triggered | ${latencyMs}ms | ${tokens} tokens]`);
+        let resultStatus = 'Not Triggered';
+        if (rawOutput?.error) {
+          if (rawOutput.raw_output?.includes('Opening authentication page')) {
+            resultStatus = 'AUTH REQUIRED';
+          } else {
+            resultStatus = 'ERROR';
+          }
+        }
+        Logger.info(`[Result: ${resultStatus} | ${latencyMs}ms | ${tokens} tokens]`);
       }
     }
 

@@ -28,9 +28,9 @@ test('GeminiCliRunner.runPrompt should return error object on invalid JSON', asy
 
   const result = runner.runPrompt('test prompt');
   
-  // Currently it returns null on failure, we want it to potentially include error info or at least handle it gracefully
-  // Let's first check current behavior and then improve it.
-  assert.strictEqual(result, null);
+  assert.ok(result);
+  assert.strictEqual(result?.error, 'No JSON object found');
+  assert.strictEqual(result?.raw_output, 'this is not json');
   
   spawnMock.mock.restore();
 });
@@ -44,7 +44,8 @@ test('GeminiCliRunner.runPrompt should handle non-zero exit code', async (t) => 
   }));
 
   const result = runner.runPrompt('test prompt');
-  assert.strictEqual(result, null);
+  assert.ok(result);
+  assert.strictEqual(result?.error, 'Empty output from Gemini CLI');
   
   spawnMock.mock.restore();
 });

@@ -20,7 +20,7 @@ test('functionalCommand should skip functional pass if expectations are missing'
   mock.method(EvalEnvironment.prototype, 'createWorktree', (id: string) => `/tmp/worktree-${id}`);
   mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
   mock.method(RunnerFactory, 'create', () => ({
-    runPrompt: () => ({ response: 'ok', stats: {} })
+    runPrompt: () => ({ response: 'ok', stats: {}, error: undefined })
   }));
   mock.method(FunctionalEvaluator.prototype, 'isSkillTriggered', () => true);
   mock.method(FunctionalEvaluator.prototype, 'extractMetrics', () => ({ latencyMs: 10, tokens: 100 }));

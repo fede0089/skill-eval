@@ -126,7 +126,9 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
         fs.writeFileSync(resultPath, JSON.stringify(augmentedOutput, null, 2), 'utf-8');
       } else {
         response = 'Error: No JSON output was produced';
+        // Runner returned null (process crash / JSON parse fail / Auth required)
         fs.writeFileSync(resultPath, JSON.stringify({ error: response }, null, 2), 'utf-8');
+        allPassed = false;
       }
 
       // Cleanup worktree after diff capture and evaluation
@@ -149,17 +151,25 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
       const hasExpectations = evalSpec.expectations && evalSpec.expectations.length > 0;
       if (triggered && allPassed && hasExpectations) functionalPassCount++;
 
-      const resultStatus = triggered 
-        ? (hasExpectations ? (allPassed ? 'PASSED' : 'FAILED EXPECTATIONS') : 'NO EXPECTATIONS') 
-        : 'NOT TRIGGERED';
+      let resultStatus = '';
+      if (triggered) {
+        resultStatus = hasExpectations ? (allPassed ? 'PASSED' : 'FAILED EXPECTATIONS') : 'NO EXPECTATIONS';
+      } else {
+        // Check for specific error reasons in response if runner returned null
+        if (response.includes('Opening authentication page')) {
+          resultStatus = 'AUTH REQUIRED';
+        } else if (response.includes('Error:')) {
+          resultStatus = 'ERROR';
+        } else {
+          resultStatus = 'NOT TRIGGERED';
+        }
+      }
+
       Logger.info(`[Result: ${resultStatus} | ${latencyMs}ms | ${tokens} tokens]`);
     }
 
     const triggerPercentage = Math.round((triggeredCount / evals.length) * 100);
-    const totalWithExpectations = summaryResults.filter(r => {
-      const spec = evals.find(e => (e.id || `eval-${summaryResults.indexOf(r)}`) === r.id);
-      return spec && spec.expectations && spec.expectations.length > 0;
-    }).length;
+    const totalWithExpectations = evals.filter(e => e.expectations && e.expectations.length > 0).length;
 
     const functionalPercentage = totalWithExpectations > 0 
       ? Math.round((functionalPassCount / totalWithExpectations) * 100)

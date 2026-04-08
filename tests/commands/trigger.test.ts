@@ -24,7 +24,7 @@ test('triggerCommand should use worktrees for each evaluation', async (t) => {
 
   // Mock Runner
   const runnerMock = {
-    runPrompt: mock.fn((prompt: string, cwd?: string) => ({ response: 'ok', stats: {} }))
+    runPrompt: mock.fn((prompt: string, cwd?: string) => ({ response: 'ok', stats: {}, error: undefined }))
   };
   mock.method(RunnerFactory, 'create', () => runnerMock);
 

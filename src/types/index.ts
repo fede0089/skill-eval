@@ -59,8 +59,10 @@ export interface ModelMetrics {
 }
 
 export interface AgentOutput {
-  session_id: string;
+  session_id?: string;
   response?: string;
+  error?: string;
+  raw_output?: string;
   stats?: {
     tools?: AgentOutputTools;
     models?: Record<string, ModelMetrics>;

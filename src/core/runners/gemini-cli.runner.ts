@@ -39,7 +39,7 @@ export class GeminiCliRunner implements AgentRunner {
       const rawOutput = child.stdout;
       if (!rawOutput || rawOutput.trim() === '') {
         Logger.error(`Received empty output from Gemini CLI. Cannot evaluate.`);
-        return null;
+        return { error: 'Empty output from Gemini CLI', raw_output: child.stderr };
       }
 
       // Extract JSON part from output (handles leading/trailing logs)
@@ -50,23 +50,23 @@ export class GeminiCliRunner implements AgentRunner {
       if (firstBraceIndex === -1 || lastBraceIndex === -1 || firstBraceIndex > lastBraceIndex) {
         Logger.error(`Could not find a valid JSON object in Gemini CLI output.`);
         Logger.debug(`Raw Output: ${rawOutput}`);
-        return null;
+        return { error: 'No JSON object found', raw_output: rawOutput };
       }
 
       jsonPart = jsonPart.substring(firstBraceIndex, lastBraceIndex + 1);
 
       try {
         const parsed = JSON.parse(jsonPart);
-        return parsed as AgentOutput;
+        return { ...parsed, raw_output: rawOutput } as AgentOutput;
       } catch (parseError) {
         Logger.error(`Failed to parse JSON output: ${parseError}`);
         Logger.error(`Runner Output Preview: ${rawOutput.substring(0, 300)}`);
-        return null;
+        return { error: 'JSON parse failure', raw_output: rawOutput };
       }
 
     } catch (e) {
       Logger.error(`Unexpected error running process: ${e}`);
-      return null;
+      return { error: `Process error: ${e instanceof Error ? e.message : String(e)}` };
     }
   }
 }
