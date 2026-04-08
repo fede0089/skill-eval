@@ -3,11 +3,13 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Say hi to my friend"
+      "prompt": "Say hi to my friend",
+      "expectations": ["The response should be polite", "The response should say hi"]
     },
     {
       "id": 2,
-      "prompt": "What is the date today?"
+      "prompt": "What is the date today?",
+      "expectations": ["The response should include a date"]
     }
   ]
 }
