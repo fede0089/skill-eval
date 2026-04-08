@@ -3,9 +3,21 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const commander_1 = require("commander");
 const trigger_1 = require("./commands/trigger");
-const rate_1 = require("./commands/rate");
-const view_1 = require("./commands/view");
+const logger_1 = require("./utils/logger");
+const errors_1 = require("./core/errors");
 const program = new commander_1.Command();
+const errorHandler = (err) => {
+    if (err instanceof errors_1.AppError) {
+        logger_1.Logger.error(err.message);
+    }
+    else if (err instanceof Error) {
+        logger_1.Logger.error(`An unexpected error occurred: ${err.message}`, err.stack);
+    }
+    else {
+        logger_1.Logger.error(`An unknown error occurred: ${String(err)}`);
+    }
+    process.exit(1);
+};
 program
     .name('skill-eval')
     .description('CLI to evaluate agent skills triggering')
@@ -16,33 +28,6 @@ program
     .requiredOption('--skill <path>', 'Path to the skill directory')
     .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
-    (0, trigger_1.triggerCommand)(selectedAgent, options.skill).catch((err) => {
-        console.error(`Fatal error:`, err);
-        process.exit(1);
-    });
-});
-program
-    .command('rate')
-    .description('Rate your experience with the tool')
-    .argument('<score>', 'Rating score from 1 to 5')
-    .option('-c, --comment <text>', 'Optional comment')
-    .action((score, options) => {
-    (0, rate_1.rateCommand)(score, options).catch((err) => {
-        console.error(`Fatal error:`, err);
-        process.exit(1);
-    });
-});
-program
-    .command('view')
-    .description('Comprehensive view to rate your experience')
-    .option('-e, --ease <1-5>', 'Ease of use score (1-5)')
-    .option('-s, --speed <1-5>', 'Speed and performance score (1-5)')
-    .option('-a, --accuracy <1-5>', 'Triggering accuracy score (1-5)')
-    .option('-c, --comment <text>', 'Overall comment')
-    .action((options) => {
-    (0, view_1.viewCommand)(options).catch((err) => {
-        console.error(`Fatal error:`, err);
-        process.exit(1);
-    });
+    (0, trigger_1.triggerCommand)(selectedAgent, options.skill).catch(errorHandler);
 });
 program.parse(process.argv);

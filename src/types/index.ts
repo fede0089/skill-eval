@@ -2,7 +2,7 @@ export interface Eval {
   id: string;
   prompt: string;
   expected_output?: string;
-  expectations?: any[];
+  expectations?: unknown[];
   files?: string[];
 }
 
@@ -11,12 +11,21 @@ export interface EvalFile {
   evals: Eval[];
 }
 
+export interface ToolMetrics {
+  count?: number;
+  totalCalls?: number;
+  totalSuccess?: number;
+  totalFail?: number;
+  durationMs?: number;
+  [key: string]: unknown;
+}
+
 export interface AgentOutputTools {
   totalCalls: number;
   totalSuccess: number;
   totalFail: number;
   totalDurationMs: number;
-  byName: Record<string, any>;
+  byName: Record<string, ToolMetrics>;
 }
 
 export interface AgentOutput {
@@ -24,7 +33,7 @@ export interface AgentOutput {
   response?: string;
   stats?: {
     tools?: AgentOutputTools;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 }

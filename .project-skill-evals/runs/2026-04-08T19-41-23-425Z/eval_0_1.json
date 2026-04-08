@@ -1,0 +1,114 @@
+{
+  "session_id": "6dc34efd-e99d-4c3d-9a6b-26bb05992dd9",
+  "response": "hi user!",
+  "stats": {
+    "models": {
+      "gemini-2.5-flash-lite": {
+        "api": {
+          "totalRequests": 1,
+          "totalErrors": 0,
+          "totalLatencyMs": 1681
+        },
+        "tokens": {
+          "input": 1360,
+          "prompt": 1360,
+          "candidates": 35,
+          "total": 1533,
+          "cached": 0,
+          "thoughts": 138,
+          "tool": 0
+        },
+        "roles": {
+          "utility_router": {
+            "totalRequests": 1,
+            "totalErrors": 0,
+            "totalLatencyMs": 1681,
+            "tokens": {
+              "input": 1360,
+              "prompt": 1360,
+              "candidates": 35,
+              "total": 1533,
+              "cached": 0,
+              "thoughts": 138,
+              "tool": 0
+            }
+          }
+        }
+      },
+      "gemini-3-flash-preview": {
+        "api": {
+          "totalRequests": 3,
+          "totalErrors": 0,
+          "totalLatencyMs": 11349
+        },
+        "tokens": {
+          "input": 13573,
+          "prompt": 26509,
+          "candidates": 67,
+          "total": 27050,
+          "cached": 12936,
+          "thoughts": 474,
+          "tool": 0
+        },
+        "roles": {
+          "main": {
+            "totalRequests": 3,
+            "totalErrors": 0,
+            "totalLatencyMs": 11349,
+            "tokens": {
+              "input": 13573,
+              "prompt": 26509,
+              "candidates": 67,
+              "total": 27050,
+              "cached": 12936,
+              "thoughts": 474,
+              "tool": 0
+            }
+          }
+        }
+      }
+    },
+    "tools": {
+      "totalCalls": 2,
+      "totalSuccess": 1,
+      "totalFail": 1,
+      "totalDurationMs": 3,
+      "totalDecisions": {
+        "accept": 1,
+        "reject": 0,
+        "modify": 0,
+        "auto_accept": 0
+      },
+      "byName": {
+        "activate_skill": {
+          "count": 1,
+          "success": 0,
+          "fail": 1,
+          "durationMs": 0,
+          "decisions": {
+            "accept": 0,
+            "reject": 0,
+            "modify": 0,
+            "auto_accept": 0
+          }
+        },
+        "read_file": {
+          "count": 1,
+          "success": 1,
+          "fail": 0,
+          "durationMs": 3,
+          "decisions": {
+            "accept": 1,
+            "reject": 0,
+            "modify": 0,
+            "auto_accept": 0
+          }
+        }
+      }
+    },
+    "files": {
+      "totalLinesAdded": 0,
+      "totalLinesRemoved": 0
+    }
+  }
+}

@@ -36,6 +36,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.EvalEnvironment = void 0;
 const child_process_1 = require("child_process");
 const path = __importStar(require("path"));
+const logger_1 = require("../utils/logger");
+const errors_1 = require("./errors");
 class EvalEnvironment {
     skillPath;
     absoluteSkillPath;
@@ -44,26 +46,32 @@ class EvalEnvironment {
         this.absoluteSkillPath = path.resolve(process.cwd(), this.skillPath);
     }
     async setup() {
-        console.log(`\n[Environment] Linking skill from: ${this.absoluteSkillPath}`);
-        try {
-            // Link the target skill and auto-confirm the prompt
-            (0, child_process_1.execSync)(`echo "Y" | gemini skills link "${this.absoluteSkillPath}"`, { stdio: 'inherit' });
-            console.log(`[Environment] Skill linked successfully.\n`);
+        logger_1.Logger.info(`\n[Environment] Linking skill from: ${this.absoluteSkillPath}`);
+        // Link the target skill and auto-confirm the prompt
+        const child = (0, child_process_1.spawnSync)('gemini', ['skills', 'link', this.absoluteSkillPath], {
+            input: 'Y\n',
+            stdio: ['pipe', 'inherit', 'inherit'],
+            encoding: 'utf-8'
+        });
+        if (child.status !== 0) {
+            const errorMsg = `Failed to link skill: gemini process exited with code ${child.status}`;
+            logger_1.Logger.error(errorMsg);
+            throw new errors_1.ExecutionError(errorMsg);
         }
-        catch (error) {
-            console.error(`[Error] Failed to link skill: ${error}`);
-            throw error;
-        }
+        logger_1.Logger.info(`[Environment] Skill linked successfully.\n`);
     }
     async teardown() {
         const skillName = path.basename(this.absoluteSkillPath);
-        console.log(`\n[Environment] Tearing down skill link for '${skillName}'...`);
-        try {
-            (0, child_process_1.execSync)(`gemini skills uninstall ${skillName}`, { stdio: 'inherit' });
-            console.log(`[Environment] Teardown complete.\n`);
+        logger_1.Logger.info(`\n[Environment] Tearing down skill link for '${skillName}'...`);
+        const child = (0, child_process_1.spawnSync)('gemini', ['skills', 'uninstall', skillName], {
+            stdio: 'inherit',
+            encoding: 'utf-8'
+        });
+        if (child.status !== 0) {
+            logger_1.Logger.warn(`Failed to uninstall skill during teardown (it might already be uninstalled). Status code: ${child.status}`);
         }
-        catch (error) {
-            console.error(`\n[Warning] Failed to uninstall skill during teardown (it might already be uninstalled): ${error}`);
+        else {
+            logger_1.Logger.info(`[Environment] Teardown complete.\n`);
         }
     }
 }

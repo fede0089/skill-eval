@@ -39,11 +39,12 @@ const path = __importStar(require("path"));
 const environment_1 = require("../core/environment");
 const runners_1 = require("../core/runners");
 const evaluator_1 = require("../core/evaluator");
+const logger_1 = require("../utils/logger");
+const errors_1 = require("../core/errors");
 async function triggerCommand(agent, skillPath) {
     const evalsPath = path.resolve(process.cwd(), skillPath, 'evals', 'evals.json');
     if (!fs.existsSync(evalsPath)) {
-        console.error(`[Error] Could not find evals.json at ${evalsPath}`);
-        process.exit(1);
+        throw new errors_1.ConfigError(`Could not find evals.json at ${evalsPath}`);
     }
     let evalsConfig;
     try {
@@ -51,43 +52,32 @@ async function triggerCommand(agent, skillPath) {
         evalsConfig = JSON.parse(raw);
     }
     catch (err) {
-        console.error(`[Error] Failed to parse evals.json:`, err);
-        process.exit(1);
-        throw err; // For TS flow
+        throw new errors_1.ConfigError(`Failed to parse evals.json: ${err instanceof Error ? err.message : String(err)}`);
     }
     const { skill_name, evals } = evalsConfig;
     if (!skill_name || !Array.isArray(evals) || evals.length === 0) {
-        console.error(`[Error] Invalid evals.json format. Expected 'skill_name' and a non-empty 'evals' array.`);
-        process.exit(1);
+        throw new errors_1.ConfigError(`Invalid evals.json format. Expected 'skill_name' and a non-empty 'evals' array.`);
     }
-    console.log(`\nStarting evaluation for skill: ${skill_name}`);
-    console.log(`Agent: ${agent}`);
-    console.log(`Found ${evals.length} evals.\n`);
+    logger_1.Logger.info(`\nStarting evaluation for skill: ${skill_name}`);
+    logger_1.Logger.info(`Agent: ${agent}`);
+    logger_1.Logger.info(`Found ${evals.length} evals.\n`);
     // Setup Environment
     const env = new environment_1.EvalEnvironment({ skillPath });
     const evaluator = new evaluator_1.Evaluator(skill_name);
-    let runner;
-    try {
-        runner = runners_1.RunnerFactory.create(agent);
-    }
-    catch (err) {
-        console.error(`\n[Runner] ${err.message}`);
-        process.exit(1);
-        return; // For TS
-    }
+    const runner = runners_1.RunnerFactory.create(agent);
     await env.setup();
     // Setup Artifacts Directory
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const runDir = path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp);
     fs.mkdirSync(runDir, { recursive: true });
-    console.log(`[Artifacts] Saving to: ${runDir}\n`);
+    logger_1.Logger.info(`[Artifacts] Saving to: ${runDir}\n`);
     let triggeredCount = 0;
     try {
         for (let i = 0; i < evals.length; i++) {
             const evalSpec = evals[i];
             const resultFileName = `eval_${i}_${evalSpec.id || 'unnamed'}.json`;
             const resultPath = path.join(runDir, resultFileName);
-            process.stdout.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n  ... `);
+            logger_1.Logger.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n  ... `);
             // Run and determine parsing output
             const rawOutput = runner.runPrompt(evalSpec.prompt);
             let triggered = false;
@@ -102,14 +92,14 @@ async function triggerCommand(agent, skillPath) {
             }
             if (triggered) {
                 triggeredCount++;
-                console.log(`[Result: Triggered]`);
+                logger_1.Logger.info(`[Result: Triggered]`);
             }
             else {
-                console.log(`[Result: Not Triggered]`);
+                logger_1.Logger.info(`[Result: Not Triggered]`);
             }
         }
         const percentage = Math.round((triggeredCount / evals.length) * 100);
-        console.log(`\nResumen final: ${triggeredCount}/${evals.length}  ${percentage}%\n`);
+        logger_1.Logger.info(`\nResumen final: ${triggeredCount}/${evals.length}  ${percentage}%\n`);
     }
     finally {
         await env.teardown();

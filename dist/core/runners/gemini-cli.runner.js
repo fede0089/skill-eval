@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GeminiCliRunner = void 0;
 const child_process_1 = require("child_process");
+const logger_1 = require("../../utils/logger");
 class GeminiCliRunner {
     /**
      * Runs the prompt through a headless isolated gemini instance in auto_edit mode.
@@ -11,7 +12,6 @@ class GeminiCliRunner {
      * @returns Parsed JSON output from Gemini
      */
     runPrompt(prompt) {
-        // Escaping the prompt just in case. spawnSync handles formatting but better safe.
         try {
             const child = (0, child_process_1.spawnSync)('gemini', [
                 '-p', prompt,
@@ -19,24 +19,21 @@ class GeminiCliRunner {
                 '--approval-mode', 'auto_edit'
             ], {
                 encoding: 'utf-8',
-                // Not passing default stdio because we need to parse stdout 
-                // silently without printing all the tool interactions to the user terminal.
                 stdio: ['ignore', 'pipe', 'pipe']
             });
             if (child.error) {
-                console.error(`\n[Runner] Failed to start gemini CLI. Error: ${child.error.message}`);
+                logger_1.Logger.error(`Failed to start gemini CLI. Error: ${child.error.message}`);
                 return null;
             }
-            // If exit code is not 0, there was likely a crash or unhanded exception in gemini cli.
             if (child.status !== 0) {
-                console.error(`\n[Runner] Gemini CLI exited with status ${child.status}`);
+                logger_1.Logger.error(`Gemini CLI exited with status ${child.status}`);
                 if (child.stderr) {
-                    console.error(`[Runner Stderr] ${child.stderr.trim()}`);
+                    logger_1.Logger.error(`Gemini CLI Stderr: ${child.stderr.trim()}`);
                 }
             }
             const rawOutput = child.stdout;
             if (!rawOutput || rawOutput.trim() === '') {
-                console.error(`\n[Runner] Received empty output from Gemini CLI. Cannot evaluate.`);
+                logger_1.Logger.error(`Received empty output from Gemini CLI. Cannot evaluate.`);
                 return null;
             }
             // Extract JSON part from output
@@ -50,14 +47,13 @@ class GeminiCliRunner {
                 return parsed;
             }
             catch (parseError) {
-                console.error(`\n[Runner] Failed to parse JSON output: ${parseError}`);
-                // Dump first 300 chars of raw to debug
-                console.error(`[Runner Output Preview] ${rawOutput.substring(0, 300)}`);
+                logger_1.Logger.error(`Failed to parse JSON output: ${parseError}`);
+                logger_1.Logger.error(`Runner Output Preview: ${rawOutput.substring(0, 300)}`);
                 return null;
             }
         }
         catch (e) {
-            console.error(`\n[Runner] Unexpected error running process: ${e}`);
+            logger_1.Logger.error(`Unexpected error running process: ${e}`);
             return null;
         }
     }
