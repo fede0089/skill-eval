@@ -12,7 +12,11 @@ export class Evaluator {
     ];
   }
 
-  public isSkillTriggered(output: AgentOutput): boolean {
+  /**
+   * Verifies if the skill was triggered by analyzing the agent's tool calls.
+   * Checks for explicit skill dispatch or name matches in the tool statistics.
+   */
+  isSkillTriggered(output: AgentOutput): boolean {
     if (!output?.stats?.tools?.byName) {
       return false;
     }
@@ -50,7 +54,10 @@ export class Evaluator {
     return false;
   }
 
-  public extractMetrics(output: AgentOutput): { latencyMs: number; tokens: number } {
+  /**
+   * Aggregates latency and token usage from all models called during execution.
+   */
+  extractMetrics(output: AgentOutput): { latencyMs: number; tokens: number } {
     let latencyMs = 0;
     let tokens = 0;
 
@@ -71,15 +78,26 @@ export class Evaluator {
   }
 }
 
+/**
+ * FunctionalEvaluator extends the base Evaluator to support Judge-led
+ * verification of functional expectations.
+ */
 export class FunctionalEvaluator extends Evaluator {
   constructor(skillName: string) {
     super(skillName);
   }
 
   /**
-   * Invokes the Judge agent (Gemini CLI) to evaluate expectations based on output and workspace context.
+   * Invokes an LLM Judge (Gemini CLI) to evaluate if the agent's response
+   * and workspace changes meet the defined functional expectations.
+   * 
+   * @param prompt Original user prompt
+   * @param output Output from the agent execution
+   * @param expectations List of textual expectations
+   * @param workspaceContext Current state/diff of the local workspace
+   * @returns Array of individual expectation results with status and reasoning
    */
-  public async evaluateFunctional(
+  async evaluateFunctional(
     prompt: string,
     output: AgentOutput,
     expectations: string[],

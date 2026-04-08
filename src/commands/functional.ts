@@ -4,7 +4,7 @@ import { execSync } from 'child_process';
 import { EvalEnvironment } from '../core/environment';
 import { RunnerFactory } from '../core/runners';
 import { FunctionalEvaluator } from '../core/evaluator';
-import { EvalFile, FunctionalEvalResult, EvalSummaryReport } from '../types';
+import { EvalFile, FunctionalEvalResult, EvalSummaryReport, ExpectationResult } from '../types';
 import { Logger } from '../utils/logger';
 import { ConfigError } from '../core/errors';
 
@@ -63,7 +63,7 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
       let latencyMs = 0;
       let tokens = 0;
       let response = '';
-      let expectationsResults: any[] = [];
+      let expectationsResults: ExpectationResult[] = [];
       let allPassed = true;
 
       if (rawOutput) {
