@@ -6,15 +6,15 @@
     - [x] Implement `createWorktree` and `removeWorktree` in `src/core/environment.ts`.
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Environment Worktree Management' (025cd8e)
 
-## Phase 2: Runner Directory Support & JSON Resilience
-- [ ] Task: Update AgentRunner interface
-    - [ ] Write failing test for interface update (if applicable).
-    - [ ] Update `runPrompt` to accept an execution directory `cwd`.
-- [ ] Task: Enhance GeminiCliRunner resilience
-    - [ ] Write failing tests for JSON extraction handling Invalid JSON, Non-zero Exit, and Empty Output.
-    - [ ] Implement robust JSON extraction in `src/core/runners/gemini-cli.runner.ts`.
-    - [ ] Implement `cwd` propagation to `spawnSync` in `GeminiCliRunner`.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Runner Directory Support & JSON Resilience' (Protocol in workflow.md)
+## Phase 2: Runner Directory Support & JSON Resilience [checkpoint: d4034ed]
+- [x] Task: Update AgentRunner interface (4cff669)
+    - [x] Write failing test for interface update (if applicable).
+    - [x] Update `runPrompt` to accept an execution directory `cwd`.
+- [x] Task: Enhance GeminiCliRunner resilience (d15a572)
+    - [x] Write failing tests for JSON extraction handling Invalid JSON, Non-zero Exit, and Empty Output.
+    - [x] Implement robust JSON extraction in `src/core/runners/gemini-cli.runner.ts`.
+    - [x] Implement `cwd` propagation to `spawnSync` in `GeminiCliRunner`.
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Runner Directory Support & JSON Resilience' (d4034ed)
 
 ## Phase 3: Evaluator Loop & Functional Judge Enrichment
 - [ ] Task: Update Trigger Command Loop
