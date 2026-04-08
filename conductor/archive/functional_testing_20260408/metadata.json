@@ -1,0 +1,8 @@
+{
+  "track_id": "functional_testing_20260408",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-04-08T00:00:00Z",
+  "updated_at": "2026-04-08T00:00:00Z",
+  "description": "Quiero sumar una segunda capacidad: `functional testing`.\n\nObjetivo de esta iteración\nAgregar un subcomando nuevo:\n\n`skill-eval functional --skill <path>`\n\nLa idea es evaluar, para cada eval del skill, si el resultado generado cumple o no las `expectations` definidas en `evals/evals.json`."
+}
