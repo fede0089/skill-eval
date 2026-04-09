@@ -58,9 +58,9 @@ async function triggerCommand(agent, skillPath) {
     if (!skill_name || !Array.isArray(evals) || evals.length === 0) {
         throw new errors_1.ConfigError(`Invalid evals.json format. Expected 'skill_name' and a non-empty 'evals' array.`);
     }
-    logger_1.Logger.info(`\nStarting evaluation for skill: ${skill_name}`);
-    logger_1.Logger.info(`Agent: ${agent}`);
-    logger_1.Logger.info(`Found ${evals.length} evals.\n`);
+    logger_1.Logger.debug(`\nStarting evaluation for skill: ${skill_name}`);
+    logger_1.Logger.debug(`Agent: ${agent}`);
+    logger_1.Logger.debug(`Found ${evals.length} evals.\n`);
     // Setup Environment
     const env = new environment_1.EvalEnvironment({ skillPath });
     const evaluator = new evaluator_1.Evaluator(skill_name);
@@ -71,7 +71,7 @@ async function triggerCommand(agent, skillPath) {
     const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
     const runDir = path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp);
     fs.mkdirSync(runDir, { recursive: true });
-    logger_1.Logger.info(`[Artifacts] Saving to: ${runDir}\n`);
+    logger_1.Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
     const summaryResults = [];
     let triggeredCount = 0;
     try {
@@ -79,14 +79,37 @@ async function triggerCommand(agent, skillPath) {
             const evalSpec = evals[i];
             const resultFileName = `eval_${i}_${evalSpec.id || 'unnamed'}.json`;
             const resultPath = path.join(runDir, resultFileName);
-            logger_1.Logger.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n  ... `);
-            // Run and determine parsing output
-            const rawOutput = runner.runPrompt(evalSpec.prompt);
+            logger_1.Logger.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n`);
+            let worktreePath;
+            let rawOutput = null;
+            try {
+                // Create isolated worktree for this evaluation
+                worktreePath = env.createWorktree(`eval-${i}`);
+                // Run agent strictly inside the worktree
+                logger_1.Logger.write(`   Running agent... `);
+                // Use a simple interval to show progress
+                const interval = setInterval(() => {
+                    logger_1.Logger.write('.');
+                }, 2000);
+                try {
+                    rawOutput = runner.runPrompt(evalSpec.prompt, worktreePath);
+                }
+                finally {
+                    clearInterval(interval);
+                    logger_1.Logger.write(` Done.\n`);
+                }
+            }
+            finally {
+                // Cleanup worktree immediately after run
+                if (worktreePath) {
+                    env.removeWorktree(worktreePath);
+                }
+            }
             let triggered = false;
             let latencyMs = 0;
             let tokens = 0;
             let response = '';
-            if (rawOutput) {
+            if (rawOutput && !rawOutput.error) {
                 triggered = evaluator.isSkillTriggered(rawOutput);
                 const metrics = evaluator.extractMetrics(rawOutput);
                 latencyMs = metrics.latencyMs;
@@ -96,9 +119,9 @@ async function triggerCommand(agent, skillPath) {
                 fs.writeFileSync(resultPath, JSON.stringify(rawOutput, null, 2), 'utf-8');
             }
             else {
-                // Runner returned null (process crash / JSON parse fail)
-                response = 'Error: No JSON output was produced';
-                fs.writeFileSync(resultPath, JSON.stringify({ error: response }, null, 2), 'utf-8');
+                // Runner returned error (process crash / JSON parse fail / Auth required)
+                response = rawOutput?.error || 'Error: No JSON output was produced';
+                fs.writeFileSync(resultPath, JSON.stringify({ error: response, raw_output: rawOutput?.raw_output }, null, 2), 'utf-8');
             }
             summaryResults.push({
                 id: evalSpec.id || `eval-${i}`,
@@ -113,7 +136,16 @@ async function triggerCommand(agent, skillPath) {
                 logger_1.Logger.info(`[Result: Triggered | ${latencyMs}ms | ${tokens} tokens]`);
             }
             else {
-                logger_1.Logger.info(`[Result: Not Triggered | ${latencyMs}ms | ${tokens} tokens]`);
+                let resultStatus = 'Not Triggered';
+                if (rawOutput?.error) {
+                    if (rawOutput.raw_output?.includes('Opening authentication page')) {
+                        resultStatus = 'AUTH REQUIRED';
+                    }
+                    else {
+                        resultStatus = 'ERROR';
+                    }
+                }
+                logger_1.Logger.info(`[Result: ${resultStatus} | ${latencyMs}ms | ${tokens} tokens]`);
             }
         }
         const percentage = Math.round((triggeredCount / evals.length) * 100);

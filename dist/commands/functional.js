@@ -59,9 +59,9 @@ async function functionalCommand(agent, skillPath) {
     if (!skill_name || !Array.isArray(evals) || evals.length === 0) {
         throw new errors_1.ConfigError(`Invalid evals.json format. Expected 'skill_name' and a non-empty 'evals' array.`);
     }
-    logger_1.Logger.info(`\nStarting functional evaluation for skill: ${skill_name}`);
-    logger_1.Logger.info(`Agent: ${agent}`);
-    logger_1.Logger.info(`Found ${evals.length} evals.\n`);
+    logger_1.Logger.debug(`\nStarting functional evaluation for skill: ${skill_name}`);
+    logger_1.Logger.debug(`Agent: ${agent}`);
+    logger_1.Logger.debug(`Found ${evals.length} evals.\n`);
     const env = new environment_1.EvalEnvironment({ skillPath });
     const evaluator = new evaluator_1.FunctionalEvaluator(skill_name);
     const runner = runners_1.RunnerFactory.create(agent);
@@ -70,45 +70,78 @@ async function functionalCommand(agent, skillPath) {
     const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
     const runDir = path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp);
     fs.mkdirSync(runDir, { recursive: true });
-    logger_1.Logger.info(`[Artifacts] Saving to: ${runDir}\n`);
+    logger_1.Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
     const summaryResults = [];
     let triggeredCount = 0;
     let functionalPassCount = 0;
+    let passedExpectationsCount = 0;
+    const totalExpectationsCount = evals.reduce((acc, e) => acc + (e.expectations?.length || 0), 0);
     try {
         for (let i = 0; i < evals.length; i++) {
             const evalSpec = evals[i];
             const resultFileName = `eval_${i}_${evalSpec.id || 'unnamed'}.json`;
             const resultPath = path.join(runDir, resultFileName);
-            logger_1.Logger.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n  ... `);
-            // 1. Run target skill
-            const rawOutput = runner.runPrompt(evalSpec.prompt);
+            logger_1.Logger.write(`=> Eval ${i + 1}/${evals.length} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n`);
+            let worktreePath;
+            let rawOutput = null;
+            try {
+                // Create isolated worktree for this evaluation
+                worktreePath = env.createWorktree(`eval-${i}`);
+                // 1. Run target skill strictly inside the worktree
+                logger_1.Logger.write(`   Running agent... `);
+                // Use a simple interval to show progress
+                const interval = setInterval(() => {
+                    logger_1.Logger.write('.');
+                }, 2000);
+                try {
+                    rawOutput = runner.runPrompt(evalSpec.prompt, worktreePath);
+                }
+                finally {
+                    clearInterval(interval);
+                    logger_1.Logger.write(` Done.\n`);
+                }
+            }
+            finally {
+                // We'll cleanup worktree later to capture diff
+            }
             let triggered = false;
             let latencyMs = 0;
             let tokens = 0;
             let response = '';
             let expectationsResults = [];
             let allPassed = true;
-            if (rawOutput) {
+            if (rawOutput && !rawOutput.error) {
                 triggered = evaluator.isSkillTriggered(rawOutput);
                 const metrics = evaluator.extractMetrics(rawOutput);
                 latencyMs = metrics.latencyMs;
                 tokens = metrics.tokens;
                 response = rawOutput.response || '';
-                // 2. Capture Workspace Context (Simplified)
+                // 2. Capture Workspace Context (Rich Diff)
                 let context = 'No changes detected or git not available.';
                 try {
-                    context = (0, child_process_1.execSync)('git status --porcelain', { encoding: 'utf-8' });
-                    if (!context)
-                        context = 'No changes detected (clean workspace).';
+                    if (worktreePath) {
+                        const diff = (0, child_process_1.execSync)('git diff HEAD', { encoding: 'utf-8', cwd: worktreePath });
+                        const untracked = (0, child_process_1.execSync)('git ls-files --others --exclude-standard', { encoding: 'utf-8', cwd: worktreePath });
+                        if (diff || untracked) {
+                            context = `[DIFF]\n${diff}\n\n[UNTRACKED FILES]\n${untracked}`;
+                        }
+                        else {
+                            context = 'No changes detected (clean workspace).';
+                        }
+                    }
                 }
                 catch (e) {
-                    // Git might not be available or not a repo
+                    // Git might not be available or error running diff
                 }
                 // 3. Evaluate Expectations if any
                 if (evalSpec.expectations && evalSpec.expectations.length > 0) {
-                    logger_1.Logger.write(`Evaluating ${evalSpec.expectations.length} expectations... `);
+                    logger_1.Logger.debug(`   Evaluating ${evalSpec.expectations.length} expectations...`);
                     expectationsResults = await evaluator.evaluateFunctional(evalSpec.prompt, rawOutput, evalSpec.expectations, context);
                     allPassed = expectationsResults.every(r => r.passed);
+                    passedExpectationsCount += expectationsResults.filter(r => r.passed).length;
+                }
+                else {
+                    allPassed = false; // No expectations = Not passed functionally
                 }
                 // Persist the output (augmented with expectations)
                 const augmentedOutput = {
@@ -122,8 +155,22 @@ async function functionalCommand(agent, skillPath) {
                 fs.writeFileSync(resultPath, JSON.stringify(augmentedOutput, null, 2), 'utf-8');
             }
             else {
-                response = 'Error: No JSON output was produced';
-                fs.writeFileSync(resultPath, JSON.stringify({ error: response }, null, 2), 'utf-8');
+                response = rawOutput?.error || 'Error: No JSON output was produced';
+                // Runner returned error (process crash / JSON parse fail / Auth required)
+                fs.writeFileSync(resultPath, JSON.stringify({ error: response, raw_output: rawOutput?.raw_output }, null, 2), 'utf-8');
+                allPassed = false;
+                // Map missing expectations as failed
+                if (evalSpec.expectations) {
+                    expectationsResults = evalSpec.expectations.map(e => ({
+                        expectation: e,
+                        passed: false,
+                        reason: triggered ? 'Failed to evaluate' : 'Agent did not trigger'
+                    }));
+                }
+            }
+            // Cleanup worktree after diff capture and evaluation
+            if (worktreePath) {
+                env.removeWorktree(worktreePath);
             }
             summaryResults.push({
                 id: evalSpec.id || `eval-${i}`,
@@ -137,14 +184,54 @@ async function functionalCommand(agent, skillPath) {
             });
             if (triggered)
                 triggeredCount++;
-            if (triggered && allPassed)
+            const hasExpectations = evalSpec.expectations && evalSpec.expectations.length > 0;
+            if (triggered && allPassed && hasExpectations)
                 functionalPassCount++;
-            const resultStatus = triggered ? (allPassed ? 'PASSED' : 'FAILED EXPECTATIONS') : 'NOT TRIGGERED';
-            logger_1.Logger.info(`[Result: ${resultStatus} | ${latencyMs}ms | ${tokens} tokens]`);
+            // Detailed logging for this eval
+            const triggerEmoji = triggered ? '✅' : '❌';
+            let resultStatus = '';
+            if (triggered) {
+                resultStatus = hasExpectations ? (allPassed ? 'PASSED' : 'FAILED EXPECTATIONS') : 'NO EXPECTATIONS';
+            }
+            else {
+                // Check for specific error reasons in response if runner returned error
+                if (response.includes('Opening authentication page')) {
+                    resultStatus = 'AUTH REQUIRED';
+                }
+                else if (response.includes('Error:')) {
+                    resultStatus = 'ERROR';
+                }
+                else {
+                    resultStatus = 'NOT TRIGGERED';
+                }
+            }
+            logger_1.Logger.info(`   Trigger: ${triggerEmoji} (${latencyMs}ms | ${tokens} tokens)`);
+            if (hasExpectations) {
+                const passedCount = expectationsResults.filter(r => r.passed).length;
+                const totalCount = expectationsResults.length;
+                const statusEmoji = (allPassed && triggered) ? '✅' : '❌';
+                logger_1.Logger.info(`   Expectations (${passedCount}/${totalCount} Passed) ${statusEmoji}:`);
+                for (const exp of expectationsResults) {
+                    const expEmoji = exp.passed ? '✅' : '❌';
+                    const reason = exp.passed ? '' : ` -> (Reason: ${exp.reason})`;
+                    logger_1.Logger.info(`      ${expEmoji} "${exp.expectation}"${reason}`);
+                }
+            }
+            else if (!triggered) {
+                logger_1.Logger.info(`   Result: ${resultStatus}`);
+            }
+            else {
+                logger_1.Logger.info(`   Result: NO EXPECTATIONS`);
+            }
+            logger_1.Logger.write('\n');
         }
         const triggerPercentage = Math.round((triggeredCount / evals.length) * 100);
-        const functionalPercentage = triggeredCount > 0
-            ? Math.round((functionalPassCount / triggeredCount) * 100)
+        const totalWithExpectations = evals.filter(e => e.expectations && e.expectations.length > 0).length;
+        const functionalPercentage = totalWithExpectations > 0
+            ? Math.round((functionalPassCount / totalWithExpectations) * 100)
+            : 0;
+        const expectationsMetPercentage = totalExpectationsCount > 0
+            ? Math.round((passedExpectationsCount / totalExpectationsCount) * 100)
             : 0;
         const totalTokens = summaryResults.reduce((acc, r) => acc + r.tokens, 0);
         const avgLatency = summaryResults.length > 0
@@ -164,16 +251,21 @@ async function functionalCommand(agent, skillPath) {
             functional_metrics: {
                 passRate: `${functionalPercentage}%`,
                 passedCount: functionalPassCount,
-                totalTriggered: triggeredCount
+                totalTriggered: triggeredCount,
+                totalWithExpectations,
+                totalExpectations: totalExpectationsCount,
+                passedExpectations: passedExpectationsCount,
+                expectationsPassRate: `${expectationsMetPercentage}%`
             },
             results: summaryResults
         };
         fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
-        logger_1.Logger.info(`\nResumen final:`);
-        logger_1.Logger.info(`Trigger Rate:    ${triggeredCount}/${evals.length} (${triggerPercentage}%)`);
-        logger_1.Logger.info(`Functional Rate: ${functionalPassCount}/${triggeredCount} (${functionalPercentage}%)`);
-        logger_1.Logger.info(`Avg Latency:     ${avgLatency}ms`);
-        logger_1.Logger.info(`Total Tokens:    ${totalTokens}\n`);
+        logger_1.Logger.info(`Resumen final:`);
+        logger_1.Logger.info(`--------------------------------------------------`);
+        logger_1.Logger.info(`Functional Rate:   ${functionalPassCount} / ${totalWithExpectations} Evals (${functionalPercentage}%)`);
+        logger_1.Logger.info(`Expectations Met:  ${passedExpectationsCount} / ${totalExpectationsCount} Total (${expectationsMetPercentage}%)`);
+        logger_1.Logger.info(`Avg Latency:       ${avgLatency}ms`);
+        logger_1.Logger.info(`Total Tokens:      ${totalTokens}\n`);
     }
     finally {
         await env.teardown();

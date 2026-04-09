@@ -9,9 +9,10 @@ class GeminiCliRunner {
      * Auto Edit mode automatically allows tools meant for modifying files, falling back interactively
      * only for severe system-level actions.
      * @param prompt The evaluation prompt text
+     * @param cwd Optional execution directory
      * @returns Parsed JSON output from Gemini
      */
-    runPrompt(prompt) {
+    runPrompt(prompt, cwd) {
         try {
             const child = (0, child_process_1.spawnSync)('gemini', [
                 '-p', prompt,
@@ -19,7 +20,8 @@ class GeminiCliRunner {
                 '--approval-mode', 'auto_edit'
             ], {
                 encoding: 'utf-8',
-                stdio: ['ignore', 'pipe', 'pipe']
+                stdio: ['ignore', 'pipe', 'pipe'],
+                cwd: cwd
             });
             if (child.error) {
                 logger_1.Logger.error(`Failed to start gemini CLI. Error: ${child.error.message}`);
@@ -34,27 +36,31 @@ class GeminiCliRunner {
             const rawOutput = child.stdout;
             if (!rawOutput || rawOutput.trim() === '') {
                 logger_1.Logger.error(`Received empty output from Gemini CLI. Cannot evaluate.`);
-                return null;
+                return { error: 'Empty output from Gemini CLI', raw_output: child.stderr };
             }
-            // Extract JSON part from output
+            // Extract JSON part from output (handles leading/trailing logs)
             let jsonPart = rawOutput.trim();
             const firstBraceIndex = jsonPart.indexOf('{');
-            if (firstBraceIndex > 0) {
-                jsonPart = jsonPart.substring(firstBraceIndex);
+            const lastBraceIndex = jsonPart.lastIndexOf('}');
+            if (firstBraceIndex === -1 || lastBraceIndex === -1 || firstBraceIndex > lastBraceIndex) {
+                logger_1.Logger.error(`Could not find a valid JSON object in Gemini CLI output.`);
+                logger_1.Logger.debug(`Raw Output: ${rawOutput}`);
+                return { error: 'No JSON object found', raw_output: rawOutput };
             }
+            jsonPart = jsonPart.substring(firstBraceIndex, lastBraceIndex + 1);
             try {
                 const parsed = JSON.parse(jsonPart);
-                return parsed;
+                return { ...parsed, raw_output: rawOutput };
             }
             catch (parseError) {
                 logger_1.Logger.error(`Failed to parse JSON output: ${parseError}`);
                 logger_1.Logger.error(`Runner Output Preview: ${rawOutput.substring(0, 300)}`);
-                return null;
+                return { error: 'JSON parse failure', raw_output: rawOutput };
             }
         }
         catch (e) {
             logger_1.Logger.error(`Unexpected error running process: ${e}`);
-            return null;
+            return { error: `Process error: ${e instanceof Error ? e.message : String(e)}` };
         }
     }
 }

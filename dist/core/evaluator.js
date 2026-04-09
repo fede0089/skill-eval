@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FunctionalEvaluator = exports.Evaluator = void 0;
+exports.validateExpectation = validateExpectation;
 const logger_1 = require("../utils/logger");
 const factory_1 = require("./runners/factory");
 class Evaluator {
@@ -151,3 +152,27 @@ Do not include any other text in your response, only the JSON array.`;
     }
 }
 exports.FunctionalEvaluator = FunctionalEvaluator;
+/**
+ * Validates a single expectation against the actual output.
+ * Supported types: contains, not_contains, regex, json.
+ */
+function validateExpectation(expectation, actualOutput) {
+    switch (expectation.type) {
+        case 'contains':
+            return actualOutput.includes(expectation.value);
+        case 'not_contains':
+            return !actualOutput.includes(expectation.value);
+        case 'regex':
+            return new RegExp(expectation.value).test(actualOutput);
+        case 'json':
+            try {
+                JSON.parse(actualOutput);
+                return true;
+            }
+            catch {
+                return false;
+            }
+        default:
+            return false;
+    }
+}

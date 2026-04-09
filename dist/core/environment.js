@@ -46,11 +46,11 @@ class EvalEnvironment {
         this.absoluteSkillPath = path.resolve(process.cwd(), this.skillPath);
     }
     async setup() {
-        logger_1.Logger.info(`\n[Environment] Linking skill from: ${this.absoluteSkillPath}`);
+        logger_1.Logger.debug(`Linking skill from: ${this.absoluteSkillPath}`);
         // Link the target skill and auto-confirm the prompt
         const child = (0, child_process_1.spawnSync)('gemini', ['skills', 'link', this.absoluteSkillPath], {
             input: 'Y\n',
-            stdio: ['pipe', 'inherit', 'inherit'],
+            stdio: ['pipe', 'ignore', 'ignore'],
             encoding: 'utf-8'
         });
         if (child.status !== 0) {
@@ -58,20 +58,52 @@ class EvalEnvironment {
             logger_1.Logger.error(errorMsg);
             throw new errors_1.ExecutionError(errorMsg);
         }
-        logger_1.Logger.info(`[Environment] Skill linked successfully.\n`);
+        logger_1.Logger.debug(`Skill linked successfully.`);
     }
     async teardown() {
         const skillName = path.basename(this.absoluteSkillPath);
-        logger_1.Logger.info(`\n[Environment] Tearing down skill link for '${skillName}'...`);
+        logger_1.Logger.debug(`Tearing down skill link for '${skillName}'...`);
         const child = (0, child_process_1.spawnSync)('gemini', ['skills', 'uninstall', skillName], {
-            stdio: 'inherit',
+            stdio: 'ignore',
             encoding: 'utf-8'
         });
         if (child.status !== 0) {
-            logger_1.Logger.warn(`Failed to uninstall skill during teardown (it might already be uninstalled). Status code: ${child.status}`);
+            logger_1.Logger.debug(`Failed to uninstall skill during teardown (it might already be uninstalled). Status code: ${child.status}`);
         }
         else {
-            logger_1.Logger.info(`[Environment] Teardown complete.\n`);
+            logger_1.Logger.debug(`Teardown complete.`);
+        }
+    }
+    /**
+     * Creates a temporary git worktree for a specific evaluation.
+     * This provides isolation by ensuring each test runs in its own clean copy of the repo.
+     */
+    createWorktree(evalId) {
+        const worktreePath = path.resolve(process.cwd(), '.project-skill-evals', 'worktrees', evalId);
+        logger_1.Logger.debug(`Creating worktree at: ${worktreePath}`);
+        // Ensure the path is clean before adding a worktree
+        // We try to remove it first in case a previous run crashed
+        (0, child_process_1.spawnSync)('git', ['worktree', 'remove', '--force', worktreePath], { stdio: 'ignore' });
+        const child = (0, child_process_1.spawnSync)('git', ['worktree', 'add', worktreePath, '-f'], {
+            stdio: 'ignore',
+            encoding: 'utf-8'
+        });
+        if (child.status !== 0) {
+            throw new errors_1.ExecutionError(`Failed to create git worktree at ${worktreePath}. Process exited with code ${child.status}`);
+        }
+        return worktreePath;
+    }
+    /**
+     * Removes a previously created git worktree.
+     */
+    removeWorktree(worktreePath) {
+        logger_1.Logger.debug(`Removing worktree: ${worktreePath}`);
+        const child = (0, child_process_1.spawnSync)('git', ['worktree', 'remove', '--force', worktreePath], {
+            stdio: 'ignore',
+            encoding: 'utf-8'
+        });
+        if (child.status !== 0) {
+            logger_1.Logger.debug(`Failed to remove worktree at ${worktreePath}. Process exited with code ${child.status}`);
         }
     }
 }
