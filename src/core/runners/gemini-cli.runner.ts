@@ -1,63 +1,94 @@
 import { spawn } from 'child_process';
 import { AgentOutput } from '../../types';
-import { AgentRunner } from './runner.interface';
+import { AgentRunner, RunPromptOptions } from './runner.interface';
 import { Logger } from '../../utils/logger';
 
 export class GeminiCliRunner implements AgentRunner {
   /**
-   * Runs the prompt through a headless isolated gemini instance in auto_edit mode.
-   * Auto Edit mode automatically allows tools meant for modifying files, falling back interactively
-   * only for severe system-level actions.
+   * Runs the prompt through an isolated gemini instance.
+   * Default mode is headless using --approval-mode yolo.
+   * Interactive mode allows user interaction by inheriting stdin/stderr.
+   * 
    * @param prompt The evaluation prompt text
    * @param cwd Optional execution directory
    * @param onLog Callback to receive real-time logs (from stderr)
+   * @param options Configuration for the run (e.g. interactive mode)
    * @returns Parsed JSON output from Gemini
    */
-  public async runPrompt(prompt: string, cwd?: string, onLog?: (log: string) => void): Promise<AgentOutput | null> {
+  public async runPrompt(
+    prompt: string, 
+    cwd?: string, 
+    onLog?: (log: string) => void,
+    options: RunPromptOptions = {}
+  ): Promise<AgentOutput | null> {
     return new Promise((resolve) => {
       let stdout = '';
       let stderr = '';
       let resolved = false;
 
-      const child = spawn('gemini', [
+      const args = [
         '-p', prompt,
-        '-o', 'json',
-        '--approval-mode', 'auto_edit'
-      ], {
+        '-o', 'json'
+      ];
+
+      if (options.interactive) {
+        args.push('--prompt-interactive');
+      } else {
+        args.push('--approval-mode', 'yolo');
+      }
+
+      const spawnOptions: any = {
         cwd: cwd,
-        env: { ...process.env, FORCE_COLOR: '1' } // Try to keep colors if possible
-      });
+        env: { ...process.env, FORCE_COLOR: '1' }
+      };
 
-      // Safety timeout: 5 minutes
-      const timeout = setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          child.kill('SIGKILL');
-          Logger.error('\nGemini CLI process timed out after 5 minutes.');
-          resolve({ error: 'Process timeout exceeded (5 minutes)', raw_output: stderr });
-        }
-      }, 300000);
+      // In interactive mode, we must inherit stdin so the user can respond to prompts,
+      // and stderr so they can see the prompts. 
+      // stdout is always piped to capture the JSON response.
+      if (options.interactive) {
+        spawnOptions.stdio = ['inherit', 'pipe', 'inherit'];
+      }
 
-      child.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
+      const child = spawn('gemini', args, spawnOptions);
 
-      child.stderr.on('data', (data) => {
-        const chunk = data.toString();
-        stderr += chunk;
-        if (onLog) {
-          // Send the last non-empty line to the logger
-          const lines = chunk.split('\n').filter((l: string) => l.trim() !== '');
-          if (lines.length > 0) {
-            onLog(lines[lines.length - 1]);
+      // Safety timeout: 5 minutes (300,000 ms)
+      // Only enable timeout if NOT in interactive mode, as user interaction might take time.
+      let timeout: NodeJS.Timeout | undefined;
+      if (!options.interactive) {
+        timeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            child.kill('SIGKILL');
+            Logger.error('\nGemini CLI process timed out after 5 minutes.');
+            resolve({ error: 'Process timeout exceeded (5 minutes)', raw_output: stderr });
           }
-        }
-      });
+        }, 300000);
+      }
+
+      if (child.stdout) {
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+      }
+
+      if (child.stderr) {
+        child.stderr.on('data', (data) => {
+          const chunk = data.toString();
+          stderr += chunk;
+          if (onLog) {
+            // Send the last non-empty line to the logger
+            const lines = chunk.split('\n').filter((l: string) => l.trim() !== '');
+            if (lines.length > 0) {
+              onLog(lines[lines.length - 1]);
+            }
+          }
+        });
+      }
 
       child.on('error', (err) => {
         if (!resolved) {
           resolved = true;
-          clearTimeout(timeout);
+          if (timeout) clearTimeout(timeout);
           Logger.error(`Failed to start gemini CLI. Error: ${err.message}`);
           resolve(null);
         }
@@ -66,7 +97,7 @@ export class GeminiCliRunner implements AgentRunner {
       child.on('close', (code) => {
         if (!resolved) {
           resolved = true;
-          clearTimeout(timeout);
+          if (timeout) clearTimeout(timeout);
 
           if (code !== 0) {
             Logger.error(`Gemini CLI exited with status ${code}`);
