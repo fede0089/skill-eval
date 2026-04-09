@@ -32,20 +32,18 @@ program
   .command('trigger [agent]')
   .description('Evaluate triggering of an agent skill')
   .requiredOption('--skill <path>', 'Path to the skill directory')
-  .option('-i, --interactive', 'Enable interactive mode for Gemini CLI', false)
   .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
-    triggerCommand(selectedAgent, options.skill, { interactive: options.interactive }).catch(errorHandler);
+    triggerCommand(selectedAgent, options.skill).catch(errorHandler);
   });
 
 program
   .command('functional [agent]')
   .description('Evaluate functional correctness of an agent skill based on expectations')
   .requiredOption('--skill <path>', 'Path to the skill directory')
-  .option('-i, --interactive', 'Enable interactive mode for Gemini CLI', false)
   .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
-    functionalCommand(selectedAgent, options.skill, { interactive: options.interactive }).catch(errorHandler);
+    functionalCommand(selectedAgent, options.skill).catch(errorHandler);
   });
 
 program.parse(process.argv);

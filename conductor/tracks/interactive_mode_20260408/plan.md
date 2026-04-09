@@ -9,9 +9,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Update Agent Runner Interface and Implementation' (Protocol in workflow.md) (69c8814)
 
 ## Phase 2: Update CLI Commands
-- [ ] Task: Add `--interactive` flag to CLI commands
-    - [ ] Write failing tests for `triggerCommand` and `functionalCommand` to handle the new flag.
-    - [ ] Update `src/index.ts` to add `--interactive` (alias `-i`) to `trigger` and `functional` commands.
-    - [ ] Update `src/commands/trigger.ts` to accept the `interactive` parameter, conditionally disable the UI `Spinner` to avoid overlapping terminal output, and pass the configuration to the runner.
-    - [ ] Update `src/commands/functional.ts` to accept the `interactive` parameter, conditionally disable the UI `Spinner`, and pass the configuration to the runner.
+- [x] Task: Add `--interactive` flag to CLI commands (be00473)
+    - [x] Write failing tests for `triggerCommand` and `functionalCommand` to handle the new flag.
+    - [x] Update `src/index.ts` to add `--interactive` (alias `-i`) to `trigger` and `functional` commands.
+    - [x] Update `src/commands/trigger.ts` to accept the `interactive` parameter, conditionally disable the UI `Spinner` to avoid overlapping terminal output, and pass the configuration to the runner.
+    - [x] Update `src/commands/functional.ts` to accept the `interactive` parameter, conditionally disable the UI `Spinner`, and pass the configuration to the runner.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Update CLI Commands' (Protocol in workflow.md)

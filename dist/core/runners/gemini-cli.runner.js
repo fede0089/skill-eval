@@ -5,9 +5,9 @@ const child_process_1 = require("child_process");
 const logger_1 = require("../../utils/logger");
 class GeminiCliRunner {
     /**
-     * Runs the prompt through a headless isolated gemini instance in auto_edit mode.
-     * Auto Edit mode automatically allows tools meant for modifying files, falling back interactively
-     * only for severe system-level actions.
+     * Runs the prompt through an isolated gemini instance.
+     * Default mode is headless using --approval-mode auto_edit.
+     *
      * @param prompt The evaluation prompt text
      * @param cwd Optional execution directory
      * @param onLog Callback to receive real-time logs (from stderr)
@@ -18,15 +18,14 @@ class GeminiCliRunner {
             let stdout = '';
             let stderr = '';
             let resolved = false;
-            const child = (0, child_process_1.spawn)('gemini', [
-                '-p', prompt,
-                '-o', 'json',
-                '--approval-mode', 'auto_edit'
-            ], {
+            // Use -p and --approval-mode auto_edit for headless mode
+            const args = ['-p', prompt, '--approval-mode', 'auto_edit', '-o', 'json'];
+            const spawnOptions = {
                 cwd: cwd,
-                env: { ...process.env, FORCE_COLOR: '1' } // Try to keep colors if possible
-            });
-            // Safety timeout: 5 minutes
+                env: { ...process.env, FORCE_COLOR: '1' }
+            };
+            const child = (0, child_process_1.spawn)('gemini', args, spawnOptions);
+            // Safety timeout: 5 minutes (300,000 ms)
             const timeout = setTimeout(() => {
                 if (!resolved) {
                     resolved = true;
@@ -35,20 +34,24 @@ class GeminiCliRunner {
                     resolve({ error: 'Process timeout exceeded (5 minutes)', raw_output: stderr });
                 }
             }, 300000);
-            child.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
-            child.stderr.on('data', (data) => {
-                const chunk = data.toString();
-                stderr += chunk;
-                if (onLog) {
-                    // Send the last non-empty line to the logger
-                    const lines = chunk.split('\n').filter((l) => l.trim() !== '');
-                    if (lines.length > 0) {
-                        onLog(lines[lines.length - 1]);
+            if (child.stdout) {
+                child.stdout.on('data', (data) => {
+                    stdout += data.toString();
+                });
+            }
+            if (child.stderr) {
+                child.stderr.on('data', (data) => {
+                    const chunk = data.toString();
+                    stderr += chunk;
+                    if (onLog) {
+                        // Send the last non-empty line to the logger
+                        const lines = chunk.split('\n').filter((l) => l.trim() !== '');
+                        if (lines.length > 0) {
+                            onLog(lines[lines.length - 1]);
+                        }
                     }
-                }
-            });
+                });
+            }
             child.on('error', (err) => {
                 if (!resolved) {
                     resolved = true;

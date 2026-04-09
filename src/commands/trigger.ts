@@ -7,14 +7,9 @@ import { EvalFile, EvalSummaryReport, EvalSummaryResult, AgentOutput } from '../
 import { Logger, Spinner } from '../utils/logger';
 import { ConfigError } from '../core/errors';
 
-export interface TriggerOptions {
-  interactive?: boolean;
-}
-
 export async function triggerCommand(
   agent: string, 
-  skillPath: string, 
-  options: TriggerOptions = {}
+  skillPath: string
 ): Promise<void> {
   const evalsPath = path.resolve(process.cwd(), skillPath, 'evals', 'evals.json');
 
@@ -73,20 +68,15 @@ export async function triggerCommand(
         worktreePath = env.createWorktree(`eval-${i}`);
 
         // Run agent strictly inside the worktree
-        let spinner: Spinner | undefined;
-        if (!options.interactive) {
-          spinner = new Spinner('Running agent');
-          spinner.start();
-        } else {
-          Logger.write('Running agent in interactive mode...\n');
-        }
+        const spinner = new Spinner('Running agent');
+        spinner.start();
 
         try {
           rawOutput = await runner.runPrompt(evalSpec.prompt, worktreePath, (log) => {
             if (spinner) spinner.updateLog(log);
-          }, { interactive: options.interactive });
+          });
         } finally {
-          if (spinner) spinner.stop();
+          spinner.stop();
         }
       } finally {
         // Cleanup worktree immediately after run

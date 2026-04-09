@@ -90,7 +90,8 @@ async function triggerCommand(agent, skillPath) {
                 spinner.start();
                 try {
                     rawOutput = await runner.runPrompt(evalSpec.prompt, worktreePath, (log) => {
-                        spinner.updateLog(log);
+                        if (spinner)
+                            spinner.updateLog(log);
                     });
                 }
                 finally {

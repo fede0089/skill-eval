@@ -1,38 +1,34 @@
-# Implementation Plan: Asynchronous Agent Runner with Interactive Spinner & Real-time Logs
+# Implementation Plan: Revert Interactive Mode & Restore Auto Edit
 
 ## Objective
-Convert the current synchronous agent execution model to an asynchronous approach to prevent blocking the Node.js main thread. This will enable the display of an interactive terminal spinner with real-time process logs (from `stderr`) and implement a safety timeout to prevent infinite hangs.
+Revert the "interactive mode" additions from the CLI, specifically removing the `--interactive` flag, restoring the UI spinner everywhere, and reverting the `GeminiCliRunner` to its previous default behavior of using `--approval-mode auto_edit` instead of `yolo` or prompting. The goal is to enforce the automated run by default, resolving policy issues with auto-edit.
 
-## Scope & Impact
-- **Affected files:**
-  - `src/core/runners/runner.interface.ts`: Update `runPrompt` signature to return a `Promise`.
-  - `src/core/runners/gemini-cli.runner.ts`: Replace `spawnSync` with `spawn` and return a Promise. Implement safety timeout and capture real-time stderr logs.
-  - `src/commands/trigger.ts`: Update the `runPrompt` call to `await`. Implement a visual terminal spinner that clears on completion or updates with real-time logs.
-  - `src/commands/functional.ts`: Update the `runPrompt` call to `await`. Implement the same visual terminal spinner as `trigger.ts`.
-  - `src/utils/logger.ts`: Enhance the logger or provide a utility to print the spinner on the same line to keep the terminal clean.
+## Key Files & Context
+- `src/core/runners/runner.interface.ts`: Revert `AgentRunner` interface to remove the `interactive` option.
+- `src/core/runners/gemini-cli.runner.ts`: Revert default arguments to include `--approval-mode auto_edit`. Remove any `--prompt-interactive` or `yolo` logic.
+- `src/index.ts`: Remove the `-i, --interactive` flag definition from `trigger` and `functional` commands.
+- `src/commands/trigger.ts`: Remove the interactive parameter handling and unconditionally use the UI Spinner.
+- `src/commands/functional.ts`: Remove the interactive parameter handling and unconditionally use the UI Spinner.
+- Associated test files:
+  - `tests/core/runners/gemini-cli.runner.test.ts`
+  - `tests/commands/trigger.test.ts`
+  - `tests/commands/functional.test.ts`
 
-## Proposed Solution
+## Implementation Steps
+1. **Runner Interfaces & Core:**
+   - In `src/core/runners/runner.interface.ts`, remove the `interactive?: boolean;` property from the `AgentRunnerOptions` (or equivalent interface).
+   - In `src/core/runners/gemini-cli.runner.ts`, update the `run` method to stop accepting or passing the interactive mode configuration. Change the default execution arguments back to appending `--approval-mode auto_edit`. Adjust the `stdio` back to its previous default (likely `'pipe'` for all streams instead of inheriting stdin).
 
-1. **`AgentRunner` Interface:** Update `runPrompt(prompt: string, cwd?: string)` to return `Promise<AgentOutput | null>`.
-2. **`GeminiCliRunner` implementation:**
-    - Use `child_process.spawn` instead of `spawnSync`.
-    - Setup a timeout timer (e.g., 5 minutes = 300000 ms) using `setTimeout`. If the timeout is reached, call `child.kill()` and resolve with an error output `Timeout exceeded`.
-    - Listen to `child.stdout.on('data')` to build the full standard output string.
-    - Listen to `child.stderr.on('data')` to emit/log real-time lines to the console (which the spinner will display).
-    - To relay the `stderr` logs to the command module, we can pass a callback function to `runPrompt` (e.g. `onLog?: (log: string) => void`) or emit events. A simple callback parameter is more direct.
-3. **`Logger` / Spinner Implementation:**
-    - Create a simple terminal spinner animation using frames like `['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']` or similar.
-    - Use `process.stdout.write` and carriage return `\r` (along with ANSI clear line escape sequences like `\x1b[2K`) to redraw the spinner and the latest log message on the same line without overflowing the terminal.
-4. **Command Files (`trigger.ts` and `functional.ts`):**
-    - Set up the spinner before calling `runner.runPrompt()`.
-    - Provide the `onLog` callback to receive log updates and redraw the spinner with the log text.
-    - Await `runner.runPrompt()`.
-    - Stop the spinner and print `Done.` or the final result.
+2. **CLI Entrypoint & Commands:**
+   - In `src/index.ts`, remove `.option('-i, --interactive', 'Run in interactive mode')` from both `.command('trigger')` and `.command('functional')`.
+   - In `src/commands/trigger.ts`, remove the check for `options.interactive`. Ensure that the `ora` spinner is always started and stopped appropriately around the runner execution.
+   - In `src/commands/functional.ts`, remove the check for `options.interactive`. Unconditionally initialize and use the `ora` spinner.
 
-## Verification
-- Run `npm run test:trigger` and verify that the spinner spins, and logs from Gemini CLI appear in real-time.
-- Run `npm run test:functional` to ensure the same behavior.
-- Ensure the process does not hang indefinitely.
+3. **Update Tests:**
+   - In `tests/core/runners/gemini-cli.runner.test.ts`, update assertions to expect `--approval-mode auto_edit` instead of `yolo`. Remove any tests explicitly testing the `interactive: true` behavior.
+   - In `tests/commands/trigger.test.ts` and `tests/commands/functional.test.ts`, remove tests checking the spinner behavior when interactive mode is true. Ensure assertions check that the spinner is called properly in the default (now only) flow.
 
-## Rollback
-- Revert the files to their original states if the asynchronous approach causes integration issues.
+## Verification & Testing
+- Run `npm run build` to ensure the project compiles successfully after interface changes.
+- Run `npm run test:unit` to verify that all unit tests pass, validating the newly adjusted assertions for the runner and commands.
+- Manually run `node dist/index.js trigger --skill ./mock-skill` to confirm it runs in `auto_edit` mode without prompting, and that the UI spinner is visible.

@@ -8,14 +8,9 @@ import { EvalFile, FunctionalEvalResult, EvalSummaryReport, ExpectationResult, A
 import { Logger, Spinner } from '../utils/logger';
 import { ConfigError } from '../core/errors';
 
-export interface FunctionalOptions {
-  interactive?: boolean;
-}
-
 export async function functionalCommand(
   agent: string, 
-  skillPath: string, 
-  options: FunctionalOptions = {}
+  skillPath: string
 ): Promise<void> {
   const evalsPath = path.resolve(process.cwd(), skillPath, 'evals', 'evals.json');
 
@@ -74,20 +69,15 @@ export async function functionalCommand(
         worktreePath = env.createWorktree(`eval-${i}`);
 
         // 1. Run target skill strictly inside the worktree
-        let spinner: Spinner | undefined;
-        if (!options.interactive) {
-          spinner = new Spinner('Running agent');
-          spinner.start();
-        } else {
-          Logger.write('Running agent in interactive mode...\n');
-        }
+        const spinner = new Spinner('Running agent');
+        spinner.start();
 
         try {
           rawOutput = await runner.runPrompt(evalSpec.prompt, worktreePath, (log) => {
             if (spinner) spinner.updateLog(log);
-          }, { interactive: options.interactive });
+          });
         } finally {
-          if (spinner) spinner.stop();
+          spinner.stop();
         }
       } finally {
         // We'll cleanup worktree later to capture diff
