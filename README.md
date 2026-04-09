@@ -1,13 +1,18 @@
 # skill-eval
 
-A robust Node.js CLI tool specifically built to test and evaluate the triggering of Agent Skills locally using Gemini CLI.
+A robust Node.js CLI tool specifically built to test and evaluate Agent Skills locally. It supports evaluating skill triggers and validating functional correctness through an LLM judge.
 
-Currently, it focuses purely on parsing the outputs to evaluate whether a skill triggered successfully (`--approval-mode auto_edit` under the hood) without interrupting your CI/CD or development environment.
+The agent executes in a **headless mode** (e.g., using `--approval-mode auto_edit` under the hood) without interrupting your CI/CD or development environment. 
+
+> **⚠️ Important Note on Permissions:** 
+> Because the execution is headless, the agent needs non-interactive permissions for the tools it intends to use. 
+> - **Minimum requirement:** Permissions to use the skill dispatch tool (e.g., `activate_skill` or `generalist` for Gemini CLI).
+> - **Functional edits:** If your evaluations require the agent to edit files, run commands, or use other specific tools, you MUST configure your environment (e.g., Gemini CLI policies) to allow these tools to run non-interactively. Otherwise, the agent will block waiting for user approval, and the evaluation will timeout or fail.
 
 ## Requirements
 - Node.js environment
 - TypeScript (`npm install` to grab all `devDependencies`)
-- `gemini` CLI installed and added to `$PATH`.
+- `gemini` CLI (or target agent CLI) installed and available in `$PATH`.
 
 ## Setup and Installation
 
@@ -22,7 +27,7 @@ This will make the `skill-eval` binary available globally on your terminal.
 
 ## Usage
 
-Evaluating a skill trigger goes through the `evals/evals.json` definition inside your target skill directory.
+Evaluations are defined via an `evals/evals.json` file inside your target skill directory.
 
 1. Ensure the destination skill has the typical structure:
    ```txt
@@ -32,24 +37,27 @@ Evaluating a skill trigger goes through the `evals/evals.json` definition inside
        evals.json
    ```
 
-2. Execute the CLI from anywhere **outside** the skill referencing its relative or absolute path:
+2. Execute the CLI from anywhere **outside** the skill referencing its relative or absolute path. You can run trigger evaluations or functional evaluations:
+
+   **Evaluate Triggers (Trigger Command):**
    ```sh
    skill-eval trigger --skill ../ruta/al/skill
    ```
 
-3. `skill-eval` will automatically:
-   - Link the skill temporarily (it simulates a `Y` via pipes to bypass interactive links).
-   - Fire up `gemini` in a headless mode reading the eval prompts.
-   - Detect if the skill tools actually fired (`totalCalls > 0` under `stats.tools.byName`).
-   - Create a local directory `.project-skill-evals/runs/<timestamp>/` and dump the raw full evaluation JSONs there for deeper debugging.
-
-4. You can also rate your experience with the tool using the `view` command:
+   **Evaluate Functional Correctness (Functional Command):**
    ```sh
-   skill-eval view --ease 5 --speed 4 --accuracy 5 --comment "Excellent!"
+   skill-eval functional --skill ../ruta/al/skill
    ```
 
+3. `skill-eval` will automatically:
+   - Create isolated git worktrees for each evaluation to prevent destructive changes to your main workspace.
+   - Fire up the agent in a headless mode reading the eval prompts.
+   - Detect if the skill tools actually fired (via plain text logs or stats).
+   - Evaluate expectations via an LLM judge (for the `functional` command).
+   - Create a local directory `.project-skill-evals/runs/<timestamp>/` and dump the raw full evaluation JSONs, logs, and a summary report there for deeper debugging.
+
 ## JSON Valid Structure (evals.json)
-Minimum structure required:
+Minimum structure required for triggers:
 ```json
 {
   "skill_name": "example-skill",
@@ -57,6 +65,23 @@ Minimum structure required:
     {
       "id": "1",
       "prompt": "Activate my skill by doing XYZ"
+    }
+  ]
+}
+```
+
+For functional evaluations, include `expectations`:
+```json
+{
+  "skill_name": "example-skill",
+  "evals": [
+    {
+      "id": "1",
+      "prompt": "Create a new file called hello.txt with the word 'world'",
+      "expectations": [
+        "A file named hello.txt should be created",
+        "The file should contain the exact text 'world'"
+      ]
     }
   ]
 }
