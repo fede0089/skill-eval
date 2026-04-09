@@ -23,7 +23,6 @@ test('functionalCommand should skip functional pass if expectations are missing'
     runPrompt: () => ({ response: 'ok', stats: {}, error: undefined })
   }));
   mock.method(FunctionalEvaluator.prototype, 'isSkillTriggered', () => true);
-  mock.method(FunctionalEvaluator.prototype, 'extractMetrics', () => ({ latencyMs: 10, tokens: 100 }));
 
   await functionalCommand('gemini-cli', 'mock-skill');
   

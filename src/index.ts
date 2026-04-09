@@ -21,7 +21,12 @@ const errorHandler = (err: unknown) => {
 program
   .name('skill-eval')
   .description('CLI to evaluate agent skills triggering and functionality')
-  .version('1.0.0');
+  .version('1.0.0')
+  .option('-v, --verbose', 'Enable verbose logging', false);
+
+program.on('option:verbose', () => {
+  process.env.DEBUG = 'true';
+});
 
 program
   .command('trigger [agent]')

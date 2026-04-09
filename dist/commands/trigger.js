@@ -79,24 +79,22 @@ async function triggerCommand(agent, skillPath) {
             const evalSpec = evals[i];
             const resultFileName = `eval_${i}_${evalSpec.id || 'unnamed'}.json`;
             const resultPath = path.join(runDir, resultFileName);
-            logger_1.Logger.write(`=> Processing eval ${i} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n`);
+            logger_1.Logger.write(`=> Eval ${i + 1}/${evals.length} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n`);
             let worktreePath;
             let rawOutput = null;
             try {
                 // Create isolated worktree for this evaluation
                 worktreePath = env.createWorktree(`eval-${i}`);
                 // Run agent strictly inside the worktree
-                logger_1.Logger.write(`   Running agent... `);
-                // Use a simple interval to show progress
-                const interval = setInterval(() => {
-                    logger_1.Logger.write('.');
-                }, 2000);
+                const spinner = new logger_1.Spinner('Running agent');
+                spinner.start();
                 try {
-                    rawOutput = runner.runPrompt(evalSpec.prompt, worktreePath);
+                    rawOutput = await runner.runPrompt(evalSpec.prompt, worktreePath, (log) => {
+                        spinner.updateLog(log);
+                    });
                 }
                 finally {
-                    clearInterval(interval);
-                    logger_1.Logger.write(` Done.\n`);
+                    spinner.stop();
                 }
             }
             finally {
@@ -106,14 +104,9 @@ async function triggerCommand(agent, skillPath) {
                 }
             }
             let triggered = false;
-            let latencyMs = 0;
-            let tokens = 0;
             let response = '';
             if (rawOutput && !rawOutput.error) {
                 triggered = evaluator.isSkillTriggered(rawOutput);
-                const metrics = evaluator.extractMetrics(rawOutput);
-                latencyMs = metrics.latencyMs;
-                tokens = metrics.tokens;
                 response = rawOutput.response || '';
                 // Persist the output
                 fs.writeFileSync(resultPath, JSON.stringify(rawOutput, null, 2), 'utf-8');
@@ -127,16 +120,14 @@ async function triggerCommand(agent, skillPath) {
                 id: evalSpec.id || `eval-${i}`,
                 prompt: evalSpec.prompt,
                 triggered,
-                latencyMs,
-                tokens,
                 response
             });
             if (triggered) {
                 triggeredCount++;
-                logger_1.Logger.info(`[Result: Triggered | ${latencyMs}ms | ${tokens} tokens]`);
+                logger_1.Logger.info(`   Trigger: ✅`);
             }
             else {
-                let resultStatus = 'Not Triggered';
+                let resultStatus = 'NOT TRIGGERED';
                 if (rawOutput?.error) {
                     if (rawOutput.raw_output?.includes('Opening authentication page')) {
                         resultStatus = 'AUTH REQUIRED';
@@ -145,21 +136,17 @@ async function triggerCommand(agent, skillPath) {
                         resultStatus = 'ERROR';
                     }
                 }
-                logger_1.Logger.info(`[Result: ${resultStatus} | ${latencyMs}ms | ${tokens} tokens]`);
+                logger_1.Logger.info(`   Trigger: ❌`);
+                logger_1.Logger.info(`   Result: ${resultStatus}`);
             }
+            logger_1.Logger.write('\n');
         }
         const percentage = Math.round((triggeredCount / evals.length) * 100);
-        const totalTokens = summaryResults.reduce((acc, r) => acc + r.tokens, 0);
-        const avgLatency = summaryResults.length > 0
-            ? Math.round(summaryResults.reduce((acc, r) => acc + r.latencyMs, 0) / summaryResults.length)
-            : 0;
         const report = {
             timestamp: startTime.toISOString(),
             skill_name,
             agent,
             metrics: {
-                avgLatencyMs: avgLatency,
-                totalTokens: totalTokens,
                 passRate: `${percentage}%`,
                 triggeredCount,
                 totalCount: evals.length
@@ -167,10 +154,10 @@ async function triggerCommand(agent, skillPath) {
             results: summaryResults
         };
         fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
-        logger_1.Logger.info(`\nResumen final:`);
-        logger_1.Logger.info(`Success Rate: ${triggeredCount}/${evals.length} (${percentage}%)`);
-        logger_1.Logger.info(`Avg Latency:  ${avgLatency}ms`);
-        logger_1.Logger.info(`Total Tokens: ${totalTokens}\n`);
+        logger_1.Logger.info(`Resumen final:`);
+        logger_1.Logger.info(`--------------------------------------------------`);
+        logger_1.Logger.info(`Success Rate:      ${triggeredCount} / ${evals.length} Evals (${percentage}%)`);
+        logger_1.Logger.write('\n');
     }
     finally {
         await env.teardown();

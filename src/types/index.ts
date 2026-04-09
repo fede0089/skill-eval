@@ -75,8 +75,6 @@ export interface EvalSummaryResult {
   id: string;
   prompt: string;
   triggered: boolean;
-  latencyMs: number;
-  tokens: number;
   response: string;
 }
 
@@ -85,8 +83,6 @@ export interface EvalSummaryReport {
   skill_name: string;
   agent: string;
   metrics: {
-    avgLatencyMs: number;
-    totalTokens: number;
     passRate: string;
     triggeredCount: number;
     totalCount: number;

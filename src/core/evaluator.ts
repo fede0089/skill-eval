@@ -53,29 +53,6 @@ export class Evaluator {
 
     return false;
   }
-
-  /**
-   * Aggregates latency and token usage from all models called during execution.
-   */
-  extractMetrics(output: AgentOutput): { latencyMs: number; tokens: number } {
-    let latencyMs = 0;
-    let tokens = 0;
-
-    const models = output?.stats?.models;
-    if (models) {
-      for (const modelId in models) {
-        const m = models[modelId] as ModelMetrics;
-        if (m.api?.totalLatencyMs) {
-          latencyMs += m.api.totalLatencyMs;
-        }
-        if (m.tokens?.total) {
-          tokens += m.tokens.total;
-        }
-      }
-    }
-
-    return { latencyMs, tokens };
-  }
 }
 
 /**
@@ -111,7 +88,7 @@ export class FunctionalEvaluator extends Evaluator {
     const runner = RunnerFactory.create('gemini-cli');
     
     // We run the prompt and expect a JSON response
-    const judgeRawOutput = runner.runPrompt(judgePrompt);
+    const judgeRawOutput = await runner.runPrompt(judgePrompt);
     
     if (!judgeRawOutput || !judgeRawOutput.response) {
       return expectations.map(e => ({

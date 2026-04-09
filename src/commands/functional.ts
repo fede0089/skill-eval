@@ -5,7 +5,7 @@ import { EvalEnvironment } from '../core/environment';
 import { RunnerFactory } from '../core/runners';
 import { FunctionalEvaluator } from '../core/evaluator';
 import { EvalFile, FunctionalEvalResult, EvalSummaryReport, ExpectationResult, AgentOutput } from '../types';
-import { Logger } from '../utils/logger';
+import { Logger, Spinner } from '../utils/logger';
 import { ConfigError } from '../core/errors';
 
 export async function functionalCommand(agent: string, skillPath: string): Promise<void> {
@@ -66,35 +66,27 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
         worktreePath = env.createWorktree(`eval-${i}`);
 
         // 1. Run target skill strictly inside the worktree
-        Logger.write(`   Running agent... `);
-        
-        // Use a simple interval to show progress
-        const interval = setInterval(() => {
-          Logger.write('.');
-        }, 2000);
+        const spinner = new Spinner('Running agent');
+        spinner.start();
 
         try {
-          rawOutput = runner.runPrompt(evalSpec.prompt, worktreePath);
+          rawOutput = await runner.runPrompt(evalSpec.prompt, worktreePath, (log) => {
+            spinner.updateLog(log);
+          });
         } finally {
-          clearInterval(interval);
-          Logger.write(` Done.\n`);
+          spinner.stop();
         }
       } finally {
         // We'll cleanup worktree later to capture diff
       }
 
       let triggered = false;
-      let latencyMs = 0;
-      let tokens = 0;
       let response = '';
       let expectationsResults: ExpectationResult[] = [];
       let allPassed = true;
 
       if (rawOutput && !rawOutput.error) {
         triggered = evaluator.isSkillTriggered(rawOutput);
-        const metrics = evaluator.extractMetrics(rawOutput);
-        latencyMs = metrics.latencyMs;
-        tokens = metrics.tokens;
         response = rawOutput.response || '';
 
         // 2. Capture Workspace Context (Rich Diff)
@@ -164,8 +156,6 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
         id: evalSpec.id || `eval-${i}`,
         prompt: evalSpec.prompt,
         triggered,
-        latencyMs,
-        tokens,
         response,
         expectationsResults,
         allExpectationsPassed: allPassed
@@ -191,7 +181,7 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
         }
       }
 
-      Logger.info(`   Trigger: ${triggerEmoji} (${latencyMs}ms | ${tokens} tokens)`);
+      Logger.info(`   Trigger: ${triggerEmoji}`);
       if (hasExpectations) {
         const passedCount = expectationsResults.filter(r => r.passed).length;
         const totalCount = expectationsResults.length;
@@ -219,18 +209,12 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
     const expectationsMetPercentage = totalExpectationsCount > 0
       ? Math.round((passedExpectationsCount / totalExpectationsCount) * 100)
       : 0;
-    const totalTokens = summaryResults.reduce((acc, r) => acc + r.tokens, 0);
-    const avgLatency = summaryResults.length > 0 
-      ? Math.round(summaryResults.reduce((acc, r) => acc + r.latencyMs, 0) / summaryResults.length)
-      : 0;
 
     const report: EvalSummaryReport & { functional_metrics: any } = {
       timestamp: startTime.toISOString(),
       skill_name,
       agent,
       metrics: {
-        avgLatencyMs: avgLatency,
-        totalTokens: totalTokens,
         passRate: `${triggerPercentage}%`,
         triggeredCount,
         totalCount: evals.length
@@ -253,8 +237,7 @@ export async function functionalCommand(agent: string, skillPath: string): Promi
     Logger.info(`--------------------------------------------------`);
     Logger.info(`Functional Rate:   ${functionalPassCount} / ${totalWithExpectations} Evals (${functionalPercentage}%)`);
     Logger.info(`Expectations Met:  ${passedExpectationsCount} / ${totalExpectationsCount} Total (${expectationsMetPercentage}%)`);
-    Logger.info(`Avg Latency:       ${avgLatency}ms`);
-    Logger.info(`Total Tokens:      ${totalTokens}\n`);
+    Logger.write('\n');
 
   } finally {
     await env.teardown();
