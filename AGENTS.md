@@ -3,15 +3,18 @@
 ## Build and test commands
 - `npm install` - Install all dependencies.
 - `npm run build` - Build the project using `tsc`.
-- `npm test` - Run the automated test suite.
+- `npm run test:unit` - Run the unit test suite using tsx.
+- `npm run test:trigger` - Run skill triggering evaluation with the mock skill.
+- `npm run test:functional` - Run functional evaluation with the mock skill.
 
 ## Project overview
-- A Node.js CLI tool built to evaluate Agent Skills triggering locally using the Gemini CLI.
+- A Node.js CLI tool built to evaluate Agent Skills locally using the Gemini CLI, measuring both triggering reliability and functional correctness through an LLM judge.
 - Entrypoints for understanding the system:
   - `src/index.ts` - Main CLI entrypoint.
-  - `src/commands/trigger.ts` - Skill triggering logic.
-  - `src/core/evaluator.ts` - Core evaluation logic.
-  - `mock-skill/SKILL.md` - Example skill structure.
+  - `src/commands/trigger.ts` - Skill triggering evaluation logic.
+  - `src/commands/functional.ts` - Functional evaluation and expectations logic.
+  - `src/core/evaluator.ts` - Core evaluation logic including functional judge prompts.
+  - `mock-skill/SKILL.md` - Example skill structure for testing.
 
 ### Repository layout
 ```
@@ -23,6 +26,7 @@
 │   ├── commands/         # CLI command definitions
 │   ├── core/            # core evaluation and runner logic
 │   └── types/           # shared TypeScript types
+├── tests/                # test suite
 ├── package.json          # project manifest
 ├── tsconfig.json         # TypeScript configuration
 └── README.md             # project documentation
@@ -33,19 +37,17 @@
 - **Runtime:** Node.js
 - **Package manager:** npm (`package-lock.json`)
 - **Framework:** [Commander.js](https://www.npmjs.com/package/commander) - CLI framework (`package.json`)
-- **Testing:** Custom test script using Node.js (`package.json`, `npm test`)
-- **Lint/Format:** No dedicated linting/formatting tools are documented.
+- **Testing:** [tsx](https://tsx.is/) for unit tests (`package.json`, `npm run test:unit`).
+- **Other notable libraries/tools:** [Gemini CLI](https://github.com/google/gemini-cli) is used as the runner for the agents being evaluated.
 
 ## Code style guidelines
-- No explicit linting or formatting configuration exists.
 - Refer to `tsconfig.json` for TypeScript compilation settings.
 - Use `src/index.ts` and `src/commands/trigger.ts` as canonical examples for style and structure.
 
 ## Testing instructions
-- Use `npm test` to run the full test suite.
-- For manual testing, you can use the mock skill: 
-  - `node dist/index.js trigger --skill ./mock-skill` (default: gemini-cli)
-  - `node dist/index.js trigger [agent] --skill ./mock-skill` (to specify an agent)
+- Use `npm run test:unit` to run the full unit test suite.
+- Use `npm run test:trigger` or `npm run test:functional` to run integration evaluations against the mock skill.
+- To test a subset of tests, use `tsx --test "tests/path/to/test.test.ts"`.
 
 ## Security considerations
 - No specific security constraints are documented.

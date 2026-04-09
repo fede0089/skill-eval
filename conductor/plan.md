@@ -1,13 +1,23 @@
-# Plan: Revert Spinner to Single Line
+# Plan: Remove 'generalist' from evaluator and documentation
 
 ## Objective
-Revert the `Spinner` implementation in `src/utils/logger.ts` to use a single line. The multi-line approach with ANSI escape codes causes rendering issues depending on the terminal, making the "tail" look stuck on a single line instead of updating fluidly.
+Remove references to `generalist` as a valid dispatch tool for skill triggering. The `generalist` agent does not specifically trigger skills, so counting it as a trigger event is inaccurate. It should be removed from both the code (`src/core/evaluator.ts`) and the documentation (`README.md`).
+
+## Key Files & Context
+- `src/core/evaluator.ts`: Contains the logic to determine if a skill triggered by looking at the dispatch tools.
+- `README.md`: Mentions `generalist` as an example of a skill dispatch tool.
 
 ## Implementation Steps
-1. Modify `src/utils/logger.ts`.
-2. Update the `Spinner.render()` method to print everything on a single line: `\r\x1b[2K   ${frame} ${this.prefix}... ${logPart}`.
-3. Update the `Spinner.stop()` method to only clear the current line and print the final message, removing the multi-line clearing logic (`\n\r\x1b[K\x1b[1A`).
+### 1. Update `src/core/evaluator.ts`
+- In `isSkillTriggered` (structured stats block), change `const dispatchTools = ['activate_skill', 'generalist'];` to `const dispatchTools = ['activate_skill'];`.
+- In `isSkillTriggered` (plain text parsing block), change `const dispatchTools = ['activate_skill', 'generalist'];` to `const dispatchTools = ['activate_skill'];`.
+- Update the comment `// e.g. "Calling tool: activate_skill", "Tool: generalist", etc.` to remove `"Tool: generalist"`.
+
+### 2. Update `README.md`
+- Locate the line: `> - **Minimum requirement:** Permissions to use the skill dispatch tool (e.g., \`activate_skill\` or \`generalist\` for Gemini CLI).`
+- Change it to: `> - **Minimum requirement:** Permissions to use the skill dispatch tool (e.g., \`activate_skill\` for Gemini CLI).`
 
 ## Verification
-- Recompile the project (`npm run build`).
-- Run `npm run test:functional` to ensure the spinner updates properly on a single line and no rendering artifacts remain.
+- Run `npm run build` to compile TypeScript.
+- Run `npm run test:unit` to ensure no tests are broken by this removal.
+- Run `npm run test:trigger` to verify basic evaluation logic is intact.
