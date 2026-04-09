@@ -74,7 +74,7 @@ export interface AgentOutput {
 export interface EvalSummaryResult {
   id: string;
   prompt: string;
-  triggered: boolean;
+  triggered?: boolean;
   response: string;
 }
 
@@ -84,8 +84,9 @@ export interface EvalSummaryReport {
   agent: string;
   metrics: {
     passRate: string;
-    triggeredCount: number;
+    passedCount: number;
     totalCount: number;
+    [key: string]: any;
   };
   results: EvalSummaryResult[];
 }

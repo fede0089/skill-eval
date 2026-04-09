@@ -72,7 +72,6 @@ async function functionalCommand(agent, skillPath) {
     fs.mkdirSync(runDir, { recursive: true });
     logger_1.Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
     const summaryResults = [];
-    let triggeredCount = 0;
     let functionalPassCount = 0;
     let passedExpectationsCount = 0;
     const totalExpectationsCount = evals.reduce((acc, e) => acc + (e.expectations?.length || 0), 0);
@@ -105,12 +104,10 @@ async function functionalCommand(agent, skillPath) {
             finally {
                 // We'll cleanup worktree later to capture diff
             }
-            let triggered = false;
             let response = '';
             let expectationsResults = [];
-            let allPassed = true;
+            let allPassed = false;
             if (rawOutput && !rawOutput.error) {
-                triggered = evaluator.isSkillTriggered(rawOutput);
                 response = rawOutput.response || '';
                 // 2. Capture Workspace Context (Rich Diff)
                 let context = 'No changes detected or git not available.';
@@ -131,8 +128,14 @@ async function functionalCommand(agent, skillPath) {
                 }
                 // 3. Evaluate Expectations if any
                 if (evalSpec.expectations && evalSpec.expectations.length > 0) {
-                    logger_1.Logger.debug(`   Evaluating ${evalSpec.expectations.length} expectations...`);
-                    expectationsResults = await evaluator.evaluateFunctional(evalSpec.prompt, rawOutput, evalSpec.expectations, context);
+                    const evalSpinner = new logger_1.Spinner('Evaluating expectations');
+                    evalSpinner.start();
+                    try {
+                        expectationsResults = await evaluator.evaluateFunctional(evalSpec.prompt, rawOutput, evalSpec.expectations, context);
+                    }
+                    finally {
+                        evalSpinner.stop();
+                    }
                     allPassed = expectationsResults.every(r => r.passed);
                     passedExpectationsCount += expectationsResults.filter(r => r.passed).length;
                 }
@@ -160,7 +163,7 @@ async function functionalCommand(agent, skillPath) {
                     expectationsResults = evalSpec.expectations.map(e => ({
                         expectation: e,
                         passed: false,
-                        reason: triggered ? 'Failed to evaluate' : 'Agent did not trigger'
+                        reason: 'Agent execution failed'
                     }));
                 }
             }
@@ -171,39 +174,18 @@ async function functionalCommand(agent, skillPath) {
             summaryResults.push({
                 id: evalSpec.id || `eval-${i}`,
                 prompt: evalSpec.prompt,
-                triggered,
                 response,
                 expectationsResults,
                 allExpectationsPassed: allPassed
             });
-            if (triggered)
-                triggeredCount++;
             const hasExpectations = evalSpec.expectations && evalSpec.expectations.length > 0;
-            if (triggered && allPassed && hasExpectations)
+            if (allPassed && hasExpectations)
                 functionalPassCount++;
             // Detailed logging for this eval
-            const triggerEmoji = triggered ? '✅' : '❌';
-            let resultStatus = '';
-            if (triggered) {
-                resultStatus = hasExpectations ? (allPassed ? 'PASSED' : 'FAILED EXPECTATIONS') : 'NO EXPECTATIONS';
-            }
-            else {
-                // Check for specific error reasons in response if runner returned error
-                if (response.includes('Opening authentication page')) {
-                    resultStatus = 'AUTH REQUIRED';
-                }
-                else if (response.includes('Error:')) {
-                    resultStatus = 'ERROR';
-                }
-                else {
-                    resultStatus = 'NOT TRIGGERED';
-                }
-            }
-            logger_1.Logger.info(`   Trigger: ${triggerEmoji}`);
             if (hasExpectations) {
                 const passedCount = expectationsResults.filter(r => r.passed).length;
                 const totalCount = expectationsResults.length;
-                const statusEmoji = (allPassed && triggered) ? '✅' : '❌';
+                const statusEmoji = allPassed ? '✅' : '❌';
                 logger_1.Logger.info(`   Expectations (${passedCount}/${totalCount} Passed) ${statusEmoji}:`);
                 for (const exp of expectationsResults) {
                     const expEmoji = exp.passed ? '✅' : '❌';
@@ -211,15 +193,21 @@ async function functionalCommand(agent, skillPath) {
                     logger_1.Logger.info(`      ${expEmoji} "${exp.expectation}"${reason}`);
                 }
             }
-            else if (!triggered) {
-                logger_1.Logger.info(`   Result: ${resultStatus}`);
-            }
             else {
-                logger_1.Logger.info(`   Result: NO EXPECTATIONS`);
+                let resultStatus = '';
+                if (response.includes('Opening authentication page')) {
+                    resultStatus = 'AUTH REQUIRED';
+                }
+                else if (response.includes('Error:')) {
+                    resultStatus = 'ERROR';
+                }
+                else {
+                    resultStatus = 'NO EXPECTATIONS';
+                }
+                logger_1.Logger.info(`   Result: ${resultStatus} ❌`);
             }
             logger_1.Logger.write('\n');
         }
-        const triggerPercentage = Math.round((triggeredCount / evals.length) * 100);
         const totalWithExpectations = evals.filter(e => e.expectations && e.expectations.length > 0).length;
         const functionalPercentage = totalWithExpectations > 0
             ? Math.round((functionalPassCount / totalWithExpectations) * 100)
@@ -232,15 +220,9 @@ async function functionalCommand(agent, skillPath) {
             skill_name,
             agent,
             metrics: {
-                passRate: `${triggerPercentage}%`,
-                triggeredCount,
-                totalCount: evals.length
-            },
-            functional_metrics: {
                 passRate: `${functionalPercentage}%`,
                 passedCount: functionalPassCount,
-                totalTriggered: triggeredCount,
-                totalWithExpectations,
+                totalCount: totalWithExpectations,
                 totalExpectations: totalExpectationsCount,
                 passedExpectations: passedExpectationsCount,
                 expectationsPassRate: `${expectationsMetPercentage}%`

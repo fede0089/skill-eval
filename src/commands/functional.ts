@@ -48,7 +48,6 @@ export async function functionalCommand(
   Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
 
   const summaryResults: FunctionalEvalResult[] = [];
-  let triggeredCount = 0;
   let functionalPassCount = 0;
   let passedExpectationsCount = 0;
   const totalExpectationsCount = evals.reduce((acc, e) => acc + (e.expectations?.length || 0), 0);
@@ -85,13 +84,11 @@ export async function functionalCommand(
         // We'll cleanup worktree later to capture diff
       }
 
-      let triggered = false;
       let response = '';
       let expectationsResults: ExpectationResult[] = [];
-      let allPassed = true;
+      let allPassed = false;
 
       if (rawOutput && !rawOutput.error) {
-        triggered = evaluator.isSkillTriggered(rawOutput);
         response = rawOutput.response || '';
 
         // 2. Capture Workspace Context (Rich Diff)
@@ -113,13 +110,18 @@ export async function functionalCommand(
 
         // 3. Evaluate Expectations if any
         if (evalSpec.expectations && evalSpec.expectations.length > 0) {
-          Logger.debug(`   Evaluating ${evalSpec.expectations.length} expectations...`);
-          expectationsResults = await evaluator.evaluateFunctional(
-            evalSpec.prompt,
-            rawOutput,
-            evalSpec.expectations,
-            context
-          );
+          const evalSpinner = new Spinner('Evaluating expectations');
+          evalSpinner.start();
+          try {
+            expectationsResults = await evaluator.evaluateFunctional(
+              evalSpec.prompt,
+              rawOutput,
+              evalSpec.expectations,
+              context
+            );
+          } finally {
+            evalSpinner.stop();
+          }
           allPassed = expectationsResults.every(r => r.passed);
           passedExpectationsCount += expectationsResults.filter(r => r.passed).length;
         } else {
@@ -147,7 +149,7 @@ export async function functionalCommand(
           expectationsResults = evalSpec.expectations.map(e => ({
             expectation: e,
             passed: false,
-            reason: triggered ? 'Failed to evaluate' : 'Agent did not trigger'
+            reason: 'Agent execution failed'
           }));
         }
       }
@@ -160,52 +162,39 @@ export async function functionalCommand(
       summaryResults.push({
         id: evalSpec.id || `eval-${i}`,
         prompt: evalSpec.prompt,
-        triggered,
         response,
         expectationsResults,
         allExpectationsPassed: allPassed
       });
 
-      if (triggered) triggeredCount++;
       const hasExpectations = evalSpec.expectations && evalSpec.expectations.length > 0;
-      if (triggered && allPassed && hasExpectations) functionalPassCount++;
+      if (allPassed && hasExpectations) functionalPassCount++;
 
       // Detailed logging for this eval
-      const triggerEmoji = triggered ? '✅' : '❌';
-      let resultStatus = '';
-      if (triggered) {
-        resultStatus = hasExpectations ? (allPassed ? 'PASSED' : 'FAILED EXPECTATIONS') : 'NO EXPECTATIONS';
-      } else {
-        // Check for specific error reasons in response if runner returned error
-        if (response.includes('Opening authentication page')) {
-          resultStatus = 'AUTH REQUIRED';
-        } else if (response.includes('Error:')) {
-          resultStatus = 'ERROR';
-        } else {
-          resultStatus = 'NOT TRIGGERED';
-        }
-      }
-
-      Logger.info(`   Trigger: ${triggerEmoji}`);
       if (hasExpectations) {
         const passedCount = expectationsResults.filter(r => r.passed).length;
         const totalCount = expectationsResults.length;
-        const statusEmoji = (allPassed && triggered) ? '✅' : '❌';
+        const statusEmoji = allPassed ? '✅' : '❌';
         Logger.info(`   Expectations (${passedCount}/${totalCount} Passed) ${statusEmoji}:`);
         for (const exp of expectationsResults) {
           const expEmoji = exp.passed ? '✅' : '❌';
           const reason = exp.passed ? '' : ` -> (Reason: ${exp.reason})`;
           Logger.info(`      ${expEmoji} "${exp.expectation}"${reason}`);
         }
-      } else if (!triggered) {
-        Logger.info(`   Result: ${resultStatus}`);
       } else {
-        Logger.info(`   Result: NO EXPECTATIONS`);
+        let resultStatus = '';
+        if (response.includes('Opening authentication page')) {
+          resultStatus = 'AUTH REQUIRED';
+        } else if (response.includes('Error:')) {
+          resultStatus = 'ERROR';
+        } else {
+          resultStatus = 'NO EXPECTATIONS';
+        }
+        Logger.info(`   Result: ${resultStatus} ❌`);
       }
       Logger.write('\n');
     }
 
-    const triggerPercentage = Math.round((triggeredCount / evals.length) * 100);
     const totalWithExpectations = evals.filter(e => e.expectations && e.expectations.length > 0).length;
 
     const functionalPercentage = totalWithExpectations > 0 
@@ -215,20 +204,14 @@ export async function functionalCommand(
       ? Math.round((passedExpectationsCount / totalExpectationsCount) * 100)
       : 0;
 
-    const report: EvalSummaryReport & { functional_metrics: any } = {
+    const report = {
       timestamp: startTime.toISOString(),
       skill_name,
       agent,
       metrics: {
-        passRate: `${triggerPercentage}%`,
-        triggeredCount,
-        totalCount: evals.length
-      },
-      functional_metrics: {
         passRate: `${functionalPercentage}%`,
         passedCount: functionalPassCount,
-        totalTriggered: triggeredCount,
-        totalWithExpectations,
+        totalCount: totalWithExpectations,
         totalExpectations: totalExpectationsCount,
         passedExpectations: passedExpectationsCount,
         expectationsPassRate: `${expectationsMetPercentage}%`

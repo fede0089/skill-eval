@@ -64,14 +64,16 @@ export class Spinner {
       this.interval = null;
     }
 
-    // Clear line, show cursor, and print final message
-    process.stdout.write(`\r\x1b[2K${this.prefix}... ${finalMessage}\n`);
+    // Clear the current line, show cursor, and print final message
+    process.stdout.write(`\r\x1b[2K   ${this.prefix}... ${finalMessage}\n`);
     process.stdout.write('\x1B[?25h');
   }
 
   private render(): void {
     const frame = Spinner.frames[this.currentFrame];
     const logPart = this.lastLog ? ` \x1b[90m[${this.lastLog}]\x1b[39m` : '';
+    
+    // Render everything on a single line with \r\x1b[2K to clear any leftover characters
     process.stdout.write(`\r\x1b[2K   ${frame} ${this.prefix}...${logPart}`);
   }
 }

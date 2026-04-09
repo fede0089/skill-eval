@@ -140,7 +140,7 @@ async function triggerCommand(agent, skillPath) {
                     }
                 }
                 logger_1.Logger.info(`   Trigger: ❌`);
-                logger_1.Logger.info(`   Result: ${resultStatus}`);
+                logger_1.Logger.info(`   Result: ${resultStatus} ❌`);
             }
             logger_1.Logger.write('\n');
         }
@@ -151,7 +151,7 @@ async function triggerCommand(agent, skillPath) {
             agent,
             metrics: {
                 passRate: `${percentage}%`,
-                triggeredCount,
+                passedCount: triggeredCount,
                 totalCount: evals.length
             },
             results: summaryResults
@@ -159,7 +159,7 @@ async function triggerCommand(agent, skillPath) {
         fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
         logger_1.Logger.info(`Resumen final:`);
         logger_1.Logger.info(`--------------------------------------------------`);
-        logger_1.Logger.info(`Success Rate:      ${triggeredCount} / ${evals.length} Evals (${percentage}%)`);
+        logger_1.Logger.info(`Trigger Rate:      ${triggeredCount} / ${evals.length} Evals (${percentage}%)`);
         logger_1.Logger.write('\n');
     }
     finally {

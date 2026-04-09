@@ -122,7 +122,7 @@ export async function triggerCommand(
           }
         }
         Logger.info(`   Trigger: ❌`);
-        Logger.info(`   Result: ${resultStatus}`);
+        Logger.info(`   Result: ${resultStatus} ❌`);
       }
       Logger.write('\n');
     }
@@ -135,7 +135,7 @@ export async function triggerCommand(
       agent,
       metrics: {
         passRate: `${percentage}%`,
-        triggeredCount,
+        passedCount: triggeredCount,
         totalCount: evals.length
       },
       results: summaryResults
@@ -145,7 +145,7 @@ export async function triggerCommand(
 
     Logger.info(`Resumen final:`);
     Logger.info(`--------------------------------------------------`);
-    Logger.info(`Success Rate:      ${triggeredCount} / ${evals.length} Evals (${percentage}%)`);
+    Logger.info(`Trigger Rate:      ${triggeredCount} / ${evals.length} Evals (${percentage}%)`);
     Logger.write('\n');
 
   } finally {
