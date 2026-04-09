@@ -1,7 +1,7 @@
 # Implementation Plan: skill-eval Full Evaluation & Reporting Improvements
 
 ## Phase 1: Setup Rich UI Dependencies
-- [ ] Task: Install UI libraries (e.g., chalk, ora, cli-table3) and add them to package.json
+- [x] Task: Install UI libraries (e.g., chalk, ora, cli-table3) and add them to package.json [a6655b3]
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Setup Rich UI Dependencies' (Protocol in workflow.md)
 
 ## Phase 2: Implement Rich CLI Output Utilities
