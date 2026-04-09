@@ -19,7 +19,8 @@ export class GeminiCliRunner implements AgentRunner {
     prompt: string, 
     cwd?: string, 
     onLog?: (log: string) => void,
-    logPath?: string
+    logPath?: string,
+    extraArgs: string[] = []
   ): Promise<AgentOutput | null> {
     return new Promise((resolve) => {
       let stdout = '';
@@ -27,8 +28,7 @@ export class GeminiCliRunner implements AgentRunner {
       let resolved = false;
 
       // Use -p and --approval-mode auto_edit for headless mode.
-      // Removed -o json to get plain text output.
-      const args: string[] = ['-p', prompt, '--approval-mode', 'auto_edit'];
+      const args: string[] = ['-p', prompt, '--approval-mode', 'auto_edit', ...extraArgs];
 
       const spawnOptions: any = {
         cwd: cwd,

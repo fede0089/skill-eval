@@ -46,10 +46,10 @@ export class Evaluator {
     const textToSearch = (output.raw_output || output.response || '').toLowerCase();
     if (!textToSearch) return false;
 
-    const dispatchTools = ['activate_skill', 'generalist'];
+    const dispatchTools = ['activate_skill'];
     for (const tool of dispatchTools) {
       // Look for common tool execution patterns in Gemini CLI output
-      // e.g. "Calling tool: activate_skill", "Tool: generalist", etc.
+      // e.g. "Calling tool: activate_skill", etc.
       if (textToSearch.includes(tool.toLowerCase())) {
         Logger.debug(`Detected skill dispatch tool "${tool}" in plain text output.`);
         return true;
@@ -90,7 +90,9 @@ export class FunctionalEvaluator extends Evaluator {
     prompt: string,
     output: AgentOutput,
     expectations: string[],
-    workspaceContext: string
+    workspaceContext: string,
+    onLog?: (log: string) => void,
+    logPath?: string
   ): Promise<ExpectationResult[]> {
     if (!expectations || expectations.length === 0) {
       return [];
@@ -100,13 +102,14 @@ export class FunctionalEvaluator extends Evaluator {
     const runner = RunnerFactory.create('gemini-cli');
     
     // We run the prompt and expect a JSON response
-    const judgeRawOutput = await runner.runPrompt(judgePrompt);
+    const judgeRawOutput = await runner.runPrompt(judgePrompt, undefined, onLog, logPath);
     
     if (!judgeRawOutput || !judgeRawOutput.response) {
+      const errorMsg = judgeRawOutput?.error ? ` (Error: ${judgeRawOutput.error})` : '';
       return expectations.map(e => ({
         expectation: e,
         passed: false,
-        reason: 'Judge agent failed to provide a response.'
+        reason: `Judge agent failed to provide a response.${errorMsg}`
       }));
     }
 

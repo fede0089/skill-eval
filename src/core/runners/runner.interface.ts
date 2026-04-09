@@ -5,6 +5,7 @@ export interface AgentRunner {
     prompt: string, 
     cwd?: string, 
     onLog?: (log: string) => void,
-    logPath?: string
+    logPath?: string,
+    extraArgs?: string[]
   ): Promise<AgentOutput | null>;
 }

@@ -16,6 +16,7 @@ test('triggerCommand should use worktrees for each evaluation', async (t) => {
 
   mock.method(EvalEnvironment.prototype, 'setup', async () => {});
   mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
+  mock.method(EvalEnvironment.prototype, 'linkSkill', async () => {});
   const createWorktreeMock = mock.method(EvalEnvironment.prototype, 'createWorktree', (id: string) => `/tmp/worktree-${id}`);
   const removeWorktreeMock = mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
 

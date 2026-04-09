@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import { spawnSync } from 'child_process';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
@@ -17,38 +18,46 @@ export class EvalEnvironment {
   }
 
   public async setup(): Promise<void> {
-    Logger.debug(`Linking skill from: ${this.absoluteSkillPath}`);
-    
-    // Link the target skill and auto-confirm the prompt
-    const child = spawnSync('gemini', ['skills', 'link', this.absoluteSkillPath], {
-      input: 'Y\n',
-      stdio: ['pipe', 'ignore', 'ignore'],
-      encoding: 'utf-8'
-    });
-
-    if (child.status !== 0) {
-      const errorMsg = `Failed to link skill: gemini process exited with code ${child.status}`;
-      Logger.error(errorMsg);
-      throw new ExecutionError(errorMsg);
-    }
-
-    Logger.debug(`Skill linked successfully.`);
+    Logger.debug(`Setting up evaluation environment...`);
   }
 
   public async teardown(): Promise<void> {
-    const skillName = path.basename(this.absoluteSkillPath);
-    Logger.debug(`Tearing down skill link for '${skillName}'...`);
-    
-    const child = spawnSync('gemini', ['skills', 'uninstall', skillName], {
-      stdio: 'ignore',
-      encoding: 'utf-8'
-    });
+    // Global unlink is no longer needed as worktree deletion cleans up local symlinks
+  }
 
-    if (child.status !== 0) {
-      Logger.debug(`Failed to uninstall skill during teardown (it might already be uninstalled). Status code: ${child.status}`);
-    } else {
-      Logger.debug(`Teardown complete.`);
+  /**
+   * Links the target skill locally within the specified worktree.
+   * This provides isolation by avoiding global skill linking.
+   */
+  public async linkSkill(worktreePath: string): Promise<void> {
+    const skillName = path.basename(this.absoluteSkillPath);
+    const localSkillsDir = path.join(worktreePath, '.agents', 'skills');
+    const symlinkPath = path.join(localSkillsDir, skillName);
+
+    Logger.debug(`Linking skill to worktree: ${symlinkPath}`);
+
+    try {
+      if (!fs.existsSync(localSkillsDir)) {
+        fs.mkdirSync(localSkillsDir, { recursive: true });
+      }
+
+      // If a symlink already exists, remove it
+      if (fs.existsSync(symlinkPath)) {
+        fs.unlinkSync(symlinkPath);
+      }
+
+      fs.symlinkSync(this.absoluteSkillPath, symlinkPath, 'dir');
+      Logger.debug(`Skill linked successfully to worktree.`);
+    } catch (err) {
+      const errorMsg = `Failed to link skill to worktree: ${err instanceof Error ? err.message : String(err)}`;
+      Logger.error(errorMsg);
+      throw new ExecutionError(errorMsg);
     }
+  }
+
+  public async unlinkSkill(): Promise<void> {
+    // Global unlink is deprecated in favor of isolated worktree linking.
+    // This is kept for backward compatibility but does nothing.
   }
 
   /**

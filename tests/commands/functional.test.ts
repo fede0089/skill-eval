@@ -16,6 +16,8 @@ test('functionalCommand should skip functional pass if expectations are missing'
   mock.method(fs, 'writeFileSync', () => {});
   mock.method(EvalEnvironment.prototype, 'setup', async () => {});
   mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
+  mock.method(EvalEnvironment.prototype, 'linkSkill', async () => {});
+  mock.method(EvalEnvironment.prototype, 'unlinkSkill', async () => {});
   mock.method(EvalEnvironment.prototype, 'createWorktree', (id: string) => `/tmp/worktree-${id}`);
   mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
   mock.method(RunnerFactory, 'create', () => ({

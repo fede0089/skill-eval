@@ -68,6 +68,7 @@ export async function triggerCommand(
       try {
         // Create isolated worktree for this evaluation
         worktreePath = env.createWorktree(`eval-${i}`);
+        await env.linkSkill(worktreePath);
 
         // Run agent strictly inside the worktree
         const spinner = new Spinner('Running agent');

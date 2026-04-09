@@ -16,6 +16,8 @@ export interface FunctionalEvalResult extends EvalSummaryResult {
   expectationsResults: ExpectationResult[];
   allExpectationsPassed: boolean;
   judgeReasoning?: string;
+  baselineAllExpectationsPassed?: boolean;
+  baselineExpectationsResults?: ExpectationResult[];
 }
 
 export interface EvalFile {
@@ -86,6 +88,9 @@ export interface EvalSummaryReport {
     passRate: string;
     passedCount: number;
     totalCount: number;
+    baselinePassedCount?: number;
+    baselinePassRate?: string;
+    skillUplift?: string;
     [key: string]: any;
   };
   results: EvalSummaryResult[];
