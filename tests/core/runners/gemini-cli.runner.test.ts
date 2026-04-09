@@ -32,7 +32,8 @@ test('GeminiCliRunner.runPrompt should use --approval-mode yolo by default', asy
   const lastCall = spawnMock.mock.calls[0];
   const args = lastCall.arguments[1];
   
-  // Verify yolo is used (this should FAIL initially as it's auto_edit)
+  assert.ok(args.includes('-p'), 'Should include -p');
+  assert.strictEqual(args[args.indexOf('-p') + 1], 'test prompt');
   assert.ok(args.includes('--approval-mode'));
   assert.strictEqual(args[args.indexOf('--approval-mode') + 1], 'yolo');
   
@@ -62,8 +63,8 @@ test('GeminiCliRunner.runPrompt when interactive is true', async (t) => {
   const mockChild = createMockChild();
   const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
 
-  // We expect to pass interactive as true (this will require interface update)
-  const promise = (runner as any).runPrompt('test prompt', undefined, undefined, { interactive: true });
+  const prompt = 'test prompt';
+  const promise = runner.runPrompt(prompt, undefined, undefined, { interactive: true });
 
   mockChild.stdout.emit('data', Buffer.from('{"response": "ok"}'));
   mockChild.emit('close', 0);
@@ -74,6 +75,8 @@ test('GeminiCliRunner.runPrompt when interactive is true', async (t) => {
   const options = lastCall.arguments[2];
 
   assert.ok(args.includes('--prompt-interactive'), 'Should include --prompt-interactive');
+  assert.strictEqual(args[args.indexOf('--prompt-interactive') + 1], prompt, 'Should pass prompt to --prompt-interactive');
+  assert.ok(!args.includes('-p'), 'Should NOT include -p in interactive mode');
   assert.ok(!args.includes('--approval-mode'), 'Should NOT include --approval-mode in interactive mode');
   assert.deepStrictEqual(options.stdio, ['inherit', 'pipe', 'inherit'], 'Should inherit stdin/stderr');
   

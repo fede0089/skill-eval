@@ -26,16 +26,18 @@ export class GeminiCliRunner implements AgentRunner {
       let stderr = '';
       let resolved = false;
 
-      const args = [
-        '-p', prompt,
-        '-o', 'json'
-      ];
+      const args: string[] = [];
 
       if (options.interactive) {
-        args.push('--prompt-interactive');
+        // Use --prompt-interactive instead of -p for interactive mode
+        args.push('--prompt-interactive', prompt);
       } else {
+        // Use -p and --approval-mode yolo for headless mode
+        args.push('-p', prompt);
         args.push('--approval-mode', 'yolo');
       }
+
+      args.push('-o', 'json');
 
       const spawnOptions: any = {
         cwd: cwd,
