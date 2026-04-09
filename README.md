@@ -6,7 +6,7 @@ The agent executes in a **headless mode** (e.g., using `--approval-mode auto_edi
 
 > **⚠️ Important Note on Permissions:** 
 > Because the execution is headless, the agent needs non-interactive permissions for the tools it intends to use. 
-> - **Minimum requirement:** Permissions to use the skill dispatch tool (e.g., `activate_skill` or `generalist` for Gemini CLI).
+> - **Minimum requirement:** Permissions to use the skill dispatch tool (e.g., `activate_skill` for Gemini CLI).
 > - **Functional edits:** If your evaluations require the agent to edit files, run commands, or use other specific tools, you MUST configure your environment (e.g., Gemini CLI policies) to allow these tools to run non-interactively. Otherwise, the agent will block waiting for user approval, and the evaluation will timeout or fail.
 
 ## Requirements

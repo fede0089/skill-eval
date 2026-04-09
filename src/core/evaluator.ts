@@ -23,7 +23,7 @@ export class Evaluator {
       const byName = output.stats.tools.byName;
       const toolNames = Object.keys(byName);
 
-      const dispatchTools = ['activate_skill', 'generalist'];
+      const dispatchTools = ['activate_skill'];
       for (const tool of dispatchTools) {
         if (toolNames.includes(tool)) {
           const metrics: ToolMetrics = byName[tool];
