@@ -84,6 +84,8 @@ async function functionalCommand(agent, skillPath) {
             logger_1.Logger.write(`=> Eval ${i + 1}/${evals.length} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n`);
             let worktreePath;
             let rawOutput = null;
+            const logFileName = `eval_${i}_${evalSpec.id || 'unnamed'}_gemini.log`;
+            const logPath = path.join(runDir, logFileName);
             try {
                 // Create isolated worktree for this evaluation
                 worktreePath = env.createWorktree(`eval-${i}`);
@@ -94,7 +96,7 @@ async function functionalCommand(agent, skillPath) {
                     rawOutput = await runner.runPrompt(evalSpec.prompt, worktreePath, (log) => {
                         if (spinner)
                             spinner.updateLog(log);
-                    });
+                    }, logPath);
                 }
                 finally {
                     spinner.stop();

@@ -14,41 +14,53 @@ export class Evaluator {
 
   /**
    * Verifies if the skill was triggered by analyzing the agent's tool calls.
-   * Checks for explicit skill dispatch or name matches in the tool statistics.
+   * Checks for explicit skill dispatch or name matches in tool statistics (if available)
+   * or in the raw output text.
    */
   isSkillTriggered(output: AgentOutput): boolean {
-    if (!output?.stats?.tools?.byName) {
-      return false;
+    // 1. Check structured stats if available (Legacy/Structured mode)
+    if (output?.stats?.tools?.byName) {
+      const byName = output.stats.tools.byName;
+      const toolNames = Object.keys(byName);
+
+      const dispatchTools = ['activate_skill', 'generalist'];
+      for (const tool of dispatchTools) {
+        if (toolNames.includes(tool)) {
+          const metrics: ToolMetrics = byName[tool];
+          const calls = metrics.count ?? metrics.totalCalls ?? 0;
+          if (calls > 0) return true;
+        }
+      }
+
+      for (const expectedKey of this.targetToolKeys) {
+        const match = toolNames.find(t => t.includes(expectedKey) || expectedKey.includes(t));
+        if (match) {
+          const metrics: ToolMetrics = byName[match];
+          const calls = metrics.count ?? metrics.totalCalls ?? 0;
+          if (calls > 0) return true;
+        }
+      }
     }
 
-    const byName = output.stats.tools.byName;
-    const toolNames = Object.keys(byName);
+    // 2. Fallback to parsing raw text output (Plain Text mode)
+    const textToSearch = (output.raw_output || output.response || '').toLowerCase();
+    if (!textToSearch) return false;
 
     const dispatchTools = ['activate_skill', 'generalist'];
     for (const tool of dispatchTools) {
-      if (toolNames.includes(tool)) {
-        const metrics: ToolMetrics = byName[tool];
-        const calls = metrics.count ?? metrics.totalCalls ?? 0;
-        if (calls > 0) {
-          return true;
-        }
+      // Look for common tool execution patterns in Gemini CLI output
+      // e.g. "Calling tool: activate_skill", "Tool: generalist", etc.
+      if (textToSearch.includes(tool.toLowerCase())) {
+        Logger.debug(`Detected skill dispatch tool "${tool}" in plain text output.`);
+        return true;
       }
     }
 
     for (const expectedKey of this.targetToolKeys) {
-      const match = toolNames.find(t => t.includes(expectedKey) || expectedKey.includes(t));
-      if (match) {
-        const metrics: ToolMetrics = byName[match];
-        const calls = metrics.count ?? metrics.totalCalls ?? 0;
-        if (calls > 0) {
-          return true;
-        }
+      if (textToSearch.includes(expectedKey.toLowerCase())) {
+        Logger.debug(`Detected target skill key "${expectedKey}" in plain text output.`);
+        return true;
       }
-    }
-
-    const totalCalls = output.stats.tools.totalCalls;
-    if (totalCalls > 0) {
-      Logger.debug(`Tools were called (${toolNames.join(', ')}), but no explicit skill dispatch was detected.`);
     }
 
     return false;

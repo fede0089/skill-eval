@@ -62,6 +62,8 @@ export async function triggerCommand(
 
       let worktreePath: string | undefined;
       let rawOutput: AgentOutput | null = null;
+      const logFileName = `eval_${i}_${evalSpec.id || 'unnamed'}_gemini.log`;
+      const logPath = path.join(runDir, logFileName);
 
       try {
         // Create isolated worktree for this evaluation
@@ -74,7 +76,7 @@ export async function triggerCommand(
         try {
           rawOutput = await runner.runPrompt(evalSpec.prompt, worktreePath, (log) => {
             if (spinner) spinner.updateLog(log);
-          });
+          }, logPath);
         } finally {
           spinner.stop();
         }

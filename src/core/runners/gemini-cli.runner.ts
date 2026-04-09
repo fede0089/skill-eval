@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import { spawn } from 'child_process';
 import { AgentOutput } from '../../types';
 import { AgentRunner } from './runner.interface';
@@ -11,20 +12,23 @@ export class GeminiCliRunner implements AgentRunner {
    * @param prompt The evaluation prompt text
    * @param cwd Optional execution directory
    * @param onLog Callback to receive real-time logs (from stderr)
-   * @returns Parsed JSON output from Gemini
+   * @param logPath Optional file path to save raw execution logs
+   * @returns Raw output from Gemini
    */
   public async runPrompt(
     prompt: string, 
     cwd?: string, 
-    onLog?: (log: string) => void
+    onLog?: (log: string) => void,
+    logPath?: string
   ): Promise<AgentOutput | null> {
     return new Promise((resolve) => {
       let stdout = '';
       let stderr = '';
       let resolved = false;
 
-      // Use -p and --approval-mode auto_edit for headless mode
-      const args: string[] = ['-p', prompt, '--approval-mode', 'auto_edit', '-o', 'json'];
+      // Use -p and --approval-mode auto_edit for headless mode.
+      // Removed -o json to get plain text output.
+      const args: string[] = ['-p', prompt, '--approval-mode', 'auto_edit'];
 
       const spawnOptions: any = {
         cwd: cwd,
@@ -33,11 +37,27 @@ export class GeminiCliRunner implements AgentRunner {
 
       const child = spawn('gemini', args, spawnOptions);
 
+      // Setup log stream if path is provided
+      let logStream: fs.WriteStream | null = null;
+      if (logPath) {
+        try {
+          logStream = fs.createWriteStream(logPath, { flags: 'a' });
+          logStream.write(`--- Gemini CLI Execution Start: ${new Date().toISOString()} ---\n`);
+          logStream.write(`Command: gemini ${args.join(' ')}\n\n`);
+        } catch (err) {
+          Logger.error(`Failed to create log file at ${logPath}: ${err}`);
+        }
+      }
+
       // Safety timeout: 5 minutes (300,000 ms)
       const timeout = setTimeout(() => {
         if (!resolved) {
           resolved = true;
           child.kill('SIGKILL');
+          if (logStream) {
+            logStream.write('\n\n--- Gemini CLI process timed out ---\n');
+            logStream.end();
+          }
           Logger.error('\nGemini CLI process timed out after 5 minutes.');
           resolve({ error: 'Process timeout exceeded (5 minutes)', raw_output: stderr });
         }
@@ -45,7 +65,9 @@ export class GeminiCliRunner implements AgentRunner {
 
       if (child.stdout) {
         child.stdout.on('data', (data) => {
-          stdout += data.toString();
+          const chunk = data.toString();
+          stdout += chunk;
+          if (logStream) logStream.write(chunk);
         });
       }
 
@@ -53,6 +75,7 @@ export class GeminiCliRunner implements AgentRunner {
         child.stderr.on('data', (data) => {
           const chunk = data.toString();
           stderr += chunk;
+          if (logStream) logStream.write(chunk);
           if (onLog) {
             // Send the last non-empty line to the logger
             const lines = chunk.split('\n').filter((l: string) => l.trim() !== '');
@@ -67,6 +90,10 @@ export class GeminiCliRunner implements AgentRunner {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeout);
+          if (logStream) {
+            logStream.write(`\n\n--- Error starting Gemini CLI: ${err.message} ---\n`);
+            logStream.end();
+          }
           Logger.error(`Failed to start gemini CLI. Error: ${err.message}`);
           resolve(null);
         }
@@ -76,6 +103,10 @@ export class GeminiCliRunner implements AgentRunner {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeout);
+          if (logStream) {
+            logStream.write(`\n\n--- Gemini CLI exited with status ${code} ---\n`);
+            logStream.end();
+          }
 
           if (code !== 0) {
             Logger.error(`Gemini CLI exited with status ${code}`);
@@ -89,27 +120,12 @@ export class GeminiCliRunner implements AgentRunner {
             return resolve({ error: 'Empty output from Gemini CLI', raw_output: stderr });
           }
 
-          // Extract JSON part from output (handles leading/trailing logs)
-          let jsonPart = stdout.trim();
-          const firstBraceIndex = jsonPart.indexOf('{');
-          const lastBraceIndex = jsonPart.lastIndexOf('}');
-          
-          if (firstBraceIndex === -1 || lastBraceIndex === -1 || firstBraceIndex > lastBraceIndex) {
-            Logger.error(`Could not find a valid JSON object in Gemini CLI output.`);
-            Logger.debug(`Raw Output: ${stdout}`);
-            return resolve({ error: 'No JSON object found', raw_output: stdout });
-          }
-
-          jsonPart = jsonPart.substring(firstBraceIndex, lastBraceIndex + 1);
-
-          try {
-            const parsed = JSON.parse(jsonPart);
-            return resolve({ ...parsed, raw_output: stdout } as AgentOutput);
-          } catch (parseError) {
-            Logger.error(`Failed to parse JSON output: ${parseError}`);
-            Logger.error(`Runner Output Preview: ${stdout.substring(0, 300)}`);
-            return resolve({ error: 'JSON parse failure', raw_output: stdout });
-          }
+          // In plain text mode, we return the full stdout as response,
+          // and both stdout and stderr in raw_output for evaluation purposes.
+          return resolve({ 
+            response: stdout.trim(), 
+            raw_output: `${stdout}\n--- STDERR ---\n${stderr}` 
+          } as AgentOutput);
         }
       });
     });
