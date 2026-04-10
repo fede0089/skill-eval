@@ -1,3 +1,3 @@
-export * from './runner.interface';
-export * from './gemini-cli.runner';
-export * from './factory';
+export * from './runner.interface.js';
+export * from './gemini-cli.runner.js';
+export * from './factory.js';

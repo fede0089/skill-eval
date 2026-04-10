@@ -1,4 +1,4 @@
-import { AgentOutput } from '../../types';
+import { AgentTranscript, AgentOutput } from '../../types/index.js';
 
 export interface AgentRunner {
   runPrompt(

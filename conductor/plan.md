@@ -15,10 +15,10 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Dynamic UI Integration' (Protocol in workflow.md) [9cdf48f]
 
 ## Phase 3: Parallel Execution Engine
-- [ ] Task: Implement concurrent evaluation execution
-    - [ ] Write unit tests for the execution engine to verify it respects the concurrency limit (e.g., max 5 concurrent executions).
-    - [ ] Modify `src/core/evaluator.ts` to execute evaluations concurrently using a connection pool.
-    - [ ] Integrate the concurrent execution engine with the `listr2` UI adapter to update line states in real-time.
+- [x] Task: Implement concurrent evaluation execution [4c221c8]
+    - [x] Write unit tests for the execution engine to verify it respects the concurrency limit (e.g., max 5 concurrent executions).
+    - [x] Modify `src/core/eval-runner.ts` to execute evaluations concurrently using a connection pool (via Listr2).
+    - [x] Integrate the concurrent execution engine with the `listr2` UI adapter to update line states in real-time.
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Parallel Execution Engine' (Protocol in workflow.md)
 
 ## Phase 4: Error Handling and Final Summary

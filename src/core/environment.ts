@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import { spawnSync } from 'child_process';
 import * as path from 'path';
-import { Logger } from '../utils/logger';
-import { ExecutionError } from './errors';
+import { Logger } from '../utils/logger.js';
+import { ExecutionError } from './errors.js';
 
 export interface EnvironmentOptions {
   skillPath: string;

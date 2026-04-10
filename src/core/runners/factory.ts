@@ -1,5 +1,5 @@
-import { AgentRunner } from './runner.interface';
-import { GeminiCliRunner } from './gemini-cli.runner';
+import { AgentRunner } from './runner.interface.js';
+import { GeminiCliRunner } from './gemini-cli.runner.js';
 
 export class RunnerFactory {
   /**

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { EvalSuite, EvalTask } from '../types';
-import { ConfigError } from '../core/errors';
+import { EvalSuite, EvalTask } from '../types/index.js';
+import { ConfigError } from '../core/errors.js';
 
 /**
  * Loads and merges all JSON evaluation files from a skill's evals directory.

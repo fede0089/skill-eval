@@ -1,6 +1,6 @@
-import { AgentTranscript, ToolMetrics, AssertionResult } from '../types';
-import { Logger } from '../utils/logger';
-import { RunnerFactory } from './runners/factory';
+import { AgentTranscript, ToolMetrics, AssertionResult } from '../types/index.js';
+import { Logger } from '../utils/logger.js';
+import { RunnerFactory } from './runners/factory.js';
 
 /**
  * Programmatic grader that checks if a skill was triggered by analyzing tool calls.

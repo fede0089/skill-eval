@@ -1,13 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
-import { EvalEnvironment } from '../core/environment';
-import { TriggerGrader } from '../core/evaluator';
-import { EvalSuiteReport, TaskResult, AssertionResult } from '../types';
-import { Logger } from '../utils/logger';
-import { loadEvalSuite } from '../utils/eval-loader';
-import { ListrEvalUI } from '../utils/ui';
-import { EvalRunner } from '../core/eval-runner';
+import { EvalEnvironment } from '../core/environment.js';
+import { TriggerGrader } from '../core/evaluator.js';
+import { EvalSuiteReport, TaskResult, AssertionResult } from '../types/index.js';
+import { Logger } from '../utils/logger.js';
+import { loadEvalSuite } from '../utils/eval-loader.js';
+import { ListrEvalUI } from '../utils/ui.js';
+import { EvalRunner } from '../core/eval-runner.js';
 
 export async function triggerCommand(
   agent: string, 

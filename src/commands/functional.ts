@@ -1,12 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
-import { EvalEnvironment } from '../core/environment';
-import { EvalSuiteReport, TaskResult, EvalTrial } from '../types';
-import { Logger } from '../utils/logger';
-import { loadEvalSuite } from '../utils/eval-loader';
-import { ListrEvalUI } from '../utils/ui';
-import { EvalRunner } from '../core/eval-runner';
+import { EvalEnvironment } from '../core/environment.js';
+import { EvalSuiteReport, TaskResult, EvalTrial } from '../types/index.js';
+import { Logger } from '../utils/logger.js';
+import { loadEvalSuite } from '../utils/eval-loader.js';
+import { ListrEvalUI } from '../utils/ui.js';
+import { EvalRunner } from '../core/eval-runner.js';
 
 export async function functionalCommand(
   agent: string, 

@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import { spawn } from 'child_process';
-import { AgentOutput } from '../../types';
-import { AgentRunner } from './runner.interface';
-import { Logger } from '../../utils/logger';
+import { AgentTranscript, AgentOutput } from '../../types/index.js';
+import { AgentRunner } from './runner.interface.js';
+import { Logger } from '../../utils/logger.js';
 
 export class GeminiCliRunner implements AgentRunner {
   /**

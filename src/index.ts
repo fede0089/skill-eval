@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { triggerCommand } from './commands/trigger';
-import { functionalCommand } from './commands/functional';
-import { Logger } from './utils/logger';
-import { AppError } from './core/errors';
+import { triggerCommand } from './commands/trigger.js';
+import { functionalCommand } from './commands/functional.js';
+import { Logger } from './utils/logger.js';
+import { AppError } from './core/errors.js';
+
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 export const program = new Command();
 
@@ -51,6 +54,12 @@ program
     functionalCommand(selectedAgent, options.skill, concurrency).catch(errorHandler);
   });
 
-if (require.main === module) {
+const isMain = process.argv[1] && (
+  process.argv[1] === fileURLToPath(import.meta.url) ||
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) ||
+  process.argv[1].endsWith('dist/index.js')
+);
+
+if (isMain) {
   program.parse(process.argv);
 }
