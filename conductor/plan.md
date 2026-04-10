@@ -9,9 +9,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Setup and Configuration' (Protocol in workflow.md) [e532dc4]
 
 ## Phase 2: Dynamic UI Integration
-- [ ] Task: Implement dynamic UI adapter
-    - [ ] Write unit tests for a new UI abstraction layer (e.g., `src/utils/ui.ts`).
-    - [ ] Implement the `listr2` adapter to handle dynamic, multi-line terminal updates (adding tasks, updating status to "Running", "Completed", "Failed").
+- [x] Task: Implement dynamic UI adapter [d7fb7e6]
+    - [x] Write unit tests for a new UI abstraction layer (e.g., `src/utils/ui.ts`).
+    - [x] Implement the `listr2` adapter to handle dynamic, multi-line terminal updates (adding tasks, updating status to "Running", "Completed", "Failed").
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Dynamic UI Integration' (Protocol in workflow.md)
 
 ## Phase 3: Parallel Execution Engine
