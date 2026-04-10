@@ -88,6 +88,8 @@ export class EvalRunner {
     const logPath = path.join(this.options.runDir, logFileName);
 
     let worktreePath: string | undefined;
+    let assertionResults: AssertionResult[] = [];
+    let trialPassed = false;
     let transcript: AgentTranscript | null = null;
 
     try {
@@ -100,63 +102,69 @@ export class EvalRunner {
       transcript = await this.runner.runPrompt(promptToUse, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
       }, logPath);
-    } catch (e) {
-      // Error handled below via transcript being null
-    }
 
-    let assertionResults: AssertionResult[] = [];
-    let trialPassed = false;
-
-    if (transcript && !transcript.error) {
-      let context = 'No changes detected or git not available.';
-      try {
-        if (worktreePath) {
-          const diff = execSync('git diff HEAD', { encoding: 'utf-8', cwd: worktreePath });
-          const untracked = execSync('git ls-files --others --exclude-standard', { encoding: 'utf-8', cwd: worktreePath });
-          if (diff || untracked) {
-            context = `[DIFF]\n${diff}\n\n[UNTRACKED FILES]\n${untracked}`;
-          } else {
-            context = 'No changes detected (clean workspace).';
+      if (transcript && !transcript.error) {
+        let context = 'No changes detected or git not available.';
+        try {
+          if (worktreePath) {
+            const diff = execSync('git diff HEAD', { encoding: 'utf-8', cwd: worktreePath });
+            const untracked = execSync('git ls-files --others --exclude-standard', { encoding: 'utf-8', cwd: worktreePath });
+            if (diff || untracked) {
+              context = `[DIFF]\n${diff}\n\n[UNTRACKED FILES]\n${untracked}`;
+            } else {
+              context = 'No changes detected (clean workspace).';
+            }
           }
+        } catch (e) { }
+
+        if (task.assertions && task.assertions.length > 0) {
+          fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} JUDGE RUN\n`);
+          assertionResults = await this.functionalGrader.gradeModelBased(
+            task.prompt,
+            transcript,
+            task.assertions,
+            context,
+            (log) => { uiCtx.updateLog(`Grading: ${log}`); },
+            logPath
+          );
+          trialPassed = assertionResults.every(r => r.passed);
+        } else {
+          trialPassed = true;
         }
-      } catch (e) { }
 
-      if (task.assertions && task.assertions.length > 0) {
-        fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} JUDGE RUN\n`);
-        assertionResults = await this.functionalGrader.gradeModelBased(
-          task.prompt,
-          transcript,
-          task.assertions,
-          context,
-          (log) => { uiCtx.updateLog(`Grading: ${log}`); },
-          logPath
-        );
-        trialPassed = assertionResults.every(r => r.passed);
+        return {
+          id: 1,
+          transcript: transcript || { error: 'No transcript produced' },
+          assertionResults: assertionResults,
+          trialPassed
+        };
       } else {
-        trialPassed = true;
+        const errorMsg = transcript?.error || 'Error: No transcript was produced';
+        trialPassed = false;
+        if (task.assertions) {
+          assertionResults = task.assertions.map(a => ({
+            assertion: a,
+            passed: false,
+            reason: `Agent execution failed: ${errorMsg}`,
+            graderType: 'model-based'
+          }));
+        }
       }
-
-      return {
-        id: 1,
-        transcript: transcript || { error: 'No transcript produced' },
-        assertionResults: assertionResults,
-        trialPassed
-      };
-    } else {
-      const errorMsg = transcript?.error || 'Error: No transcript was produced';
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
       trialPassed = false;
       if (task.assertions) {
         assertionResults = task.assertions.map(a => ({
           assertion: a,
           passed: false,
-          reason: `Agent execution failed: ${errorMsg}`,
+          reason: `Execution failed: ${errorMsg}`,
           graderType: 'model-based'
         }));
       }
-    }
-
-    if (worktreePath) {
-      this.env.removeWorktree(worktreePath);
+    } finally {
+      if (worktreePath) {
+        this.env.removeWorktree(worktreePath);
+      }
     }
 
     return {
