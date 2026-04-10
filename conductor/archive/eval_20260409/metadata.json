@@ -1,0 +1,8 @@
+{
+  "track_id": "eval_20260409",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-04-09T00:00:00Z",
+  "updated_at": "2026-04-09T00:00:00Z",
+  "description": "mejoras en el reporting (output) y creacion de comando de test que haga ambos, trigger y functional testing! por ultimo, en vez de functional creo que es mas claro otro concepto, pero no se que, investiga en web si hay algo de esto"
+}
