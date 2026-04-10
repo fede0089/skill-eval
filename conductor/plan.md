@@ -17,3 +17,6 @@ Asegurar que cuando una tarea falle en la interfaz de usuario, no se pierda el t
 - Run `npm run build`.
 - Run `npm run test:unit`.
 - Comprobar visualmente que los tests en consola que fallan ahora muestran el título original junto con la cruz de fallo.
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions (Type safety and visibility) [8746ab1]
