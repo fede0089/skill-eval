@@ -1,0 +1,63 @@
+import { Listr, ListrTask } from 'listr2';
+
+/**
+ * Interface for providing task progress and status updates
+ */
+export interface EvalTaskContext {
+  updateLog(log: string): void;
+}
+
+export type EvalTaskFn = (ctx: EvalTaskContext) => Promise<void>;
+
+/**
+ * Descriptor for a single task to be executed by the UI
+ */
+export interface EvalTaskDescriptor {
+  id: string;
+  title: string;
+  task: EvalTaskFn;
+}
+
+/**
+ * Listr implementation for rendering parallel task progress
+ */
+export class ListrEvalUI {
+  private tasks: ListrTask<any, any>[] = [];
+
+  addTask(descriptor: EvalTaskDescriptor): void {
+    this.tasks.push({
+      title: descriptor.title,
+      task: async (ctx, task) => {
+        const evalCtx: EvalTaskContext = {
+          updateLog: (log: string) => {
+            const sanitized = log.replace(/\n/g, ' ').trim();
+            const truncated = sanitized.length > 50 ? sanitized.substring(0, 47) + '...' : sanitized;
+            task.output = truncated;
+          }
+        };
+        try {
+          await descriptor.task(evalCtx);
+        } catch (error) {
+          // Failure handled by listr itself
+          throw error;
+        }
+      }
+    });
+  }
+
+  async run(concurrency: number): Promise<void> {
+    if (this.tasks.length === 0) return;
+
+    const listr = new Listr(this.tasks, {
+      concurrent: concurrency,
+      exitOnError: false, // Continue other tasks if one fails
+      rendererOptions: {
+        collapseSubtasks: false,
+        showTimer: true,
+        formatOutput: 'wrap'
+      }
+    });
+
+    await listr.run();
+  }
+}
