@@ -1,7 +1,7 @@
 # Implementation Plan: Parallel Prompt Execution with Dynamic Output
 
 ## Phase 1: Setup and Configuration
-- [ ] Task: Add `--concurrency` flag to CLI commands
+- [x] Task: Add `--concurrency` flag to CLI commands [82e84e4]
     - [ ] Write unit tests in `tests/commands/` verifying the flag is parsed correctly and defaults to 5.
     - [ ] Update `src/commands/functional.ts` and `src/commands/trigger.ts` to accept and process the `--concurrency` flag.
 - [ ] Task: Install required dependencies
