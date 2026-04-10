@@ -1,15 +1,15 @@
 # Product Guide
 
 ## Project Goal
-A robust Node.js CLI tool specifically built to test and evaluate Agent Skills locally using an AI agent.
+A robust Node.js CLI tool specifically built to test and evaluate Agent Skills locally using an AI agent, following industry-standard evaluation frameworks (Anthropic Evals).
 
 ## Target Audience
 The primary users are Agent Skills Creators who need a reliable way to develop and validate their agent skills.
 
 ## Primary Value Proposition
-The tool provides a structured way to automate the testing of agent skills. This includes verifying that skills trigger correctly when expected, validating their core functionality, and ensuring they are actually needed for the task at hand.
+The tool provides a structured way to automate the testing of agent skills using industry-standard concepts (Tasks, Trials, Assertions, and Graders). This includes verifying that skills trigger correctly when expected, validating their core functionality through model-based grading, and ensuring they are actually needed for the task at hand.
 
 ## Future Scope
-The CLI will be expanded with additional commands to test broader aspects of agent skills. While testing skill "triggering" is the initial focus, future iterations will introduce robust testing for skill "functionality/effectiveness" and skill "need".
+The CLI will be expanded with additional commands and grading strategies to test broader aspects of agent skills. While testing skill "triggering" is the initial focus, future iterations will introduce more robust testing for skill "functionality/effectiveness" and skill "need", supporting multiple trials per task for increased statistical significance.
 
 Additionally, while it currently runs evaluations locally using the Gemini CLI, the future scope includes adding support for other AI agents such as Codex or Claude Code.
