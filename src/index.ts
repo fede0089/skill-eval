@@ -11,7 +11,8 @@ const errorHandler = (err: unknown) => {
   if (err instanceof AppError) {
     Logger.error(err.message);
   } else if (err instanceof Error) {
-    Logger.error(`An unexpected error occurred: ${err.message}`, err.stack);
+    Logger.error(`An unexpected error occurred: ${err.message}`);
+    Logger.trace(err);
   } else {
     Logger.error(`An unknown error occurred: ${String(err)}`);
   }

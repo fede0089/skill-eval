@@ -1,79 +1,95 @@
+import chalk from 'chalk';
+import ora, { Ora } from 'ora';
+import Table from 'cli-table3';
+
 export class Logger {
   static info(message: string): void {
-    console.log(message);
+    console.log(chalk.blue('ℹ'), message);
   }
 
   static error(message: string, error?: unknown): void {
-    console.error(`[Error] ${message}`, error || '');
+    console.error(chalk.red('✖'), chalk.red(message), error || '');
   }
 
   static warn(message: string): void {
-    console.warn(`[Warning] ${message}`);
+    console.warn(chalk.yellow('⚠'), chalk.yellow(message));
   }
 
   static success(message: string): void {
-    console.log(`[Success] ${message}`);
+    console.log(chalk.green('✔'), chalk.green(message));
   }
 
   static debug(message: string): void {
     if (process.env.DEBUG) {
-      console.log(`[Debug] ${message}`);
+      console.log(chalk.gray('[Debug]'), message);
     }
+  }
+
+  static trace(error: Error | string): void {
+    if (typeof error === 'string') {
+      console.error(chalk.red('Trace:'), error);
+      return;
+    }
+    console.error(chalk.red.bold(`\nTrace: ${error.message}`));
+    if (error.stack) {
+      const stack = error.stack
+        .split('\n')
+        .slice(1)
+        .map(line => chalk.gray(line))
+        .join('\n');
+      console.error(stack);
+    }
+    console.error('');
   }
 
   static write(message: string): void {
     process.stdout.write(message);
   }
+
+  static table(data: any[][], options: any = {}): void {
+    const table = new Table({
+      chars: {
+        'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
+        'bottom': '─', 'bottom-mid': '┴', 'bottom-left': '└', 'bottom-right': '┘',
+        'left': '│', 'left-mid': '├', 'mid': '─', 'mid-mid': '┼',
+        'right': '│', 'right-mid': '┤', 'middle': '│'
+      },
+      style: { head: ['cyan'], border: ['gray'] },
+      ...options
+    });
+
+    table.push(...data);
+    console.log(table.toString());
+  }
 }
 
 export class Spinner {
-  private static readonly frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  private interval: NodeJS.Timeout | null = null;
-  private currentFrame = 0;
-  private lastLog = '';
-  private prefix = '';
+  private spinner: Ora;
 
   constructor(prefix = '   Running agent') {
-    this.prefix = prefix;
+    this.spinner = ora({
+      text: prefix,
+      color: 'cyan',
+      spinner: 'dots'
+    });
   }
 
   public start(): void {
-    if (this.interval) return;
-    
-    // Hide cursor
-    process.stdout.write('\x1B[?25l');
-    
-    this.render();
-    this.interval = setInterval(() => {
-      this.currentFrame = (this.currentFrame + 1) % Spinner.frames.length;
-      this.render();
-    }, 80);
+    this.spinner.start();
   }
 
   public updateLog(log: string): void {
     // Sanitize log to single line and limit length
-    this.lastLog = log.replace(/\n/g, ' ').trim();
-    if (this.lastLog.length > 60) {
-      this.lastLog = this.lastLog.substring(0, 57) + '...';
-    }
+    const sanitized = log.replace(/\n/g, ' ').trim();
+    const truncated = sanitized.length > 60 ? sanitized.substring(0, 57) + '...' : sanitized;
+    this.spinner.text = `${this.spinner.text.split(' [')[0]} [${truncated}]`;
   }
 
   public stop(finalMessage = 'Done.'): void {
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = null;
-    }
-
-    // Clear the current line, show cursor, and print final message
-    process.stdout.write(`\r\x1b[2K   ${this.prefix}... ${finalMessage}\n`);
-    process.stdout.write('\x1B[?25h');
+    this.spinner.succeed(finalMessage);
   }
 
-  private render(): void {
-    const frame = Spinner.frames[this.currentFrame];
-    const logPart = this.lastLog ? ` \x1b[90m[${this.lastLog}]\x1b[39m` : '';
-    
-    // Render everything on a single line with \r\x1b[2K to clear any leftover characters
-    process.stdout.write(`\r\x1b[2K   ${frame} ${this.prefix}...${logPart}`);
+  public stopAndClear(): void {
+    this.spinner.stop();
   }
 }

@@ -5,7 +5,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Setup Rich UI Dependencies' (Protocol in workflow.md) [33db8b5]
 
 ## Phase 2: Implement Rich CLI Output Utilities
-- [ ] Task: Write failing tests for new UI utility functions (e.g., spinner wrapper, table generator, error formatter)
+- [~] Task: Write failing tests for new UI utility functions (e.g., spinner wrapper, table generator, error formatter)
 - [ ] Task: Implement UI utility functions to pass tests
 - [ ] Task: Refactor existing loggers in `src/utils/logger.ts` to use the new UI utilities
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Implement Rich CLI Output Utilities' (Protocol in workflow.md)

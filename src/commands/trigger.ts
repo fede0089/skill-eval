@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import chalk from 'chalk';
 import { EvalEnvironment } from '../core/environment';
 import { RunnerFactory } from '../core/runners';
 import { Evaluator } from '../core/evaluator';
@@ -53,12 +54,15 @@ export async function triggerCommand(
   let triggeredCount = 0;
 
   try {
+    Logger.write(`\n${chalk.bold(`TRIGGER EVALUATION: ${skillPath}`)}\n`);
+    Logger.write(`\n--- Trigger Pass ---\n`);
+    Logger.write(`──────────────────────────────────────────────────\n`);
     for (let i = 0; i < evals.length; i++) {
       const evalSpec = evals[i];
       const resultFileName = `eval_${i}_${evalSpec.id || 'unnamed'}.json`;
       const resultPath = path.join(runDir, resultFileName);
 
-      Logger.write(`=> Eval ${i + 1}/${evals.length} [${evalSpec.id || 'unnamed'}]: "${evalSpec.prompt}"\n`);
+
 
       let worktreePath: string | undefined;
       let rawOutput: AgentOutput | null = null;
@@ -71,7 +75,7 @@ export async function triggerCommand(
         await env.linkSkill(worktreePath);
 
         // Run agent strictly inside the worktree
-        const spinner = new Spinner('Running agent');
+        const spinner = new Spinner(`Running Eval ${i + 1}/${evals.length}...`);
         spinner.start();
 
         try {
@@ -79,7 +83,7 @@ export async function triggerCommand(
             if (spinner) spinner.updateLog(log);
           }, logPath);
         } finally {
-          spinner.stop();
+          spinner.stopAndClear();
         }
       } finally {
         // Cleanup worktree immediately after run
@@ -112,7 +116,8 @@ export async function triggerCommand(
 
       if (triggered) {
         triggeredCount++;
-        Logger.info(`   Trigger: ✅`);
+        Logger.write(`✅ [${i + 1}/${evals.length}] "${evalSpec.prompt}"\n`);
+        Logger.write(`      ${chalk.green('✓')} ${chalk.gray(`Skill triggered`)}\n`);
       } else {
         let resultStatus = 'NOT TRIGGERED';
         if (rawOutput?.error) {
@@ -122,8 +127,9 @@ export async function triggerCommand(
             resultStatus = 'ERROR';
           }
         }
-        Logger.info(`   Trigger: ❌`);
-        Logger.info(`   Result: ${resultStatus} ❌`);
+        Logger.write(`❌ [${i + 1}/${evals.length}] "${evalSpec.prompt}"\n`);
+        Logger.write(`      ${chalk.red('✗')} ${chalk.gray(`Skill triggered`)}\n`);
+        Logger.write(`        ↳ ${chalk.gray(`Result: ${resultStatus}`)}\n`);
       }
       Logger.write('\n');
     }
@@ -144,9 +150,11 @@ export async function triggerCommand(
 
     fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
 
-    Logger.info(`Resumen final:`);
-    Logger.info(`--------------------------------------------------`);
-    Logger.info(`Trigger Rate:      ${triggeredCount} / ${evals.length} Evals (${percentage}%)`);
+    const triggerRateLine = `   Trigger Success Rate:   ${percentage}% (${triggeredCount}/${evals.length})`;
+
+    Logger.write(`\nEVALUATION SUMMARY\n`);
+    Logger.write(`──────────────────────────────────────────────────\n`);
+    Logger.write(`${triggerRateLine}\n`);
     Logger.write('\n');
 
   } finally {
