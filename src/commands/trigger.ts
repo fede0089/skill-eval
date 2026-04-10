@@ -2,11 +2,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { EvalEnvironment } from '../core/environment';
-import { RunnerFactory } from '../core/runners';
 import { TriggerGrader } from '../core/evaluator';
-import { EvalSuiteReport, TaskResult, AgentTranscript, EvalTrial, AssertionResult } from '../types';
-import { Logger, Spinner } from '../utils/logger';
+import { EvalSuiteReport, TaskResult, AssertionResult } from '../types';
+import { Logger } from '../utils/logger';
 import { loadEvalSuite } from '../utils/eval-loader';
+import { ListrEvalUI } from '../utils/ui';
+import { EvalRunner } from '../core/eval-runner';
 
 export async function triggerCommand(
   agent: string, 
@@ -21,12 +22,8 @@ export async function triggerCommand(
   Logger.debug(`Agent: ${agent}`);
   Logger.debug(`Found ${tasks.length} tasks.\n`);
 
-  // Setup Environment
+  // Setup Environment (global setup)
   const env = new EvalEnvironment({ skillPath });
-  const grader = new TriggerGrader(skill_name);
-
-  const runner = RunnerFactory.create(agent);
-
   await env.setup();
 
   // Setup Artifacts Directory
@@ -39,6 +36,15 @@ export async function triggerCommand(
   const taskResults: TaskResult[] = [];
   let tasksPassedCount = 0;
 
+  const runner = new EvalRunner({
+    agent,
+    skillPath,
+    skillName: skill_name,
+    runDir
+  });
+
+  const ui = new ListrEvalUI();
+
   try {
     Logger.write(`\n${chalk.bold(`TRIGGER EVALUATION: ${skillPath}`)}\n`);
     Logger.write(`\n--- Trigger Pass ---\n`);
@@ -46,99 +52,30 @@ export async function triggerCommand(
 
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
-      const resultFileName = `task_${i}_${task.id || 'unnamed'}.json`;
-      const resultPath = path.join(runDir, resultFileName);
+      ui.addTask({
+        id: task.id || `task-${i}`,
+        title: `Task ${i + 1}/${tasks.length}: ${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`,
+        task: async (uiCtx) => {
+          const trial = await runner.runTriggerTask(task, i, uiCtx);
+          
+          const taskResult: TaskResult = {
+            taskId: task.id || `task-${i}`,
+            prompt: task.prompt,
+            score: trial.trialPassed ? 1.0 : 0.0,
+            trials: [trial]
+          };
 
-      let worktreePath: string | undefined;
-      let transcript: AgentTranscript | null = null;
-      const logFileName = `task_${i}_${task.id || 'unnamed'}_gemini.log`;
-      const logPath = path.join(runDir, logFileName);
-
-      try {
-        // Create isolated worktree for this task
-        worktreePath = env.createWorktree(`task-${i}`);
-        await env.linkSkill(worktreePath);
-
-        // Run agent strictly inside the worktree
-        const spinner = new Spinner(`Running Task ${i + 1}/${tasks.length}...`);
-        spinner.start();
-
-        try {
-          transcript = await runner.runPrompt(task.prompt, worktreePath, (log) => {
-            if (spinner) spinner.updateLog(log);
-          }, logPath);
-        } finally {
-          spinner.stopAndClear();
-        }
-      } finally {
-        // Cleanup worktree immediately after run
-        if (worktreePath) {
-          env.removeWorktree(worktreePath);
-        }
-      }
-
-      let triggered = false;
-      const assertionResults: AssertionResult[] = [];
-
-      if (transcript && !transcript.error) {
-        triggered = grader.gradeTrigger(transcript);
-        
-        assertionResults.push({
-          assertion: 'Skill was triggered',
-          passed: triggered,
-          reason: triggered ? 'Detected skill activation in transcript' : 'No skill activation detected in transcript',
-          graderType: 'programmatic'
-        });
-
-        // Persist the transcript
-        fs.writeFileSync(resultPath, JSON.stringify(transcript, null, 2), 'utf-8');
-      } else {
-        const errorMsg = transcript?.error || 'Error: No transcript was produced';
-        assertionResults.push({
-          assertion: 'Skill was triggered',
-          passed: false,
-          reason: errorMsg,
-          graderType: 'programmatic'
-        });
-        fs.writeFileSync(resultPath, JSON.stringify({ error: errorMsg, raw_output: transcript?.raw_output }, null, 2), 'utf-8');
-      }
-
-      const trial: EvalTrial = {
-        id: 'trial-1',
-        transcript: transcript || { error: 'No transcript produced' },
-        assertionResults: assertionResults,
-        trialPassed: triggered
-      };
-
-      const taskResult: TaskResult = {
-        taskId: task.id || `task-${i}`,
-        prompt: task.prompt,
-        score: triggered ? 1.0 : 0.0,
-        trials: [trial]
-      };
-
-      taskResults.push(taskResult);
-
-      if (triggered) {
-        tasksPassedCount++;
-        Logger.write(`✅ [${i + 1}/${tasks.length}] "${task.prompt}"\n`);
-        Logger.write(`      ${chalk.green('✓')} ${chalk.gray(`Skill triggered`)}\n`);
-      } else {
-        let resultStatus = 'NOT TRIGGERED';
-        if (transcript?.error) {
-          if (transcript.raw_output?.includes('Opening authentication page')) {
-            resultStatus = 'AUTH REQUIRED';
-          } else {
-            resultStatus = 'ERROR';
+          taskResults.push(taskResult);
+          if (trial.trialPassed) {
+            tasksPassedCount++;
           }
         }
-        Logger.write(`❌ [${i + 1}/${tasks.length}] "${task.prompt}"\n`);
-        Logger.write(`      ${chalk.red('✗')} ${chalk.gray(`Skill triggered`)}\n`);
-        Logger.write(`        ↳ ${chalk.gray(`Result: ${resultStatus}`)}\n`);
-      }
-      Logger.write('\n');
+      });
     }
 
+    await ui.run(concurrency);
+
+    // Final Report Rendering (outside of UI)
     const percentage = Math.round((tasksPassedCount / tasks.length) * 100);
 
     const report: EvalSuiteReport = {
