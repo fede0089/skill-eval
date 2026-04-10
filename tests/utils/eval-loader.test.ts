@@ -3,8 +3,8 @@ import * as assert from 'node:assert';
 import fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { loadEvalSuite } from '../../src/utils/eval-loader';
-import { ConfigError } from '../../src/core/errors';
+import { loadEvalSuite } from '../../src/utils/eval-loader.js';
+import { ConfigError } from '../../src/core/errors.js';
 
 describe('EvalLoader', () => {
   let tempDir: string;

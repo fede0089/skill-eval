@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
-import { validateAssertion } from '../src/core/evaluator';
+import { validateAssertion } from '../src/core/evaluator.js';
 
 test('validateAssertion should return true for valid contains assertion', () => {
   const assertion = { type: 'contains', value: 'hello' } as const;

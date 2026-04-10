@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as assert from 'node:assert';
 import { test } from 'node:test';
-import { EvalEnvironment } from '../../src/core/environment';
+import { EvalEnvironment } from '../../src/core/environment.js';
 
 test('EvalEnvironment.createWorktree should return expected path', async (t) => {
   const env = new EvalEnvironment({ skillPath: 'mock-skill' });

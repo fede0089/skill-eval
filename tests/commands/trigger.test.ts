@@ -1,9 +1,9 @@
 import { test, mock } from 'node:test';
 import * as assert from 'node:assert';
 import fs from 'fs';
-import { triggerCommand } from '../../src/commands/trigger';
-import { EvalEnvironment } from '../../src/core/environment';
-import { GeminiCliRunner } from '../../src/core/runners/gemini-cli.runner';
+import { triggerCommand } from '../../src/commands/trigger.js';
+import { EvalEnvironment } from '../../src/core/environment.js';
+import { EvalRunner } from '../../src/core/eval-runner.js';
 
 test('triggerCommand should use worktrees for each task', async (t) => {
   // Mock fs and path dependencies
@@ -11,33 +11,29 @@ test('triggerCommand should use worktrees for each task', async (t) => {
   mock.method(fs, 'writeFileSync', () => {});
   mock.method(fs, 'readdirSync', () => ['evals.json']);
   mock.method(fs, 'existsSync', (p: string) => true);
-  mock.method(fs, 'readFileSync', () => JSON.stringify({
+  
+  const injectedSuite = {
     skill_name: 'mock-skill',
-    evals: [{ id: 'task-1', prompt: 'test prompt' }]
-  }));
+    tasks: [{ id: 'task-1', prompt: 'test prompt' }]
+  };
 
   // Mock environment and runner
   mock.method(EvalEnvironment.prototype, 'setup', async () => {});
   mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
-  mock.method(EvalEnvironment.prototype, 'linkSkill', async () => {});
-  const createWorktreeMock = mock.method(EvalEnvironment.prototype, 'createWorktree', (id: string) => `/tmp/worktree-${id}`);
-  const removeWorktreeMock = mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
 
   const runnerMock = {
-    runPrompt: mock.fn(async () => ({ response: 'Mock response', stats: { tools: { byName: { 'mock-skill': { count: 1 } } } } }))
+    runTriggerTask: mock.fn(async () => ({ 
+      id: 'trial-1',
+      transcript: { response: 'Mock response' },
+      assertionResults: [],
+      trialPassed: true 
+    }))
   };
-  mock.method(GeminiCliRunner.prototype, 'runPrompt', runnerMock.runPrompt);
+  mock.method(EvalRunner.prototype, 'runTriggerTask', runnerMock.runTriggerTask);
 
-  await triggerCommand('gemini-cli', 'mock-skill');
+  await triggerCommand('gemini-cli', 'mock-skill', 1, injectedSuite);
 
-  // Verify worktree was created for the task
-  assert.strictEqual(createWorktreeMock.mock.calls.length, 1);
-  assert.strictEqual(createWorktreeMock.mock.calls[0].arguments[0], 'task-0');
-  
-  // Verify runner was called with the worktree path
-  assert.strictEqual(runnerMock.runPrompt.mock.calls.length, 1);
-  assert.strictEqual(runnerMock.runPrompt.mock.calls[0].arguments[1], '/tmp/worktree-task-0');
-
-  // Verify worktree was removed
-  assert.strictEqual(removeWorktreeMock.mock.calls.length, 1);
+  // Verify runner was called
+  assert.strictEqual(runnerMock.runTriggerTask.mock.callCount(), 1);
+  assert.strictEqual(runnerMock.runTriggerTask.mock.calls[0].arguments[0].prompt, 'test prompt');
 });

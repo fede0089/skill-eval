@@ -1,6 +1,6 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert';
-import { ListrEvalUI } from '../../src/utils/ui';
+import { ListrEvalUI } from '../../src/utils/ui.js';
 
 describe('ListrEvalUI', () => {
   it('should allow adding and running tasks', async (t) => {
@@ -38,5 +38,31 @@ describe('ListrEvalUI', () => {
 
     assert.strictEqual(failingTask.mock.callCount(), 1);
     assert.strictEqual(succeedingTask.mock.callCount(), 1);
+  });
+
+  it('should continue executing other tasks when one fails', async (t) => {
+    const ui = new ListrEvalUI();
+    const results: string[] = [];
+    
+    ui.addTask({
+      id: 'failing',
+      title: 'Failing',
+      task: async () => {
+        throw new Error('Failure');
+      }
+    });
+    
+    ui.addTask({
+      id: 'succeeding',
+      title: 'Succeeding',
+      task: async () => {
+        results.push('success');
+      }
+    });
+    
+    await ui.run(2);
+    
+    assert.strictEqual(results.length, 1);
+    assert.strictEqual(results[0], 'success');
   });
 });

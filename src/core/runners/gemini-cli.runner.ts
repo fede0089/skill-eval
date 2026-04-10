@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { spawn } from 'child_process';
+import child_process from 'child_process';
 import { AgentTranscript, AgentOutput } from '../../types/index.js';
 import { AgentRunner } from './runner.interface.js';
 import { Logger } from '../../utils/logger.js';
@@ -35,17 +35,25 @@ export class GeminiCliRunner implements AgentRunner {
         env: { ...process.env, FORCE_COLOR: '1' }
       };
 
-      const child = spawn('gemini', args, spawnOptions);
+      const child = child_process.spawn('gemini', args, spawnOptions);
 
       // Setup log stream if path is provided
       let logStream: fs.WriteStream | null = null;
+      let logStreamDone = true; // Default to true if no logPath
+
       if (logPath) {
         try {
           logStream = fs.createWriteStream(logPath, { flags: 'a' });
+          logStreamDone = false;
+          logStream.on('finish', () => {
+            logStreamDone = true;
+            checkAllDone();
+          });
           logStream.write(`--- Gemini CLI Execution Start: ${new Date().toISOString()} ---\n`);
           logStream.write(`Command: gemini ${args.join(' ')}\n\n`);
         } catch (err) {
           Logger.error(`Failed to create log file at ${logPath}: ${err}`);
+          logStreamDone = true;
         }
       }
 
@@ -63,12 +71,39 @@ export class GeminiCliRunner implements AgentRunner {
         }
       }, 300000);
 
+      // Track completion of streams
+      let stdoutDone = false;
+      let stderrDone = false;
+      let processDone = false;
+
+      function checkAllDone() {
+        if (stdoutDone && stderrDone && processDone && logStreamDone && !resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          
+          if (!stdout || stdout.trim() === '') {
+            return resolve({ error: 'Empty output from Gemini CLI', raw_output: stderr });
+          }
+
+          return resolve({ 
+            response: stdout.trim(), 
+            raw_output: `${stdout}\n--- STDERR ---\n${stderr}` 
+          } as AgentOutput);
+        }
+      }
+
       if (child.stdout) {
         child.stdout.on('data', (data) => {
           const chunk = data.toString();
           stdout += chunk;
           if (logStream) logStream.write(chunk);
         });
+        child.stdout.on('end', () => {
+          stdoutDone = true;
+          checkAllDone();
+        });
+      } else {
+        stdoutDone = true;
       }
 
       if (child.stderr) {
@@ -77,13 +112,18 @@ export class GeminiCliRunner implements AgentRunner {
           stderr += chunk;
           if (logStream) logStream.write(chunk);
           if (onLog) {
-            // Send the last non-empty line to the logger
             const lines = chunk.split('\n').filter((l: string) => l.trim() !== '');
             if (lines.length > 0) {
               onLog(lines[lines.length - 1]);
             }
           }
         });
+        child.stderr.on('end', () => {
+          stderrDone = true;
+          checkAllDone();
+        });
+      } else {
+        stderrDone = true;
       }
 
       child.on('error', (err) => {
@@ -100,33 +140,20 @@ export class GeminiCliRunner implements AgentRunner {
       });
 
       child.on('close', (code) => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeout);
-          if (logStream) {
-            logStream.write(`\n\n--- Gemini CLI exited with status ${code} ---\n`);
-            logStream.end();
-          }
-
-          if (code !== 0) {
-            Logger.error(`Gemini CLI exited with status ${code}`);
-            if (stderr) {
-              Logger.debug(`Gemini CLI Stderr: ${stderr.trim()}`);
-            }
-          }
-
-          if (!stdout || stdout.trim() === '') {
-            Logger.error(`Received empty output from Gemini CLI. Cannot evaluate.`);
-            return resolve({ error: 'Empty output from Gemini CLI', raw_output: stderr });
-          }
-
-          // In plain text mode, we return the full stdout as response,
-          // and both stdout and stderr in raw_output for evaluation purposes.
-          return resolve({ 
-            response: stdout.trim(), 
-            raw_output: `${stdout}\n--- STDERR ---\n${stderr}` 
-          } as AgentOutput);
+        if (logStream) {
+          logStream.write(`\n\n--- Gemini CLI exited with status ${code} ---\n`);
+          logStream.end();
         }
+
+        if (code !== 0 && !resolved) {
+          Logger.error(`Gemini CLI exited with status ${code}`);
+          if (stderr) {
+            Logger.debug(`Gemini CLI Stderr: ${stderr.trim()}`);
+          }
+        }
+        
+        processDone = true;
+        checkAllDone();
       });
     });
   }

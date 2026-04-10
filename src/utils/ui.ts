@@ -48,9 +48,14 @@ export class ListrEvalUI {
   async run(concurrency: number): Promise<void> {
     if (this.tasks.length === 0) return;
 
+    // Use verbose renderer in non-TTY or tests to avoid hangs and provide clearer logs
+    const isTTY = process.stdout.isTTY;
+    const isTest = process.env.NODE_ENV === 'test' || process.env.CI === 'true';
+
     const listr = new Listr(this.tasks, {
       concurrent: concurrency,
       exitOnError: false, // Continue other tasks if one fails
+      renderer: (isTTY && !isTest) ? 'default' : 'verbose',
       rendererOptions: {
         collapseSubtasks: false,
         showTimer: true,

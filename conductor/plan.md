@@ -22,7 +22,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Parallel Execution Engine' (Protocol in workflow.md) [e71a5da]
 
 ## Phase 4: Error Handling and Final Summary
-- [ ] Task: Implement "Continue & Report" error handling
+- [~] Task: Implement "Continue & Report" error handling
     - [ ] Write unit tests verifying that a simulated failure in one execution does not stop others and is correctly recorded.
     - [ ] Update the execution logic to catch and store individual promise rejections/errors.
 - [ ] Task: Implement Final Summary report

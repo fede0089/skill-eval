@@ -1,6 +1,6 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert';
-import { Logger } from '../../src/utils/logger';
+import { Logger } from '../../src/utils/logger.js';
 
 describe('Logger', () => {
   it('Logger.success should print a message', (t) => {

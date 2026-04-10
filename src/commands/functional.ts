@@ -2,18 +2,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { EvalEnvironment } from '../core/environment.js';
-import { EvalSuiteReport, TaskResult, EvalTrial } from '../types/index.js';
+import { EvalSuiteReport, TaskResult, EvalTrial, EvalSuite } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
-import { loadEvalSuite } from '../utils/eval-loader.js';
+import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
 
 export async function functionalCommand(
   agent: string, 
   skillPath: string,
-  concurrency: number = 5
+  concurrency: number = 5,
+  injectedSuite?: EvalSuite
 ): Promise<void> {
-  const suite = loadEvalSuite(skillPath);
+  const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
 
   const { skill_name, tasks } = suite;
 
