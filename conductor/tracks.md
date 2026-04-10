@@ -14,5 +14,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Refactor Skill Activation Grader**
+- [x] **Track: Refactor Skill Activation Grader**
 *Link: [./tracks/refactor_grader_20260410/](./tracks/refactor_grader_20260410/)*
