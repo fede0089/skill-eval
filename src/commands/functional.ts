@@ -62,7 +62,8 @@ export async function functionalCommand(
 
     for (let i = 0; i < tasks.length; i++) {
         const task = tasks[i];
-        const taskLabel = task.expected_output ? `${task.id}: ${task.expected_output}` : `Task ${task.id}`;
+        const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
+        const taskLabel = `${promptSnippet} (#${task.id})`;
         baselineUI.addTask({
             id: `baseline-${task.id}`,
             title: `Baseline ${taskLabel}`,
@@ -100,7 +101,8 @@ export async function functionalCommand(
 
     for (let i = 0; i < tasks.length; i++) {
         const task = tasks[i];
-        const taskLabel = task.expected_output ? `${task.id}: ${task.expected_output}` : `Task ${task.id}`;
+        const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
+        const taskLabel = `${promptSnippet} (#${task.id})`;
         targetUI.addTask({
             id: `target-${task.id}`,
             title: `Target ${taskLabel}`,
@@ -177,15 +179,15 @@ export async function functionalCommand(
     Logger.write(`──────────────────────────────────────────────────\n`);
 
     const tableData = [
-      ['ID', 'Expected Output', 'Baseline', 'Target']
+      ['ID', 'Prompt', 'Baseline', 'Target']
     ];
 
     for (const result of taskResults) {
       const task = tasks.find(t => t.id === result.taskId);
-      const expectedOutput = task?.expected_output || '-';
+      const promptSnippet = task ? `${task.prompt.substring(0, 40)}${task.prompt.length > 40 ? '...' : ''}` : '-';
       const baselineStatus = result.baselineTrials?.[0].trialPassed ? chalk.green('PASS') : chalk.red('FAIL');
       const targetStatus = result.trials?.[0].trialPassed ? chalk.green('PASS') : chalk.red('FAIL');
-      tableData.push([result.taskId.toString(), expectedOutput, baselineStatus, targetStatus]);
+      tableData.push([result.taskId.toString(), promptSnippet, baselineStatus, targetStatus]);
     }
 
     Logger.table(tableData);

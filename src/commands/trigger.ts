@@ -53,7 +53,8 @@ export async function triggerCommand(
 
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
-      const taskLabel = task.expected_output ? `${task.id}: ${task.expected_output}` : `Task ${task.id}`;
+      const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
+      const taskLabel = `${promptSnippet} (#${task.id})`;
       ui.addTask({
         id: task.id,
         title: taskLabel,
@@ -128,14 +129,14 @@ export async function triggerCommand(
     Logger.write(`──────────────────────────────────────────────────\n`);
 
     const tableData = [
-      ['ID', 'Expected Output', 'Status']
+      ['ID', 'Prompt', 'Status']
     ];
 
     for (const result of taskResults) {
       const task = tasks.find(t => t.id === result.taskId);
-      const expectedOutput = task?.expected_output || '-';
+      const promptSnippet = task ? `${task.prompt.substring(0, 40)}${task.prompt.length > 40 ? '...' : ''}` : '-';
       const status = result.score === 1.0 ? chalk.green('PASS') : chalk.red('FAIL');
-      tableData.push([result.taskId.toString(), expectedOutput, status]);
+      tableData.push([result.taskId.toString(), promptSnippet, status]);
     }
 
     Logger.table(tableData);
