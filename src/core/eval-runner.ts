@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import { EvalEnvironment } from './environment.js';
-import { RunnerFactory } from './runners/index.js';
+import { RunnerFactory, AgentRunner } from './runners/index.js';
 import { AgentTranscript, EvalTask, EvalTrial, AssertionResult } from '../types/index.js';
 import { TriggerGrader, ModelBasedGrader } from './evaluator.js';
 import { EvalTaskContext } from '../utils/ui.js';
@@ -17,7 +17,7 @@ export interface EvalRunOptions {
 
 export class EvalRunner {
   private env: EvalEnvironment;
-  private runner: any;
+  private runner: AgentRunner;
   private triggerGrader: TriggerGrader;
   private functionalGrader: ModelBasedGrader;
 

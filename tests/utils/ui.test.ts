@@ -1,11 +1,11 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert';
-import { ListrEvalUI } from '../../src/utils/ui.js';
+import { ListrEvalUI, EvalTaskContext } from '../../src/utils/ui.js';
 
 describe('ListrEvalUI', () => {
   it('should allow adding and running tasks', async (t) => {
     const ui = new ListrEvalUI();
-    const taskMock = mock.fn(async (ctx: any) => {
+    const taskMock = mock.fn(async (ctx: EvalTaskContext) => {
       ctx.updateLog('Testing log');
     });
 

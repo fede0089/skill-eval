@@ -22,7 +22,7 @@ export interface EvalTaskDescriptor {
  * Listr implementation for rendering parallel task progress
  */
 export class ListrEvalUI {
-  private tasks: ListrTask<any, any>[] = [];
+  private tasks: ListrTask<unknown, any>[] = [];
 
   addTask(descriptor: EvalTaskDescriptor): void {
     this.tasks.push({

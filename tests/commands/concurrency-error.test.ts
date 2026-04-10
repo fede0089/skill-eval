@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import { triggerCommand } from '../../src/commands/trigger.js';
 import { EvalEnvironment } from '../../src/core/environment.js';
 import { EvalRunner } from '../../src/core/eval-runner.js';
+import { EvalTask } from '../../src/types/index.js';
 
 test('triggerCommand should continue and report on task failure', async (t) => {
   const injectedSuite = {
@@ -17,7 +18,7 @@ test('triggerCommand should continue and report on task failure', async (t) => {
   mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
 
   const runnerMock = {
-    runTriggerTask: mock.fn(async (task: any) => {
+    runTriggerTask: mock.fn(async (task: EvalTask) => {
       if (task.id === 'task-fail') {
         throw new Error('Task failed');
       }
