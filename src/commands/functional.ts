@@ -4,26 +4,25 @@ import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { EvalEnvironment } from '../core/environment';
 import { RunnerFactory } from '../core/runners';
-import { FunctionalEvaluator } from '../core/evaluator';
-import { FunctionalEvalResult, EvalSummaryReport, ExpectationResult, AgentOutput, Eval } from '../types';
+import { ModelBasedGrader } from '../core/evaluator';
+import { EvalSuiteReport, TaskResult, AgentTranscript, EvalTask, EvalTrial, AssertionResult } from '../types';
 import { Logger, Spinner } from '../utils/logger';
-import { ConfigError } from '../core/errors';
-import { loadEvals } from '../utils/eval-loader';
+import { loadEvalSuite } from '../utils/eval-loader';
 
 export async function functionalCommand(
   agent: string, 
   skillPath: string
 ): Promise<void> {
-  const evalsConfig = loadEvals(skillPath);
+  const suite = loadEvalSuite(skillPath);
 
-  const { skill_name, evals } = evalsConfig;
+  const { skill_name, tasks } = suite;
 
   Logger.debug(`\nStarting functional evaluation for skill: ${skill_name}`);
   Logger.debug(`Agent: ${agent}`);
-  Logger.debug(`Found ${evals.length} evals.\n`);
+  Logger.debug(`Found ${tasks.length} tasks.\n`);
 
   const env = new EvalEnvironment({ skillPath });
-  const evaluator = new FunctionalEvaluator(skill_name);
+  const grader = new ModelBasedGrader(skill_name);
   const runner = RunnerFactory.create(agent);
 
   await env.setup();
@@ -34,56 +33,47 @@ export async function functionalCommand(
   fs.mkdirSync(runDir, { recursive: true });
   Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
 
-  const summaryResults: FunctionalEvalResult[] = [];
-  let functionalPassCount = 0;
-  let passedExpectationsCount = 0;
-  let baselinePassCount = 0;
-  let baselinePassedExpectationsCount = 0;
-  const totalExpectationsCount = evals.reduce((acc, e) => acc + (e.expectations?.length || 0), 0);
+  const taskResults: TaskResult[] = [];
+  let targetTasksPassedCount = 0;
+  let baselineTasksPassedCount = 0;
 
-  async function runSingleEval(evalSpec: Eval, index: number, isBaseline: boolean): Promise<{
-    response: string;
-    allPassed: boolean;
-    expectationsResults: ExpectationResult[];
-  }> {
-    const passName = isBaseline ? 'baseline' : 'functional';
+  async function runSingleTrial(task: EvalTask, index: number, isBaseline: boolean): Promise<EvalTrial> {
+    const passName = isBaseline ? 'baseline' : 'target';
     const promptToUse = isBaseline 
-      ? evalSpec.prompt 
-      : `${evalSpec.prompt}\n\nIMPORTANT: You must use the '${skill_name}' skill/tool to solve this task.`;
+      ? task.prompt 
+      : `${task.prompt}\n\nIMPORTANT: You must use the '${skill_name}' skill/tool to solve this task.`;
 
-    const resultFileName = `eval_${index}_${evalSpec.id || 'unnamed'}_${passName}.json`;
+    const resultFileName = `task_${index}_${task.id || 'unnamed'}_${passName}.json`;
     const resultPath = path.join(runDir, resultFileName);
 
-
-
     let worktreePath: string | undefined;
-    let rawOutput: AgentOutput | null = null;
-    const logFileName = `eval_${index}_${evalSpec.id || 'unnamed'}_${passName}_gemini.log`;
+    let transcript: AgentTranscript | null = null;
+    const logFileName = `task_${index}_${task.id || 'unnamed'}_${passName}_gemini.log`;
     const logPath = path.join(runDir, logFileName);
 
     try {
-      worktreePath = env.createWorktree(`eval-${index}-${passName}`);
+      worktreePath = env.createWorktree(`task-${index}-${passName}`);
       if (!isBaseline) {
         await env.linkSkill(worktreePath);
       }
 
-      const spinner = new Spinner(`Running Eval ${index + 1}/${evals.length}...`);
+      const spinner = new Spinner(`Running ${passName.charAt(0).toUpperCase() + passName.slice(1)} Trial ${index + 1}/${tasks.length}...`);
       spinner.start();
       try {
-        rawOutput = await runner.runPrompt(promptToUse, worktreePath, (log) => {
+        transcript = await runner.runPrompt(promptToUse, worktreePath, (log) => {
           if (spinner) spinner.updateLog(log);
         }, logPath);
       } finally {
         spinner.stopAndClear();
       }
-    } finally { }
+    } catch (e) {
+      Logger.error(`Trial execution failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
 
-    let response = '';
-    let expectationsResults: ExpectationResult[] = [];
-    let allPassed = false;
+    let assertionResults: AssertionResult[] = [];
+    let trialPassed = false;
 
-    if (rawOutput && !rawOutput.error) {
-      response = rawOutput.response || '';
+    if (transcript && !transcript.error) {
       let context = 'No changes detected or git not available.';
       try {
         if (worktreePath) {
@@ -97,16 +87,16 @@ export async function functionalCommand(
         }
       } catch (e) { }
 
-      if (evalSpec.expectations && evalSpec.expectations.length > 0) {
-        const evalSpinner = new Spinner(`Evaluating expectations ${index + 1}/${evals.length}...`);
+      if (task.assertions && task.assertions.length > 0) {
+        const evalSpinner = new Spinner(`Grading assertions ${index + 1}/${tasks.length}...`);
         evalSpinner.start();
-        const judgeLogFileName = `eval_${index}_${evalSpec.id || 'unnamed'}_${passName}_judge_gemini.log`;
+        const judgeLogFileName = `task_${index}_${task.id || 'unnamed'}_${passName}_judge_gemini.log`;
         const judgeLogPath = path.join(runDir, judgeLogFileName);
         try {
-          expectationsResults = await evaluator.evaluateFunctional(
-            evalSpec.prompt,
-            rawOutput,
-            evalSpec.expectations,
+          assertionResults = await grader.gradeModelBased(
+            task.prompt,
+            transcript,
+            task.assertions,
             context,
             (log) => {
               if (evalSpinner) evalSpinner.updateLog(log);
@@ -116,29 +106,30 @@ export async function functionalCommand(
         } finally {
           evalSpinner.stopAndClear();
         }
-        allPassed = expectationsResults.every(r => r.passed);
+        trialPassed = assertionResults.every(r => r.passed);
       } else {
-        allPassed = false;
+        trialPassed = true; // No assertions means it "passed" the empty set
       }
 
       const augmentedOutput = {
-        ...rawOutput,
+        ...transcript,
         [passName + '_eval']: {
-          expectations: expectationsResults,
-          all_passed: allPassed,
+          assertions: assertionResults,
+          trial_passed: trialPassed,
           workspace_context: context
         }
       };
       fs.writeFileSync(resultPath, JSON.stringify(augmentedOutput, null, 2), 'utf-8');
     } else {
-      response = rawOutput?.error || 'Error: No JSON output was produced';
-      fs.writeFileSync(resultPath, JSON.stringify({ error: response, raw_output: rawOutput?.raw_output }, null, 2), 'utf-8');
-      allPassed = false;
-      if (evalSpec.expectations) {
-        expectationsResults = evalSpec.expectations.map(e => ({
-          expectation: e,
+      const errorMsg = transcript?.error || 'Error: No transcript was produced';
+      fs.writeFileSync(resultPath, JSON.stringify({ error: errorMsg, raw_output: transcript?.raw_output }, null, 2), 'utf-8');
+      trialPassed = false;
+      if (task.assertions) {
+        assertionResults = task.assertions.map(a => ({
+          assertion: a,
           passed: false,
-          reason: 'Agent execution failed'
+          reason: `Agent execution failed: ${errorMsg}`,
+          graderType: 'model-based'
         }));
       }
     }
@@ -147,124 +138,96 @@ export async function functionalCommand(
       env.removeWorktree(worktreePath);
     }
 
-    let hasExpectations = false;
-    if (evalSpec.expectations && evalSpec.expectations.length > 0) {
-      hasExpectations = true;
-      const passedCount = expectationsResults.filter(r => r.passed).length;
-      const totalCount = expectationsResults.length;
-      const statusEmoji = allPassed ? '✅' : '❌';
-      Logger.write(`${statusEmoji} [${index + 1}/${evals.length}] "${evalSpec.prompt}"\n`);
-      for (const exp of expectationsResults) {
-        if (exp.passed) {
-          Logger.write(`      ${chalk.green('✓')} ${chalk.gray(`"${exp.expectation}"`)}\n`);
+    // Output results to console
+    const statusEmoji = trialPassed ? '✅' : '❌';
+    Logger.write(`${statusEmoji} [${index + 1}/${tasks.length}] "${task.prompt}"\n`);
+    
+    if (task.assertions && task.assertions.length > 0) {
+      for (const res of assertionResults) {
+        if (res.passed) {
+          Logger.write(`      ${chalk.green('✓')} ${chalk.gray(`"${res.assertion}"`)}\n`);
         } else {
-          Logger.write(`      ${chalk.red('✗')} ${chalk.gray(`"${exp.expectation}"`)}\n`);
-          Logger.write(`        ↳ ${chalk.gray(`Reason: ${exp.reason}`)}\n`);
+          Logger.write(`      ${chalk.red('✗')} ${chalk.gray(`"${res.assertion}"`)}\n`);
+          Logger.write(`        ↳ ${chalk.gray(`Reason: ${res.reason}`)}\n`);
         }
       }
     } else {
-      let resultStatus = '';
-      if (response.includes('Opening authentication page')) {
-        resultStatus = 'AUTH REQUIRED';
-      } else if (response.includes('Error:')) {
-        resultStatus = 'ERROR';
-      } else {
-        resultStatus = 'NO EXPECTATIONS';
+      let resultStatus = 'PASSED (No assertions)';
+      if (transcript?.error) {
+        resultStatus = transcript.raw_output?.includes('Opening authentication page') ? 'AUTH REQUIRED' : 'ERROR';
       }
-      Logger.write(`❌ [${index + 1}/${evals.length}] "${evalSpec.prompt}"\n`);
       Logger.write(`      ↳ ${chalk.gray(`Result: ${resultStatus}`)}\n`);
     }
     Logger.write('\n');
 
-    return { response, allPassed, expectationsResults };
+    return {
+      id: `trial-1-${passName}`,
+      transcript: transcript || { error: 'No transcript produced' },
+      assertionResults: assertionResults,
+      trialPassed
+    };
   }
 
   try {
     Logger.write(`\n${chalk.bold(`FUNCTIONAL EVALUATION: ${skillPath}`)}\n`);
-    // ==== PASS 1: BASELINE ====
+    
+    // ==== BASELINE RUN ====
     Logger.write(`\n--- Baseline Pass (No Skill) ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
-    const baselineResultsMap = new Map();
-    for (let i = 0; i < evals.length; i++) {
-        const res = await runSingleEval(evals[i], i, true);
-        baselineResultsMap.set(i, res);
-        
-        const evalSpec = evals[i];
-        if (evalSpec.expectations && evalSpec.expectations.length > 0) {
-          if (res.allPassed) baselinePassCount++;
-          baselinePassedExpectationsCount += res.expectationsResults.filter((r) => r.passed).length;
-        }
+    const baselineTrials: EvalTrial[] = [];
+    for (let i = 0; i < tasks.length; i++) {
+        const trial = await runSingleTrial(tasks[i], i, true);
+        baselineTrials.push(trial);
+        if (trial.trialPassed) baselineTasksPassedCount++;
     }
 
-    // ==== PASS 2: FUNCTIONAL (Skill Linked) ====
-    Logger.write(`\n--- w/Skill Pass ---\n`);
+    // ==== TARGET RUN ====
+    Logger.write(`\n--- Target Pass (w/Skill) ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
     
-    for (let i = 0; i < evals.length; i++) {
-        const evalSpec = evals[i];
-        const res = await runSingleEval(evals[i], i, false);
-        
-        const baselineRes = baselineResultsMap.get(i);
-        summaryResults.push({
-            id: evalSpec.id || `eval-${i}`,
-            prompt: evalSpec.prompt,
-            response: res.response,
-            expectationsResults: res.expectationsResults,
-            allExpectationsPassed: res.allPassed,
-            baselineAllExpectationsPassed: baselineRes?.allPassed,
-            baselineExpectationsResults: baselineRes?.expectationsResults
-        });
+    for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i];
+        const trial = await runSingleTrial(task, i, false);
+        if (trial.trialPassed) targetTasksPassedCount++;
 
-        const hasExpectations = evalSpec.expectations && evalSpec.expectations.length > 0;
-        if (hasExpectations) {
-            if (res.allPassed) functionalPassCount++;
-            passedExpectationsCount += res.expectationsResults.filter((r) => r.passed).length;
-        }
+        const taskResult: TaskResult = {
+            taskId: task.id || `task-${i}`,
+            prompt: task.prompt,
+            score: trial.trialPassed ? 1.0 : 0.0,
+            trials: [trial],
+            baselineTrials: [baselineTrials[i]]
+        };
+        taskResults.push(taskResult);
     }
 
     // ==== REPORTING ====
-    const totalWithExpectations = evals.filter(e => e.expectations && e.expectations.length > 0).length;
+    const targetPercentage = Math.round((targetTasksPassedCount / tasks.length) * 100);
+    const baselinePercentage = Math.round((baselineTasksPassedCount / tasks.length) * 100);
+    const skillUplift = targetPercentage - baselinePercentage;
 
-    const functionalPercentage = totalWithExpectations > 0 
-      ? Math.round((functionalPassCount / totalWithExpectations) * 100)
-      : 0;
-    const expectationsMetPercentage = totalExpectationsCount > 0
-      ? Math.round((passedExpectationsCount / totalExpectationsCount) * 100)
-      : 0;
-      
-    const baselinePercentage = totalWithExpectations > 0
-      ? Math.round((baselinePassCount / totalWithExpectations) * 100)
-      : 0;
-
-    const skillUplift = functionalPercentage - baselinePercentage;
-
-    const report: EvalSummaryReport = {
+    const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
       skill_name,
       agent,
       metrics: {
-        passRate: `${functionalPercentage}%`,
-        passedCount: functionalPassCount,
-        totalCount: totalWithExpectations,
-        totalExpectations: totalExpectationsCount,
-        passedExpectations: passedExpectationsCount,
-        expectationsPassRate: `${expectationsMetPercentage}%`,
-        baselinePassedCount: baselinePassCount,
-        baselinePassRate: `${baselinePercentage}%`,
-        skillUplift: `${skillUplift > 0 ? '+' : ''}${skillUplift}%`
+        targetScore: `${targetPercentage}%`,
+        baselineScore: `${baselinePercentage}%`,
+        skillUplift: `${skillUplift > 0 ? '+' : ''}${skillUplift}%`,
+        passedCount: targetTasksPassedCount,
+        totalCount: tasks.length
       },
-      results: summaryResults
+      results: taskResults
     };
 
     fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
 
-    const baselineRateLine = `   Baseline Success Rate:   ${baselinePercentage}%  (${baselinePassCount}/${totalWithExpectations})`;
-    const funcRateLine     = `   w/Skill Success Rate:    ${functionalPercentage}% (${functionalPassCount}/${totalWithExpectations})`;
+    const baselineRateLine = `   Baseline Success Rate:   ${baselinePercentage}%  (${baselineTasksPassedCount}/${tasks.length})`;
+    const targetRateLine   = `   Target Success Rate:     ${targetPercentage}% (${targetTasksPassedCount}/${tasks.length})`;
 
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
     Logger.write(`${baselineRateLine}\n`);
-    Logger.write(`${funcRateLine}\n`);
+    Logger.write(`${targetRateLine}\n`);
     Logger.write('\n');
 
   } finally {

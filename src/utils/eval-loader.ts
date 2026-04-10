@@ -1,13 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { EvalFile, Eval } from '../types';
+import { EvalSuite, EvalTask } from '../types';
 import { ConfigError } from '../core/errors';
 
 /**
  * Loads and merges all JSON evaluation files from a skill's evals directory.
- * Following Anthropic's recommendation to split evals by capability/regression.
+ * Aligned with Anthropic's recommendation to split evals by capability/regression.
+ * Supports legacy 'tasks' and 'assertions' internally while maintaining 'evals' and 'expectations' in files.
  */
-export function loadEvals(skillPath: string): EvalFile {
+export function loadEvalSuite(skillPath: string): EvalSuite {
   const evalsDir = path.resolve(skillPath, 'evals');
 
   if (!fs.existsSync(evalsDir)) {
@@ -21,11 +22,11 @@ export function loadEvals(skillPath: string): EvalFile {
   }
 
   let mergedSkillName = '';
-  const mergedEvals: Eval[] = [];
+  const mergedTasks: EvalTask[] = [];
 
   for (const file of files) {
     const filePath = path.join(evalsDir, file);
-    let config: EvalFile;
+    let config: any;
 
     try {
       const raw = fs.readFileSync(filePath, 'utf-8');
@@ -34,9 +35,11 @@ export function loadEvals(skillPath: string): EvalFile {
       throw new ConfigError(`Failed to parse ${file}: ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    const { skill_name, evals } = config;
+    const skill_name = config.skill_name;
+    // Standard input uses 'evals' key
+    const rawEvals = config.evals || config.tasks;
 
-    if (!skill_name || !Array.isArray(evals)) {
+    if (!skill_name || !Array.isArray(rawEvals)) {
       throw new ConfigError(`Invalid format in ${file}. Expected 'skill_name' and 'evals' array.`);
     }
 
@@ -48,15 +51,27 @@ export function loadEvals(skillPath: string): EvalFile {
       );
     }
 
-    mergedEvals.push(...evals);
+    // Map input fields to internal terminology
+    const mappedTasks: EvalTask[] = rawEvals.map((e: any) => ({
+      id: e.id,
+      prompt: e.prompt,
+      expected_output: e.expected_output,
+      assertions: e.expectations || e.assertions,
+      files: e.files
+    }));
+
+    mergedTasks.push(...mappedTasks);
   }
 
-  if (mergedEvals.length === 0) {
+  if (mergedTasks.length === 0) {
     throw new ConfigError(`No evaluations found in any of the JSON files in ${evalsDir}`);
   }
 
   return {
     skill_name: mergedSkillName,
-    evals: mergedEvals
+    tasks: mergedTasks
   };
 }
+
+// Backwards compatibility alias
+export const loadEvals = loadEvalSuite;

@@ -1,10 +1,10 @@
 {
   "skill_name": "mock-skill",
-  "evals": [
+  "tasks": [
     {
       "id": "standard-name",
       "prompt": "Hi there! My name is John.",
-      "expectations": [
+      "assertions": [
         "The response must include 'Hello dear John!'",
         "The response must be polite and start with 'Hello'"
       ]
@@ -12,7 +12,7 @@
     {
       "id": "standard-no-name",
       "prompt": "Hello",
-      "expectations": [
+      "assertions": [
         "The response must include 'Hello dear user!'",
         "The response must not mention any specific names"
       ]

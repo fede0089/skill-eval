@@ -5,10 +5,10 @@ import { EvalEnvironment } from '../../src/core/environment';
 
 test('EvalEnvironment.createWorktree should return expected path', async (t) => {
   const env = new EvalEnvironment({ skillPath: 'mock-skill' });
-  const evalId = 'test-eval';
-  const expectedPath = path.resolve(process.cwd(), '.project-skill-evals', 'worktrees', evalId);
+  const taskId = 'test-task';
+  const expectedPath = path.resolve(process.cwd(), '.project-skill-evals', 'worktrees', taskId);
   
   // We can't easily mock spawnSync here without issues in this env,
   // but we can verify the path generation logic.
-  assert.ok(expectedPath.includes('.project-skill-evals/worktrees/test-eval'));
+  assert.ok(expectedPath.includes('.project-skill-evals/worktrees/test-task'));
 });

@@ -1,8 +1,11 @@
-import { AgentOutput, ToolMetrics, ModelMetrics, ExpectationResult, FunctionalEvalResult, EvalSummaryResult } from '../types';
+import { AgentTranscript, ToolMetrics, AssertionResult } from '../types';
 import { Logger } from '../utils/logger';
 import { RunnerFactory } from './runners/factory';
 
-export class Evaluator {
+/**
+ * Programmatic grader that checks if a skill was triggered by analyzing tool calls.
+ */
+export class TriggerGrader {
   private targetToolKeys: string[];
 
   constructor(skillName: string) {
@@ -13,14 +16,12 @@ export class Evaluator {
   }
 
   /**
-   * Verifies if the skill was triggered by analyzing the agent's tool calls.
-   * Checks for explicit skill dispatch or name matches in tool statistics (if available)
-   * or in the raw output text.
+   * Grades a trial based on whether the skill was triggered.
    */
-  isSkillTriggered(output: AgentOutput): boolean {
-    // 1. Check structured stats if available (Legacy/Structured mode)
-    if (output?.stats?.tools?.byName) {
-      const byName = output.stats.tools.byName;
+  gradeTrigger(transcript: AgentTranscript): boolean {
+    // 1. Check structured stats if available
+    if (transcript?.stats?.tools?.byName) {
+      const byName = transcript.stats.tools.byName;
       const toolNames = Object.keys(byName);
 
       const dispatchTools = ['activate_skill'];
@@ -42,14 +43,12 @@ export class Evaluator {
       }
     }
 
-    // 2. Fallback to parsing raw text output (Plain Text mode)
-    const textToSearch = (output.raw_output || output.response || '').toLowerCase();
+    // 2. Fallback to parsing raw text output
+    const textToSearch = (transcript.raw_output || transcript.response || '').toLowerCase();
     if (!textToSearch) return false;
 
     const dispatchTools = ['activate_skill'];
     for (const tool of dispatchTools) {
-      // Look for common tool execution patterns in Gemini CLI output
-      // e.g. "Calling tool: activate_skill", etc.
       if (textToSearch.includes(tool.toLowerCase())) {
         Logger.debug(`Detected skill dispatch tool "${tool}" in plain text output.`);
         return true;
@@ -68,72 +67,66 @@ export class Evaluator {
 }
 
 /**
- * FunctionalEvaluator extends the base Evaluator to support Judge-led
- * verification of functional expectations.
+ * Model-based grader that uses an LLM Judge to verify functional assertions.
  */
-export class FunctionalEvaluator extends Evaluator {
-  constructor(skillName: string) {
-    super(skillName);
-  }
+export class ModelBasedGrader {
+  constructor(private skillName: string) {}
 
   /**
-   * Invokes an LLM Judge (Gemini CLI) to evaluate if the agent's response
-   * and workspace changes meet the defined functional expectations.
-   * 
-   * @param prompt Original user prompt
-   * @param output Output from the agent execution
-   * @param expectations List of textual expectations
-   * @param workspaceContext Current state/diff of the local workspace
-   * @returns Array of individual expectation results with status and reasoning
+   * Invokes an LLM Judge to evaluate if assertions are met.
    */
-  async evaluateFunctional(
+  async gradeModelBased(
     prompt: string,
-    output: AgentOutput,
-    expectations: string[],
+    transcript: AgentTranscript,
+    assertions: string[],
     workspaceContext: string,
     onLog?: (log: string) => void,
     logPath?: string
-  ): Promise<ExpectationResult[]> {
-    if (!expectations || expectations.length === 0) {
+  ): Promise<AssertionResult[]> {
+    if (!assertions || assertions.length === 0) {
       return [];
     }
 
-    const judgePrompt = this.buildJudgePrompt(prompt, output.response || '', expectations, workspaceContext);
+    const judgePrompt = this.buildJudgePrompt(prompt, transcript.response || '', assertions, workspaceContext);
     const runner = RunnerFactory.create('gemini-cli');
     
-    // We run the prompt and expect a JSON response
     const judgeRawOutput = await runner.runPrompt(judgePrompt, undefined, onLog, logPath);
     
     if (!judgeRawOutput || !judgeRawOutput.response) {
       const errorMsg = judgeRawOutput?.error ? ` (Error: ${judgeRawOutput.error})` : '';
-      return expectations.map(e => ({
-        expectation: e,
+      return assertions.map(a => ({
+        assertion: a,
         passed: false,
-        reason: `Judge agent failed to provide a response.${errorMsg}`
+        reason: `Judge agent failed to provide a response.${errorMsg}`,
+        graderType: 'model-based'
       }));
     }
 
     try {
-      // Find JSON block in response
       const jsonMatch = judgeRawOutput.response.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      return JSON.parse(judgeRawOutput.response);
+      const rawResults = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(judgeRawOutput.response);
+      
+      return rawResults.map((r: any) => ({
+        assertion: r.assertion || r.expectation,
+        passed: !!r.passed,
+        reason: r.reason || '',
+        graderType: 'model-based'
+      }));
     } catch (err) {
       Logger.error(`Failed to parse Judge JSON response: ${err instanceof Error ? err.message : String(err)}`);
       Logger.debug(`Raw Judge response: ${judgeRawOutput.response}`);
-      return expectations.map(e => ({
-        expectation: e,
+      return assertions.map(a => ({
+        assertion: a,
         passed: false,
-        reason: 'Judge agent response was not valid JSON.'
+        reason: 'Judge agent response was not valid JSON.',
+        graderType: 'model-based'
       }));
     }
   }
 
-  private buildJudgePrompt(prompt: string, response: string, expectations: string[], context: string): string {
+  private buildJudgePrompt(prompt: string, response: string, assertions: string[], context: string): string {
     return `You are a Functional Quality Judge for AI Agent Skills.
-Your task is to evaluate if a skill execution met its functional expectations.
+Your task is to evaluate if a skill execution met its functional assertions.
 
 Original Prompt: "${prompt}"
 Agent Response: "${response}"
@@ -141,17 +134,17 @@ Agent Response: "${response}"
 Workspace Context (Changes detected):
 ${context}
 
-Expectations to evaluate:
-${expectations.map((e, i) => `${i + 1}. ${e}`).join('\n')}
+Assertions to evaluate:
+${assertions.map((a, i) => `${i + 1}. ${a}`).join('\n')}
 
 INSTRUCTIONS:
 1. Analyze the Response and the Workspace Context.
-2. For each expectation, determine if it was met (passed: true) or not (passed: false).
+2. For each assertion, determine if it was met (passed: true) or not (passed: false).
 3. Provide a brief reasoning for your judgment.
 4. Output your evaluation ONLY as a JSON array of objects with the following structure:
 [
   {
-    "expectation": "the exact text of expectation 1",
+    "assertion": "the exact text of assertion 1",
     "passed": true,
     "reason": "why it passed or failed"
   },
@@ -162,18 +155,22 @@ Do not include any other text in your response, only the JSON array.`;
   }
 }
 
+// Backwards compatibility aliases
+export { TriggerGrader as Evaluator };
+export { ModelBasedGrader as FunctionalEvaluator };
+
 /**
- * Validates a single expectation against the actual output.
+ * Validates a single programmatic assertion against the actual output.
  * Supported types: contains, not_contains, regex, json.
  */
-export function validateExpectation(expectation: { type: string; value: string }, actualOutput: string): boolean {
-  switch (expectation.type) {
+export function validateAssertion(assertion: { type: string; value: string }, actualOutput: string): boolean {
+  switch (assertion.type) {
     case 'contains':
-      return actualOutput.includes(expectation.value);
+      return actualOutput.includes(assertion.value);
     case 'not_contains':
-      return !actualOutput.includes(expectation.value);
+      return !actualOutput.includes(assertion.value);
     case 'regex':
-      return new RegExp(expectation.value).test(actualOutput);
+      return new RegExp(assertion.value).test(actualOutput);
     case 'json':
       try {
         JSON.parse(actualOutput);
@@ -185,3 +182,6 @@ export function validateExpectation(expectation: { type: string; value: string }
       return false;
   }
 }
+
+// Backwards compatibility alias
+export const validateExpectation = validateAssertion;

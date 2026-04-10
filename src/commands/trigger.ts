@@ -3,27 +3,26 @@ import * as path from 'path';
 import chalk from 'chalk';
 import { EvalEnvironment } from '../core/environment';
 import { RunnerFactory } from '../core/runners';
-import { Evaluator } from '../core/evaluator';
-import { EvalSummaryReport, EvalSummaryResult, AgentOutput } from '../types';
+import { TriggerGrader } from '../core/evaluator';
+import { EvalSuiteReport, TaskResult, AgentTranscript, EvalTrial, AssertionResult } from '../types';
 import { Logger, Spinner } from '../utils/logger';
-import { ConfigError } from '../core/errors';
-import { loadEvals } from '../utils/eval-loader';
+import { loadEvalSuite } from '../utils/eval-loader';
 
 export async function triggerCommand(
   agent: string, 
   skillPath: string
 ): Promise<void> {
-  const evalsConfig = loadEvals(skillPath);
+  const suite = loadEvalSuite(skillPath);
 
-  const { skill_name, evals } = evalsConfig;
+  const { skill_name, tasks } = suite;
 
-  Logger.debug(`\nStarting evaluation for skill: ${skill_name}`);
+  Logger.debug(`\nStarting trigger evaluation for skill: ${skill_name}`);
   Logger.debug(`Agent: ${agent}`);
-  Logger.debug(`Found ${evals.length} evals.\n`);
+  Logger.debug(`Found ${tasks.length} tasks.\n`);
 
   // Setup Environment
   const env = new EvalEnvironment({ skillPath });
-  const evaluator = new Evaluator(skill_name);
+  const grader = new TriggerGrader(skill_name);
 
   const runner = RunnerFactory.create(agent);
 
@@ -36,36 +35,35 @@ export async function triggerCommand(
   fs.mkdirSync(runDir, { recursive: true });
   Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
 
-  const summaryResults: EvalSummaryResult[] = [];
-  let triggeredCount = 0;
+  const taskResults: TaskResult[] = [];
+  let tasksPassedCount = 0;
 
   try {
     Logger.write(`\n${chalk.bold(`TRIGGER EVALUATION: ${skillPath}`)}\n`);
     Logger.write(`\n--- Trigger Pass ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
-    for (let i = 0; i < evals.length; i++) {
-      const evalSpec = evals[i];
-      const resultFileName = `eval_${i}_${evalSpec.id || 'unnamed'}.json`;
+
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      const resultFileName = `task_${i}_${task.id || 'unnamed'}.json`;
       const resultPath = path.join(runDir, resultFileName);
 
-
-
       let worktreePath: string | undefined;
-      let rawOutput: AgentOutput | null = null;
-      const logFileName = `eval_${i}_${evalSpec.id || 'unnamed'}_gemini.log`;
+      let transcript: AgentTranscript | null = null;
+      const logFileName = `task_${i}_${task.id || 'unnamed'}_gemini.log`;
       const logPath = path.join(runDir, logFileName);
 
       try {
-        // Create isolated worktree for this evaluation
-        worktreePath = env.createWorktree(`eval-${i}`);
+        // Create isolated worktree for this task
+        worktreePath = env.createWorktree(`task-${i}`);
         await env.linkSkill(worktreePath);
 
         // Run agent strictly inside the worktree
-        const spinner = new Spinner(`Running Eval ${i + 1}/${evals.length}...`);
+        const spinner = new Spinner(`Running Task ${i + 1}/${tasks.length}...`);
         spinner.start();
 
         try {
-          rawOutput = await runner.runPrompt(evalSpec.prompt, worktreePath, (log) => {
+          transcript = await runner.runPrompt(task.prompt, worktreePath, (log) => {
             if (spinner) spinner.updateLog(log);
           }, logPath);
         } finally {
@@ -79,64 +77,84 @@ export async function triggerCommand(
       }
 
       let triggered = false;
-      let response = '';
+      const assertionResults: AssertionResult[] = [];
 
-      if (rawOutput && !rawOutput.error) {
-        triggered = evaluator.isSkillTriggered(rawOutput);
-        response = rawOutput.response || '';
+      if (transcript && !transcript.error) {
+        triggered = grader.gradeTrigger(transcript);
+        
+        assertionResults.push({
+          assertion: 'Skill was triggered',
+          passed: triggered,
+          reason: triggered ? 'Detected skill activation in transcript' : 'No skill activation detected in transcript',
+          graderType: 'programmatic'
+        });
 
-        // Persist the output
-        fs.writeFileSync(resultPath, JSON.stringify(rawOutput, null, 2), 'utf-8');
+        // Persist the transcript
+        fs.writeFileSync(resultPath, JSON.stringify(transcript, null, 2), 'utf-8');
       } else {
-        // Runner returned error (process crash / JSON parse fail / Auth required)
-        response = rawOutput?.error || 'Error: No JSON output was produced';
-        fs.writeFileSync(resultPath, JSON.stringify({ error: response, raw_output: rawOutput?.raw_output }, null, 2), 'utf-8');
+        const errorMsg = transcript?.error || 'Error: No transcript was produced';
+        assertionResults.push({
+          assertion: 'Skill was triggered',
+          passed: false,
+          reason: errorMsg,
+          graderType: 'programmatic'
+        });
+        fs.writeFileSync(resultPath, JSON.stringify({ error: errorMsg, raw_output: transcript?.raw_output }, null, 2), 'utf-8');
       }
 
-      summaryResults.push({
-        id: evalSpec.id || `eval-${i}`,
-        prompt: evalSpec.prompt,
-        triggered,
-        response
-      });
+      const trial: EvalTrial = {
+        id: 'trial-1',
+        transcript: transcript || { error: 'No transcript produced' },
+        assertionResults: assertionResults,
+        trialPassed: triggered
+      };
+
+      const taskResult: TaskResult = {
+        taskId: task.id || `task-${i}`,
+        prompt: task.prompt,
+        score: triggered ? 1.0 : 0.0,
+        trials: [trial]
+      };
+
+      taskResults.push(taskResult);
 
       if (triggered) {
-        triggeredCount++;
-        Logger.write(`✅ [${i + 1}/${evals.length}] "${evalSpec.prompt}"\n`);
+        tasksPassedCount++;
+        Logger.write(`✅ [${i + 1}/${tasks.length}] "${task.prompt}"\n`);
         Logger.write(`      ${chalk.green('✓')} ${chalk.gray(`Skill triggered`)}\n`);
       } else {
         let resultStatus = 'NOT TRIGGERED';
-        if (rawOutput?.error) {
-          if (rawOutput.raw_output?.includes('Opening authentication page')) {
+        if (transcript?.error) {
+          if (transcript.raw_output?.includes('Opening authentication page')) {
             resultStatus = 'AUTH REQUIRED';
           } else {
             resultStatus = 'ERROR';
           }
         }
-        Logger.write(`❌ [${i + 1}/${evals.length}] "${evalSpec.prompt}"\n`);
+        Logger.write(`❌ [${i + 1}/${tasks.length}] "${task.prompt}"\n`);
         Logger.write(`      ${chalk.red('✗')} ${chalk.gray(`Skill triggered`)}\n`);
         Logger.write(`        ↳ ${chalk.gray(`Result: ${resultStatus}`)}\n`);
       }
       Logger.write('\n');
     }
 
-    const percentage = Math.round((triggeredCount / evals.length) * 100);
+    const percentage = Math.round((tasksPassedCount / tasks.length) * 100);
 
-    const report: EvalSummaryReport = {
+    const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
       skill_name,
       agent,
       metrics: {
-        passRate: `${percentage}%`,
-        passedCount: triggeredCount,
-        totalCount: evals.length
+        targetScore: `${percentage}%`,
+        passedCount: tasksPassedCount,
+        totalCount: tasks.length
       },
-      results: summaryResults
+      results: taskResults
     };
 
     fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
 
-    const triggerRateLine = `   Trigger Success Rate:   ${percentage}% (${triggeredCount}/${evals.length})`;
+    const triggerRateLine = `   Trigger Success Rate:   ${percentage}% (${tasksPassedCount}/${tasks.length})`;
 
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);

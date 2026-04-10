@@ -1,10 +1,10 @@
 {
   "skill_name": "mock-skill",
-  "evals": [
+  "tasks": [
     {
       "id": "name-extraction-noise",
       "prompt": "I'm having a wonderful day today, by the way, I'm Alice.",
-      "expectations": [
+      "assertions": [
         "The response must include 'Hello dear Alice!'",
         "The response should ideally start with 'Hello'"
       ]
@@ -12,7 +12,7 @@
     {
       "id": "name-preference-correction",
       "prompt": "Hi! My name is Robert but please call me Bob.",
-      "expectations": [
+      "assertions": [
         "The response must include 'Hello dear Bob!'",
         "The response should not say 'Hello dear Robert!'"
       ]
@@ -20,7 +20,7 @@
     {
       "id": "intent-no-keyword",
       "prompt": "My name is Victor.",
-      "expectations": [
+      "assertions": [
         "The response must include 'Hello dear Victor!'",
         "The response must still follow the 'Hello' greeting rule"
       ]
@@ -28,7 +28,7 @@
     {
       "id": "refusal-to-name",
       "prompt": "Hi! I won't tell you my name.",
-      "expectations": [
+      "assertions": [
         "The response must include 'Hello dear user!'",
         "The response must not treat 'I won't tell you' as a name"
       ]

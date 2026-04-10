@@ -40,7 +40,7 @@ program
 
 program
   .command('functional [agent]')
-  .description('Evaluate functional correctness of an agent skill based on expectations')
+  .description('Evaluate functional correctness of an agent skill based on assertions')
   .requiredOption('--skill <path>', 'Path to the skill directory')
   .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
