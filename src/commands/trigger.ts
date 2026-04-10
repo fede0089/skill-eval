@@ -63,12 +63,21 @@ export async function triggerCommand(
             taskId: task.id || `task-${i}`,
             prompt: task.prompt,
             score: trial.trialPassed ? 1.0 : 0.0,
-            trials: [trial]
+            trials: [
+              {
+                ...trial,
+                transcript: undefined as any // Remove transcript from summary to reduce redundancy
+              }
+            ]
           };
 
           taskResults.push(taskResult);
           if (trial.trialPassed) {
             tasksPassedCount++;
+          } else {
+            // Find the reason for the failure from assertion results
+            const failureReason = trial.assertionResults.find(r => !r.passed)?.reason || 'Task failed evaluation';
+            throw new Error(failureReason);
           }
         }
       });

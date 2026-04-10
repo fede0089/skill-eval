@@ -38,7 +38,9 @@ export class ListrEvalUI {
         try {
           await descriptor.task(evalCtx);
         } catch (error) {
-          // Failure handled by listr itself
+          if (error instanceof Error) {
+            error.message = `${descriptor.title} - ${error.message}`;
+          }
           throw error;
         }
       }
@@ -58,11 +60,15 @@ export class ListrEvalUI {
       renderer: (isTTY && !isTest) ? 'default' : 'verbose',
       rendererOptions: {
         collapseSubtasks: false,
-        showTimer: true,
         formatOutput: 'wrap'
       }
     });
 
-    await listr.run();
+    try {
+      await listr.run();
+    } catch (error) {
+      // Listr throws if any task fails even with exitOnError: false.
+      // We catch it here because we handle the results/errors ourselves in the caller.
+    }
   }
 }

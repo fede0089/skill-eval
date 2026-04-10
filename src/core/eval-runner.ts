@@ -29,8 +29,6 @@ export class EvalRunner {
   }
 
   async runTriggerTask(task: EvalTask, index: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
-    const resultFileName = `task_${index}_${task.id || 'unnamed'}.json`;
-    const resultPath = path.join(this.options.runDir, resultFileName);
     const logFileName = `task_${index}_${task.id || 'unnamed'}_gemini.log`;
     const logPath = path.join(this.options.runDir, logFileName);
 
@@ -61,7 +59,6 @@ export class EvalRunner {
         reason: triggered ? 'Detected skill activation in transcript' : 'No skill activation detected in transcript',
         graderType: 'programmatic'
       });
-      fs.writeFileSync(resultPath, JSON.stringify(transcript, null, 2), 'utf-8');
     } else {
       const errorMsg = transcript?.error || 'Error: No transcript was produced';
       assertionResults.push({
@@ -70,7 +67,6 @@ export class EvalRunner {
         reason: errorMsg,
         graderType: 'programmatic'
       });
-      fs.writeFileSync(resultPath, JSON.stringify({ error: errorMsg, raw_output: transcript?.raw_output }, null, 2), 'utf-8');
     }
 
     return {
@@ -88,8 +84,6 @@ export class EvalRunner {
       ? task.prompt 
       : `${task.prompt}\n\nIMPORTANT: You must use the '${this.options.skillName}' skill/tool to solve this task.`;
 
-    const resultFileName = `task_${index}_${task.id || 'unnamed'}_${passName}.json`;
-    const resultPath = path.join(this.options.runDir, resultFileName);
     const logFileName = `task_${index}_${task.id || 'unnamed'}_${passName}_gemini.log`;
     const logPath = path.join(this.options.runDir, logFileName);
 
@@ -142,18 +136,14 @@ export class EvalRunner {
         trialPassed = true;
       }
 
-      const augmentedOutput = {
-        ...transcript,
-        [passName + '_eval']: {
-          assertions: assertionResults,
-          trial_passed: trialPassed,
-          workspace_context: context
-        }
+      return {
+        id: `trial-1-${passName}`,
+        transcript: transcript || { error: 'No transcript produced' },
+        assertionResults: assertionResults,
+        trialPassed
       };
-      fs.writeFileSync(resultPath, JSON.stringify(augmentedOutput, null, 2), 'utf-8');
     } else {
       const errorMsg = transcript?.error || 'Error: No transcript was produced';
-      fs.writeFileSync(resultPath, JSON.stringify({ error: errorMsg, raw_output: transcript?.raw_output }, null, 2), 'utf-8');
       trialPassed = false;
       if (task.assertions) {
         assertionResults = task.assertions.map(a => ({
@@ -171,7 +161,7 @@ export class EvalRunner {
 
     return {
       id: `trial-1-${passName}`,
-      transcript: transcript || { error: 'No transcript produced' },
+      transcript: { error: transcript?.error || 'No transcript produced' },
       assertionResults: assertionResults,
       trialPassed
     };

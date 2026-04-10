@@ -68,7 +68,12 @@ export async function functionalCommand(
             task: async (uiCtx) => {
                 const trial = await baselineRunner.runFunctionalTask(task, i, uiCtx);
                 baselineTrials[i] = trial;
-                if (trial.trialPassed) baselineTasksPassedCount++;
+                if (trial.trialPassed) {
+                    baselineTasksPassedCount++;
+                } else {
+                    const failureReason = trial.assertionResults.find(r => !r.passed)?.reason || 'Baseline failed';
+                    throw new Error(failureReason);
+                }
             }
         });
     }
@@ -88,16 +93,26 @@ export async function functionalCommand(
             title: `Target ${i + 1}/${tasks.length}: ${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`,
             task: async (uiCtx) => {
                 const trial = await targetRunner.runFunctionalTask(task, i, uiCtx);
-                if (trial.trialPassed) targetTasksPassedCount++;
-
+                
                 const taskResult: TaskResult = {
                     taskId: task.id || `task-${i}`,
                     prompt: task.prompt,
                     score: trial.trialPassed ? 1.0 : 0.0,
-                    trials: [trial],
-                    baselineTrials: [baselineTrials[i]]
+                    trials: [
+                        { ...trial, transcript: undefined as any }
+                    ],
+                    baselineTrials: [
+                        { ...baselineTrials[i], transcript: undefined as any }
+                    ]
                 };
                 taskResults.push(taskResult);
+
+                if (trial.trialPassed) {
+                    targetTasksPassedCount++;
+                } else {
+                    const failureReason = trial.assertionResults.find(r => !r.passed)?.reason || 'Target failed';
+                    throw new Error(failureReason);
+                }
             }
         });
     }

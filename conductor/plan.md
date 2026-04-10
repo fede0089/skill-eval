@@ -1,31 +1,19 @@
-# Implementation Plan: Parallel Prompt Execution with Dynamic Output
+# Implementation Plan
 
-## Phase 1: Setup and Configuration [checkpoint: e532dc4]
-- [x] Task: Add `--concurrency` flag to CLI commands [82e84e4]
-    - [x] Write unit tests in `tests/commands/` verifying the flag is parsed correctly and defaults to 5.
-    - [x] Update `src/commands/functional.ts` and `src/commands/trigger.ts` to accept and process the `--concurrency` flag.
-- [x] Task: Install required dependencies [874a31a]
-    - [x] Add `listr2` and `p-limit` (or similar concurrency control library) as production dependencies.
-- [x] Task: Conductor - User Manual Verification 'Phase 1: Setup and Configuration' (Protocol in workflow.md) [e532dc4]
+## Objective
+Asegurar que cuando una tarea falle en la interfaz de usuario, no se pierda el título original de la tarea. Actualmente, el mensaje de error ("Task failed evaluation" o "No skill activation detected...") reemplaza el título original en la terminal, lo cual confunde al usuario. Queremos que la línea se mantenga (ej: `Task 1/6: I'm having a wonderful day today...`) y simplemente muestre la cruz de fallo junto con la razón.
 
-## Phase 2: Dynamic UI Integration [checkpoint: 9cdf48f]
-- [x] Task: Implement dynamic UI adapter [d7fb7e6]
-    - [x] Write unit tests for a new UI abstraction layer (e.g., `src/utils/ui.ts`).
-    - [x] Implement the `listr2` adapter to handle dynamic, multi-line terminal updates (adding tasks, updating status to "Running", "Completed", "Failed").
-- [x] Task: Conductor - User Manual Verification 'Phase 2: Dynamic UI Integration' (Protocol in workflow.md) [9cdf48f]
+## Key Files & Context
+- `src/utils/ui.ts`: Controla la configuración y ejecución de Listr2, incluyendo cómo se manejan y formatean los errores lanzados por las tareas.
 
-## Phase 3: Parallel Execution Engine [checkpoint: e71a5da]
-- [x] Task: Implement concurrent evaluation execution [4c221c8]
-    - [x] Write unit tests for the execution engine to verify it respects the concurrency limit (e.g., max 5 concurrent executions).
-    - [x] Modify `src/core/eval-runner.ts` to execute evaluations concurrently using a connection pool (via Listr2).
-    - [x] Integrate the concurrent execution engine with the `listr2` UI adapter to update line states in real-time.
-- [x] Task: Conductor - User Manual Verification 'Phase 3: Parallel Execution Engine' (Protocol in workflow.md) [e71a5da]
+## Implementation Steps
+1.  **Modificar el manejo de errores en `src/utils/ui.ts`**:
+    *   En el método `addTask`, dentro del bloque `catch` que captura los fallos de las tareas.
+    *   Verificar si el error capturado es una instancia de `Error`.
+    *   Modificar `error.message` para que el título original de la tarea (`descriptor.title`) se agregue como prefijo al mensaje de error. Por ejemplo: `error.message = \`\${descriptor.title} - \${error.message}\`;`.
+    *   De esta manera, Listr2 (que ya agrega la cruz `✖` automáticamente) renderizará la cruz seguida del título de la tarea y luego el error, cumpliendo el requisito: "que deje la linea igual solo ponga la cruz cuando fallo".
 
-## Phase 4: Error Handling and Final Summary
-- [~] Task: Implement "Continue & Report" error handling
-    - [ ] Write unit tests verifying that a simulated failure in one execution does not stop others and is correctly recorded.
-    - [ ] Update the execution logic to catch and store individual promise rejections/errors.
-- [ ] Task: Implement Final Summary report
-    - [ ] Write unit tests for the summary generator.
-    - [ ] Implement logic to display a clear summary table (successes, failures, execution time) after the parallel execution finishes.
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Error Handling and Final Summary' (Protocol in workflow.md)
+## Verification & Testing
+- Run `npm run build`.
+- Run `npm run test:unit`.
+- Comprobar visualmente que los tests en consola que fallan ahora muestran el título original junto con la cruz de fallo.
