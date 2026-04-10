@@ -4,32 +4,18 @@ import chalk from 'chalk';
 import { EvalEnvironment } from '../core/environment';
 import { RunnerFactory } from '../core/runners';
 import { Evaluator } from '../core/evaluator';
-import { EvalFile, EvalSummaryReport, EvalSummaryResult, AgentOutput } from '../types';
+import { EvalSummaryReport, EvalSummaryResult, AgentOutput } from '../types';
 import { Logger, Spinner } from '../utils/logger';
 import { ConfigError } from '../core/errors';
+import { loadEvals } from '../utils/eval-loader';
 
 export async function triggerCommand(
   agent: string, 
   skillPath: string
 ): Promise<void> {
-  const evalsPath = path.resolve(process.cwd(), skillPath, 'evals', 'evals.json');
-
-  if (!fs.existsSync(evalsPath)) {
-    throw new ConfigError(`Could not find evals.json at ${evalsPath}`);
-  }
-
-  let evalsConfig: EvalFile;
-  try {
-    const raw = fs.readFileSync(evalsPath, 'utf-8');
-    evalsConfig = JSON.parse(raw);
-  } catch (err) {
-    throw new ConfigError(`Failed to parse evals.json: ${err instanceof Error ? err.message : String(err)}`);
-  }
+  const evalsConfig = loadEvals(skillPath);
 
   const { skill_name, evals } = evalsConfig;
-  if (!skill_name || !Array.isArray(evals) || evals.length === 0) {
-    throw new ConfigError(`Invalid evals.json format. Expected 'skill_name' and a non-empty 'evals' array.`);
-  }
 
   Logger.debug(`\nStarting evaluation for skill: ${skill_name}`);
   Logger.debug(`Agent: ${agent}`);
