@@ -41,7 +41,7 @@ export class EvalRunner {
 
       transcript = await this.runner.runPrompt(task.prompt, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
-      }, logPath);
+      }, logPath, ['--output-format', 'stream-json']);
     } finally {
       if (worktreePath) {
         this.env.removeWorktree(worktreePath);

@@ -49,6 +49,32 @@ test('GeminiCliRunner.runPrompt should use --approval-mode auto_edit by default'
   spawnMock.mock.restore();
 });
 
+test('GeminiCliRunner.runPrompt should include --output-format stream-json when passed in extraArgs', async (t) => {
+  const mockChild = createMockChild();
+  const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
+
+  const runner = new GeminiCliRunner();
+  const promise = runner.runPrompt('test prompt', undefined, undefined, undefined, ['--output-format', 'stream-json']);
+
+  setImmediate(() => {
+    mockChild.stdout.push('{"type": "tool_use", "tool_id": "1", "tool_name": "activate_skill", "parameters": { "name": "mock-skill" }}');
+    mockChild.stdout.push(null);
+    mockChild.stderr.push(null);
+    mockChild.emit('close', 0);
+  });
+
+  await promise;
+  
+  assert.ok(spawnMock.mock.callCount() >= 1, 'spawn should have been called');
+  const lastCall = spawnMock.mock.calls[0];
+  const args = lastCall.arguments[1];
+  
+  assert.ok(args.includes('--output-format'), 'Should include --output-format');
+  assert.strictEqual(args[args.indexOf('--output-format') + 1], 'stream-json');
+  
+  spawnMock.mock.restore();
+});
+
 test('GeminiCliRunner.runPrompt should pass cwd to spawn', async (t) => {
   const mockChild = createMockChild();
   const spawnMock = mock.method(child_process, 'spawn', () => mockChild);

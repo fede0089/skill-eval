@@ -17,8 +17,59 @@ export class TriggerGrader {
 
   /**
    * Grades a trial based on whether the skill was triggered.
+   * New implementation: Parses JSON stream lines from raw_output.
    */
   gradeTrigger(transcript: AgentTranscript): boolean {
+    const rawOutput = transcript.raw_output || '';
+    const lines = rawOutput.split('\n').filter(l => l.trim() !== '');
+    
+    const events: any[] = [];
+    for (const line of lines) {
+      try {
+        // Find JSON part in the line (it might contain other text or prefixes)
+        const jsonMatch = line.match(/\{.*\}/);
+        if (jsonMatch) {
+          events.push(JSON.parse(jsonMatch[0]));
+        }
+      } catch (e) {
+        // Skip invalid JSON lines
+      }
+    }
+
+    // 1. Look for tool_use event for activate_skill
+    let foundToolUse = false;
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      if (
+        event.type === 'tool_use' && 
+        event.tool_name === 'activate_skill' &&
+        event.parameters?.name &&
+        this.targetToolKeys.some(key => event.parameters.name.toLowerCase() === key.toLowerCase())
+      ) {
+        foundToolUse = true;
+        const toolId = event.tool_id;
+        
+        // 2. Look for subsequent tool_result with matching ID and status success
+        for (let j = i + 1; j < events.length; j++) {
+          const resultEvent = events[j];
+          if (
+            resultEvent.type === 'tool_result' &&
+            resultEvent.tool_id === toolId &&
+            resultEvent.status === 'success'
+          ) {
+            return true;
+          }
+        }
+      }
+    }
+
+    // If we found a tool_use for activate_skill but no successful tool_result, we should NOT fall back to legacy.
+    // However, if no JSON events were parsed at all, we fall back.
+    if (events.length > 0) {
+      return false;
+    }
+
+    // Fallback for non-JSON stream output (legacy support)
     // 1. Check structured stats if available
     if (transcript?.stats?.tools?.byName) {
       const byName = transcript.stats.tools.byName;
