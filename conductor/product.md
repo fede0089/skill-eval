@@ -1,7 +1,7 @@
 # Product Guide
 
 ## Project Goal
-A robust Node.js CLI tool specifically built to test and evaluate Agent Skills locally using an AI agent, following industry-standard evaluation frameworks (Anthropic Evals).
+A robust Node.js CLI tool specifically built to test and evaluate Agent Skills locally using an AI agent, following industry-standard evaluation frameworks (Anthropic Evals). The tool enforces strict numeric task identification and provides standardized execution logging and output formatting aligned with Anthropic's recommendations.
 
 ## Target Audience
 The primary users are Agent Skills Creators who need a reliable way to develop and validate their agent skills.
