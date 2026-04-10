@@ -14,5 +14,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Adjust the evaluation format to match the Anthropic format, enforcing numeric IDs and standardizing output logging.**
+- [x] **Track: Adjust the evaluation format to match the Anthropic format, enforcing numeric IDs and standardizing output logging.**
 *Link: [./tracks/anthropic_evals_20260410/](./tracks/anthropic_evals_20260410/)*

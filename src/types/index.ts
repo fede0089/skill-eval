@@ -1,7 +1,7 @@
 export type GraderType = 'programmatic' | 'model-based';
 
 export interface EvalTask {
-  id: string;
+  id: number;
   prompt: string;
   expected_output?: string;
   assertions?: string[];
@@ -19,7 +19,7 @@ export interface AssertionResult {
  * Record of a single execution of a Task.
  */
 export interface EvalTrial {
-  id: string;
+  id: number;
   transcript: AgentTranscript;
   assertionResults: AssertionResult[];
   trialPassed: boolean;
@@ -29,7 +29,7 @@ export interface EvalTrial {
  * Aggregated results for a Task across one or more trials.
  */
 export interface TaskResult {
-  taskId: string;
+  taskId: number;
   prompt: string;
   score: number; // Trials passed / Total trials (0.0 to 1.0)
   trials: EvalTrial[];
@@ -120,7 +120,7 @@ export type EvalFile = EvalSuite;
 export type EvalSummaryReport = EvalSuiteReport;
 
 export interface EvalSummaryResult {
-  id: string;
+  id: number;
   prompt: string;
   triggered?: boolean;
   response: string;

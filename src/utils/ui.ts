@@ -13,7 +13,7 @@ export type EvalTaskFn = (ctx: EvalTaskContext) => Promise<void>;
  * Descriptor for a single task to be executed by the UI
  */
 export interface EvalTaskDescriptor {
-  id: string;
+  id: string | number;
   title: string;
   task: EvalTaskFn;
 }

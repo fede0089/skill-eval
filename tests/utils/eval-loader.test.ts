@@ -42,11 +42,11 @@ describe('EvalLoader', () => {
 
     const file1 = {
       skill_name: 'test-skill',
-      evals: [{ id: '1', prompt: 'prompt1', expectations: ['exp 1'] }]
+      evals: [{ id: 1, prompt: 'prompt1', expectations: ['exp 1'] }]
     };
     const file2 = {
       skill_name: 'test-skill',
-      evals: [{ id: '2', prompt: 'prompt2', expectations: ['exp 2'] }]
+      evals: [{ id: 2, prompt: 'prompt2', expectations: ['exp 2'] }]
     };
 
     fs.writeFileSync(path.join(evalsDir, 'evals1.json'), JSON.stringify(file1));
@@ -55,10 +55,45 @@ describe('EvalLoader', () => {
     const result = loadEvalSuite(skillPath);
     assert.strictEqual(result.skill_name, 'test-skill');
     assert.strictEqual(result.tasks.length, 2);
-    assert.strictEqual(result.tasks[0].id, '1');
+    assert.strictEqual(result.tasks[0].id, 1);
     assert.strictEqual(result.tasks[0].assertions![0], 'exp 1');
-    assert.strictEqual(result.tasks[1].id, '2');
+    assert.strictEqual(result.tasks[1].id, 2);
     assert.strictEqual(result.tasks[1].assertions![0], 'exp 2');
+  });
+
+  it('should support numeric IDs in evaluations', () => {
+    const skillPath = path.join(tempDir, 'skill');
+    const evalsDir = path.join(skillPath, 'evals');
+    fs.mkdirSync(evalsDir, { recursive: true });
+
+    const file = {
+      skill_name: 'test-skill',
+      evals: [{ id: 1, prompt: 'prompt1' }]
+    };
+
+    fs.writeFileSync(path.join(evalsDir, 'evals.json'), JSON.stringify(file));
+
+    const result = loadEvalSuite(skillPath);
+    assert.strictEqual(result.tasks[0].id, 1);
+  });
+
+  it('should throw ConfigError if ID is not a number', () => {
+    const skillPath = path.join(tempDir, 'skill');
+    const evalsDir = path.join(skillPath, 'evals');
+    fs.mkdirSync(evalsDir, { recursive: true });
+
+    const file = {
+      skill_name: 'test-skill',
+      evals: [{ id: 'string-id', prompt: 'prompt1' }]
+    };
+
+    fs.writeFileSync(path.join(evalsDir, 'evals.json'), JSON.stringify(file));
+
+    assert.throws(() => {
+      loadEvalSuite(skillPath);
+    }, (err) => {
+      return err instanceof ConfigError && err.message.includes('ID must be a number');
+    });
   });
 
   it('should throw if skill names mismatch', () => {
@@ -68,11 +103,11 @@ describe('EvalLoader', () => {
 
     const file1 = {
       skill_name: 'skill1',
-      evals: [{ id: '1', prompt: 'prompt1' }]
+      evals: [{ id: 1, prompt: 'prompt1' }]
     };
     const file2 = {
       skill_name: 'skill2',
-      evals: [{ id: '2', prompt: 'prompt2' }]
+      evals: [{ id: 2, prompt: 'prompt2' }]
     };
 
     fs.writeFileSync(path.join(evalsDir, 'a.json'), JSON.stringify(file1));

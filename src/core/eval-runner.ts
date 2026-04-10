@@ -29,14 +29,14 @@ export class EvalRunner {
   }
 
   async runTriggerTask(task: EvalTask, index: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
-    const logFileName = `task_${index}_${task.id || 'unnamed'}_gemini.log`;
+    const logFileName = `task_${task.id}.log`;
     const logPath = path.join(this.options.runDir, logFileName);
 
     let worktreePath: string | undefined;
     let transcript: AgentTranscript | null = null;
 
     try {
-      worktreePath = this.env.createWorktree(`task-${index}`);
+      worktreePath = this.env.createWorktree(`task-${task.id}`);
       await this.env.linkSkill(worktreePath);
 
       transcript = await this.runner.runPrompt(task.prompt, worktreePath, (log: string) => {
@@ -70,7 +70,7 @@ export class EvalRunner {
     }
 
     return {
-      id: 'trial-1',
+      id: 1,
       transcript: transcript || { error: 'No transcript produced' },
       assertionResults: assertionResults,
       trialPassed: triggered
@@ -84,14 +84,14 @@ export class EvalRunner {
       ? task.prompt 
       : `${task.prompt}\n\nIMPORTANT: You must use the '${this.options.skillName}' skill/tool to solve this task.`;
 
-    const logFileName = `task_${index}_${task.id || 'unnamed'}_${passName}_gemini.log`;
+    const logFileName = `task_${task.id}_${passName}.log`;
     const logPath = path.join(this.options.runDir, logFileName);
 
     let worktreePath: string | undefined;
     let transcript: AgentTranscript | null = null;
 
     try {
-      worktreePath = this.env.createWorktree(`task-${index}-${passName}`);
+      worktreePath = this.env.createWorktree(`task-${task.id}-${passName}`);
       if (!isBaseline) {
         await this.env.linkSkill(worktreePath);
       }
@@ -121,7 +121,7 @@ export class EvalRunner {
       } catch (e) { }
 
       if (task.assertions && task.assertions.length > 0) {
-        const judgeLogFileName = `task_${index}_${task.id || 'unnamed'}_${passName}_judge_gemini.log`;
+        const judgeLogFileName = `task_${task.id}_${passName}_judge.log`;
         const judgeLogPath = path.join(this.options.runDir, judgeLogFileName);
         assertionResults = await this.functionalGrader.gradeModelBased(
           task.prompt,
@@ -137,7 +137,7 @@ export class EvalRunner {
       }
 
       return {
-        id: `trial-1-${passName}`,
+        id: 1,
         transcript: transcript || { error: 'No transcript produced' },
         assertionResults: assertionResults,
         trialPassed
@@ -160,7 +160,7 @@ export class EvalRunner {
     }
 
     return {
-      id: `trial-1-${passName}`,
+      id: 1,
       transcript: { error: transcript?.error || 'No transcript produced' },
       assertionResults: assertionResults,
       trialPassed

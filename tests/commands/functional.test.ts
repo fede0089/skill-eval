@@ -14,7 +14,7 @@ test('functionalCommand should handle tasks and trials', async (t) => {
   
   const injectedSuite = {
     skill_name: 'mock-skill',
-    tasks: [{ id: 'task-1', prompt: 'test prompt', expectations: ['is correct'] }]
+    tasks: [{ id: 1, prompt: 'test prompt', expectations: ['is correct'] }]
   };
 
   // Mock environment and runner
@@ -23,7 +23,7 @@ test('functionalCommand should handle tasks and trials', async (t) => {
 
   const runnerMock = {
     runFunctionalTask: mock.fn(async () => ({ 
-      id: 'trial-1',
+      id: 1,
       transcript: { response: 'Mock response' },
       assertionResults: [],
       trialPassed: true 

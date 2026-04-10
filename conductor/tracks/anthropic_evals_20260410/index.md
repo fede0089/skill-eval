@@ -1,4 +1,4 @@
-# Track refactor_grader_20260410 Context
+# Track anthropic_evals_20260410 Context
 
 - [Specification](./spec.md)
 - [Implementation Plan](./plan.md)

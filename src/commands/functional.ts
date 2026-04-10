@@ -62,11 +62,23 @@ export async function functionalCommand(
 
     for (let i = 0; i < tasks.length; i++) {
         const task = tasks[i];
+        const taskLabel = task.expected_output ? `${task.id}: ${task.expected_output}` : `Task ${task.id}`;
         baselineUI.addTask({
-            id: `baseline-${i}`,
-            title: `Baseline ${i + 1}/${tasks.length}: ${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`,
+            id: `baseline-${task.id}`,
+            title: `Baseline ${taskLabel}`,
             task: async (uiCtx) => {
-                const trial = await baselineRunner.runFunctionalTask(task, i, uiCtx);
+                let trial;
+                try {
+                    trial = await baselineRunner.runFunctionalTask(task, i, uiCtx);
+                } catch (error) {
+                    baselineTrials[i] = {
+                        id: 1,
+                        transcript: { error: error instanceof Error ? error.message : String(error) },
+                        assertionResults: [{ assertion: 'Baseline Execution', passed: false, reason: String(error) }],
+                        trialPassed: false
+                    };
+                    throw error;
+                }
                 baselineTrials[i] = trial;
                 if (trial.trialPassed) {
                     baselineTasksPassedCount++;
@@ -88,14 +100,35 @@ export async function functionalCommand(
 
     for (let i = 0; i < tasks.length; i++) {
         const task = tasks[i];
+        const taskLabel = task.expected_output ? `${task.id}: ${task.expected_output}` : `Task ${task.id}`;
         targetUI.addTask({
-            id: `target-${i}`,
-            title: `Target ${i + 1}/${tasks.length}: ${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`,
+            id: `target-${task.id}`,
+            title: `Target ${taskLabel}`,
             task: async (uiCtx) => {
-                const trial = await targetRunner.runFunctionalTask(task, i, uiCtx);
+                let trial;
+                try {
+                    trial = await targetRunner.runFunctionalTask(task, i, uiCtx);
+                } catch (error) {
+                    const taskResult: TaskResult = {
+                        taskId: task.id,
+                        prompt: task.prompt,
+                        score: 0.0,
+                        trials: [{
+                            id: 1,
+                            transcript: { error: error instanceof Error ? error.message : String(error) },
+                            assertionResults: [{ assertion: 'Target Execution', passed: false, reason: String(error) }],
+                            trialPassed: false
+                        }],
+                        baselineTrials: [
+                            { ...baselineTrials[i], transcript: undefined as any }
+                        ]
+                    };
+                    taskResults.push(taskResult);
+                    throw error;
+                }
                 
                 const taskResult: TaskResult = {
-                    taskId: task.id || `task-${i}`,
+                    taskId: task.id,
                     prompt: task.prompt,
                     score: trial.trialPassed ? 1.0 : 0.0,
                     trials: [
@@ -140,11 +173,26 @@ export async function functionalCommand(
 
     fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
 
-    const baselineRateLine = `   Baseline Success Rate:   ${baselinePercentage}%  (${baselineTasksPassedCount}/${tasks.length})`;
-    const targetRateLine   = `   Target Success Rate:     ${targetPercentage}% (${targetTasksPassedCount}/${tasks.length})`;
-
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
+
+    const tableData = [
+      ['ID', 'Expected Output', 'Baseline', 'Target']
+    ];
+
+    for (const result of taskResults) {
+      const task = tasks.find(t => t.id === result.taskId);
+      const expectedOutput = task?.expected_output || '-';
+      const baselineStatus = result.baselineTrials?.[0].trialPassed ? chalk.green('PASS') : chalk.red('FAIL');
+      const targetStatus = result.trials?.[0].trialPassed ? chalk.green('PASS') : chalk.red('FAIL');
+      tableData.push([result.taskId.toString(), expectedOutput, baselineStatus, targetStatus]);
+    }
+
+    Logger.table(tableData);
+
+    const baselineRateLine = `\n   Baseline Success Rate:   ${baselinePercentage}%  (${baselineTasksPassedCount}/${tasks.length})`;
+    const targetRateLine   = `   Target Success Rate:     ${targetPercentage}% (${targetTasksPassedCount}/${tasks.length})`;
+
     Logger.write(`${baselineRateLine}\n`);
     Logger.write(`${targetRateLine}\n`);
     Logger.write('\n');

@@ -9,7 +9,7 @@ describe('ListrEvalUI', () => {
       ctx.updateLog('Testing log');
     });
 
-    ui.addTask({ id: '1', title: 'Task 1', task: taskMock });
+    ui.addTask({ id: 1, title: 'Task 1', task: taskMock });
     await ui.run(5);
     
     assert.strictEqual(taskMock.mock.callCount(), 1);
@@ -25,8 +25,8 @@ describe('ListrEvalUI', () => {
       // success
     });
 
-    ui.addTask({ id: 'fail', title: 'Failing Task', task: failingTask });
-    ui.addTask({ id: 'success', title: 'Succeeding Task', task: succeedingTask });
+    ui.addTask({ id: 1, title: 'Failing Task', task: failingTask });
+    ui.addTask({ id: 2, title: 'Succeeding Task', task: succeedingTask });
     
     // Listr.run will throw if tasks fail, unless handled.
     // However, it will attempt both if concurrent.
@@ -45,7 +45,7 @@ describe('ListrEvalUI', () => {
     const results: string[] = [];
     
     ui.addTask({
-      id: 'failing',
+      id: 1,
       title: 'Failing',
       task: async () => {
         throw new Error('Failure');
@@ -53,7 +53,7 @@ describe('ListrEvalUI', () => {
     });
     
     ui.addTask({
-      id: 'succeeding',
+      id: 2,
       title: 'Succeeding',
       task: async () => {
         results.push('success');

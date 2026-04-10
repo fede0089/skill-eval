@@ -2,7 +2,7 @@
   "skill_name": "mock-skill",
   "tasks": [
     {
-      "id": "name-extraction-noise",
+      "id": 3,
       "prompt": "I'm having a wonderful day today, by the way, I'm Alice.",
       "assertions": [
         "The response must include 'Hello dear Alice!'",
@@ -10,7 +10,7 @@
       ]
     },
     {
-      "id": "name-preference-correction",
+      "id": 4,
       "prompt": "Hi! My name is Robert but please call me Bob.",
       "assertions": [
         "The response must include 'Hello dear Bob!'",
@@ -18,7 +18,7 @@
       ]
     },
     {
-      "id": "intent-no-keyword",
+      "id": 5,
       "prompt": "My name is Victor.",
       "assertions": [
         "The response must include 'Hello dear Victor!'",
@@ -26,7 +26,7 @@
       ]
     },
     {
-      "id": "refusal-to-name",
+      "id": 6,
       "prompt": "Hi! I won't tell you my name.",
       "assertions": [
         "The response must include 'Hello dear user!'",

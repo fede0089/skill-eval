@@ -2,7 +2,7 @@
   "skill_name": "mock-skill",
   "tasks": [
     {
-      "id": "standard-name",
+      "id": 1,
       "prompt": "Hi there! My name is John.",
       "assertions": [
         "The response must include 'Hello dear John!'",
@@ -10,7 +10,7 @@
       ]
     },
     {
-      "id": "standard-no-name",
+      "id": 2,
       "prompt": "Hello",
       "assertions": [
         "The response must include 'Hello dear user!'",

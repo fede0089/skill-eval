@@ -53,14 +53,36 @@ export async function triggerCommand(
 
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
+      const taskLabel = task.expected_output ? `${task.id}: ${task.expected_output}` : `Task ${task.id}`;
       ui.addTask({
-        id: task.id || `task-${i}`,
-        title: `Task ${i + 1}/${tasks.length}: ${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`,
+        id: task.id,
+        title: taskLabel,
         task: async (uiCtx) => {
-          const trial = await runner.runTriggerTask(task, i, uiCtx);
+          let trial;
+          try {
+            trial = await runner.runTriggerTask(task, i, uiCtx);
+          } catch (error) {
+            const taskResult: TaskResult = {
+              taskId: task.id,
+              prompt: task.prompt,
+              score: 0.0,
+              trials: [{
+                id: 1,
+                transcript: { error: error instanceof Error ? error.message : String(error) },
+                assertionResults: [{
+                  assertion: 'Runner Execution',
+                  passed: false,
+                  reason: error instanceof Error ? error.message : String(error)
+                }],
+                trialPassed: false
+              }]
+            };
+            taskResults.push(taskResult);
+            throw error;
+          }
           
           const taskResult: TaskResult = {
-            taskId: task.id || `task-${i}`,
+            taskId: task.id,
             prompt: task.prompt,
             score: trial.trialPassed ? 1.0 : 0.0,
             trials: [
@@ -102,12 +124,24 @@ export async function triggerCommand(
 
     fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
 
-    const triggerRateLine = `   Trigger Success Rate:   ${percentage}% (${tasksPassedCount}/${tasks.length})`;
-
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
-    Logger.write(`${triggerRateLine}\n`);
-    Logger.write('\n');
+
+    const tableData = [
+      ['ID', 'Expected Output', 'Status']
+    ];
+
+    for (const result of taskResults) {
+      const task = tasks.find(t => t.id === result.taskId);
+      const expectedOutput = task?.expected_output || '-';
+      const status = result.score === 1.0 ? chalk.green('PASS') : chalk.red('FAIL');
+      tableData.push([result.taskId.toString(), expectedOutput, status]);
+    }
+
+    Logger.table(tableData);
+
+    const triggerRateLine = `\n   Trigger Success Rate:   ${percentage}% (${tasksPassedCount}/${tasks.length})`;
+    Logger.write(`${triggerRateLine}\n\n`);
 
   } finally {
     await env.teardown();

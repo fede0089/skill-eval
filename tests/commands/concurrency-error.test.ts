@@ -9,8 +9,8 @@ test('triggerCommand should continue and report on task failure', async (t) => {
   const injectedSuite = {
     skill_name: 'mock-skill',
     tasks: [
-      { id: 'task-fail', prompt: 'failing prompt' },
-      { id: 'task-success', prompt: 'succeeding prompt' }
+      { id: 1, prompt: 'failing prompt' },
+      { id: 2, prompt: 'succeeding prompt' }
     ]
   };
 
@@ -19,11 +19,11 @@ test('triggerCommand should continue and report on task failure', async (t) => {
 
   const runnerMock = {
     runTriggerTask: mock.fn(async (task: EvalTask) => {
-      if (task.id === 'task-fail') {
+      if (task.id === 1) {
         throw new Error('Task failed');
       }
       return { 
-        id: 'trial-1',
+        id: 1,
         transcript: { response: 'Mock response' },
         assertionResults: [],
         trialPassed: true 

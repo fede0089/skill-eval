@@ -52,13 +52,18 @@ export function loadEvalSuite(skillPath: string): EvalSuite {
     }
 
     // Map input fields to internal terminology
-    const mappedTasks: EvalTask[] = rawEvals.map((e: any) => ({
-      id: e.id,
-      prompt: e.prompt,
-      expected_output: e.expected_output,
-      assertions: e.expectations || e.assertions,
-      files: e.files
-    }));
+    const mappedTasks: EvalTask[] = rawEvals.map((e: any) => {
+      if (e.id === undefined || typeof e.id !== 'number') {
+        throw new ConfigError(`Invalid task ID in ${file}. ID must be a number.`);
+      }
+      return {
+        id: e.id,
+        prompt: e.prompt,
+        expected_output: e.expected_output,
+        assertions: e.expectations || e.assertions,
+        files: e.files
+      };
+    });
 
     mergedTasks.push(...mappedTasks);
   }
