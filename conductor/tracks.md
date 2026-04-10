@@ -16,8 +16,3 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: mejoras en el reporting (output) y creacion de comando de test que haga ambos, trigger y functional testing! por ultimo, en vez de functional creo que es mas claro otro concepto, pero no se que, investiga en web si hay algo de esto**
 *Link: [./tracks/eval_20260409/](./tracks/eval_20260409/)*
-
----
-
-- [x] **Track: Eval Terminology Refactor (Align with Anthropic standards)**
-*Link: [./tracks/eval_refactor_20260410/](./tracks/eval_refactor_20260410/)*
