@@ -84,7 +84,7 @@ export class EvalRunner {
       ? task.prompt 
       : `${task.prompt}\n\nIMPORTANT: You must use the '${this.options.skillName}' skill/tool to solve this task.`;
 
-    const logFileName = `task_${task.id}_${passName}.log`;
+    const logFileName = `task_${task.id}.log`;
     const logPath = path.join(this.options.runDir, logFileName);
 
     let worktreePath: string | undefined;
@@ -96,6 +96,7 @@ export class EvalRunner {
         await this.env.linkSkill(worktreePath);
       }
 
+      fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} AGENT RUN\n`);
       transcript = await this.runner.runPrompt(promptToUse, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
       }, logPath);
@@ -121,15 +122,14 @@ export class EvalRunner {
       } catch (e) { }
 
       if (task.assertions && task.assertions.length > 0) {
-        const judgeLogFileName = `task_${task.id}_${passName}_judge.log`;
-        const judgeLogPath = path.join(this.options.runDir, judgeLogFileName);
+        fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} JUDGE RUN\n`);
         assertionResults = await this.functionalGrader.gradeModelBased(
           task.prompt,
           transcript,
           task.assertions,
           context,
           (log) => { uiCtx.updateLog(`Grading: ${log}`); },
-          judgeLogPath
+          logPath
         );
         trialPassed = assertionResults.every(r => r.passed);
       } else {

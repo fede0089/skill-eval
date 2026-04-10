@@ -190,6 +190,7 @@ ${assertions.map((a, i) => `${i + 1}. ${a}`).join('\n')}
 
 INSTRUCTIONS:
 1. Analyze the Response and the Workspace Context.
+   IMPORTANT: The Agent Response string might contain CLI system noise, telemetry errors, or tool status warnings (e.g., initialization logs) prepended or appended to the actual reply. You MUST ignore any system-level noise and evaluate the assertions STRICTLY against the agent's intended message and actions.
 2. For each assertion, determine if it was met (passed: true) or not (passed: false).
 3. Provide a brief reasoning for your judgment.
 4. Output your evaluation ONLY as a JSON array of objects with the following structure:
