@@ -4,7 +4,7 @@
 - [x] Task: Add `--concurrency` flag to CLI commands [82e84e4]
     - [ ] Write unit tests in `tests/commands/` verifying the flag is parsed correctly and defaults to 5.
     - [ ] Update `src/commands/functional.ts` and `src/commands/trigger.ts` to accept and process the `--concurrency` flag.
-- [ ] Task: Install required dependencies
+- [x] Task: Install required dependencies [874a31a]
     - [ ] Add `listr2` and `p-limit` (or similar concurrency control library) as production dependencies.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Setup and Configuration' (Protocol in workflow.md)
 
