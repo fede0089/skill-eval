@@ -11,3 +11,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: Parallel Prompt Execution with Dynamic Output**
 *Link: [./archive/parallel_prompts_20260410/index.md](./archive/parallel_prompts_20260410/index.md)*
+
+---
+
+- [ ] **Track: Adjust the evaluation format to match the Anthropic format, enforcing numeric IDs and standardizing output logging.**
+*Link: [./tracks/anthropic_evals_20260410/](./tracks/anthropic_evals_20260410/)*
