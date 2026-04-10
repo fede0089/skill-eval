@@ -5,7 +5,7 @@ import { functionalCommand } from './commands/functional';
 import { Logger } from './utils/logger';
 import { AppError } from './core/errors';
 
-const program = new Command();
+export const program = new Command();
 
 const errorHandler = (err: unknown) => {
   if (err instanceof AppError) {
@@ -33,18 +33,24 @@ program
   .command('trigger [agent]')
   .description('Evaluate triggering of an agent skill')
   .requiredOption('--skill <path>', 'Path to the skill directory')
+  .option('--concurrency <number>', 'Number of concurrent tasks', '5')
   .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
-    triggerCommand(selectedAgent, options.skill).catch(errorHandler);
+    const concurrency = parseInt(options.concurrency, 10);
+    triggerCommand(selectedAgent, options.skill, concurrency).catch(errorHandler);
   });
 
 program
   .command('functional [agent]')
   .description('Evaluate functional correctness of an agent skill based on assertions')
   .requiredOption('--skill <path>', 'Path to the skill directory')
+  .option('--concurrency <number>', 'Number of concurrent tasks', '5')
   .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
-    functionalCommand(selectedAgent, options.skill).catch(errorHandler);
+    const concurrency = parseInt(options.concurrency, 10);
+    functionalCommand(selectedAgent, options.skill, concurrency).catch(errorHandler);
   });
 
-program.parse(process.argv);
+if (require.main === module) {
+  program.parse(process.argv);
+}

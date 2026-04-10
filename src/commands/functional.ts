@@ -11,7 +11,8 @@ import { loadEvalSuite } from '../utils/eval-loader';
 
 export async function functionalCommand(
   agent: string, 
-  skillPath: string
+  skillPath: string,
+  concurrency: number = 5
 ): Promise<void> {
   const suite = loadEvalSuite(skillPath);
 

@@ -10,7 +10,8 @@ import { loadEvalSuite } from '../utils/eval-loader';
 
 export async function triggerCommand(
   agent: string, 
-  skillPath: string
+  skillPath: string,
+  concurrency: number = 5
 ): Promise<void> {
   const suite = loadEvalSuite(skillPath);
 
