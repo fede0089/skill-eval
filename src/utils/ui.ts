@@ -28,8 +28,10 @@ export class ListrEvalUI {
     this.tasks.push({
       title: descriptor.title,
       task: async (ctx, task) => {
+        let taskDone = false;
         const evalCtx: EvalTaskContext = {
           updateLog: (log: string) => {
+            if (taskDone) return;
             const sanitized = log.replace(/\n/g, ' ').trim();
             const truncated = sanitized.length > 50 ? sanitized.substring(0, 47) + '...' : sanitized;
             task.output = truncated;
@@ -42,6 +44,8 @@ export class ListrEvalUI {
             error.message = `${descriptor.title} - ${error.message}`;
           }
           throw error;
+        } finally {
+          taskDone = true;
         }
       }
     });
