@@ -6,6 +6,7 @@ import { RunnerFactory, AgentRunner } from './runners/index.js';
 import { AgentTranscript, EvalTask, EvalTrial, AssertionResult } from '../types/index.js';
 import { TriggerGrader, ModelBasedGrader } from './evaluator.js';
 import { EvalTaskContext } from '../utils/ui.js';
+import { parseNdjsonEvents } from '../utils/ndjson.js';
 
 export interface EvalRunOptions {
   agent: string;
@@ -24,17 +25,12 @@ function parseStreamResult(output: string): { error: string } | { response: stri
   const parts: string[] = [];
   let resultEvent: any = null;
 
-  for (const line of output.split('\n')) {
-    try {
-      const m = line.match(/\{.*\}/);
-      if (!m) continue;
-      const event = JSON.parse(m[0]);
-      if (event.type === 'message' && event.role === 'assistant' && typeof event.content === 'string') {
-        parts.push(event.content);
-      } else if (event.type === 'result') {
-        resultEvent = event;
-      }
-    } catch { }
+  for (const event of parseNdjsonEvents(output)) {
+    if (event.type === 'message' && event.role === 'assistant' && typeof event.content === 'string') {
+      parts.push(event.content);
+    } else if (event.type === 'result') {
+      resultEvent = event;
+    }
   }
 
   if (!resultEvent) return null;
@@ -60,15 +56,15 @@ export class EvalRunner {
     this.functionalGrader = new ModelBasedGrader(options.skillName);
   }
 
-  async runTriggerTask(task: EvalTask, index: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
-    const logFileName = `task_${task.id}.log`;
+  async runTriggerTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
+    const logFileName = `task_${task.id}_trial_${trialId}.log`;
     const logPath = path.join(this.options.runDir, logFileName);
 
     let worktreePath: string | undefined;
     let transcript: AgentTranscript | null = null;
 
     try {
-      worktreePath = this.env.createWorktree(`task-${task.id}`);
+      worktreePath = this.env.createWorktree(`task-${task.id}-trial-${trialId}`);
       await this.env.linkSkill(worktreePath);
 
       transcript = await this.runner.runPrompt(task.prompt, worktreePath, (log: string) => {
@@ -102,21 +98,21 @@ export class EvalRunner {
     }
 
     return {
-      id: 1,
+      id: trialId,
       transcript: transcript || { error: 'No transcript produced' },
       assertionResults: assertionResults,
       trialPassed: triggered
     };
   }
 
-  async runFunctionalTask(task: EvalTask, index: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
+  async runFunctionalTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
     const isBaseline = this.options.isBaseline;
     const passName = isBaseline ? 'baseline' : 'target';
     const promptToUse = isBaseline
       ? `${task.prompt}\n\nIMPORTANT: For this task, you MUST NOT use the '${this.options.skillName}' skill/tool, even if it appears available.`
       : `${task.prompt}\n\nIMPORTANT: You must use the '${this.options.skillName}' skill/tool to solve this task.`;
 
-    const logFileName = `task_${task.id}.log`;
+    const logFileName = `task_${task.id}_${passName}_trial_${trialId}.log`;
     const logPath = path.join(this.options.runDir, logFileName);
 
     let worktreePath: string | undefined;
@@ -125,7 +121,7 @@ export class EvalRunner {
     let transcript: AgentTranscript | null = null;
 
     try {
-      worktreePath = this.env.createWorktree(`task-${task.id}-${passName}`);
+      worktreePath = this.env.createWorktree(`task-${task.id}-${passName}-trial-${trialId}`);
       if (!isBaseline) {
         await this.env.linkSkill(worktreePath);
       } else {
@@ -158,7 +154,7 @@ export class EvalRunner {
       if (transcript && !transcript.error) {
         if (isBaseline && this.triggerGrader.detectSkillAttempt(transcript)) {
           return {
-            id: 1,
+            id: trialId,
             transcript,
             assertionResults: [{
               assertion: 'Baseline must not invoke the restricted skill',
@@ -171,7 +167,7 @@ export class EvalRunner {
         }
         if (!isBaseline && !this.triggerGrader.gradeTrigger(transcript)) {
           return {
-            id: 1,
+            id: trialId,
             transcript,
             assertionResults: [{
               assertion: 'Target pass must invoke the skill',
@@ -216,7 +212,7 @@ export class EvalRunner {
         }
 
         return {
-          id: 1,
+          id: trialId,
           transcript: transcript || { error: 'No transcript produced' },
           assertionResults: assertionResults,
           trialPassed
@@ -251,7 +247,7 @@ export class EvalRunner {
     }
 
     return {
-      id: 1,
+      id: trialId,
       transcript: { error: transcript?.error || 'No transcript produced' },
       assertionResults: assertionResults,
       trialPassed

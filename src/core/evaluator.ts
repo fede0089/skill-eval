@@ -1,6 +1,7 @@
 import { AgentTranscript, ToolMetrics, AssertionResult } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
 import { RunnerFactory } from './runners/factory.js';
+import { parseNdjsonEvents } from '../utils/ndjson.js';
 
 /**
  * Programmatic grader that checks if a skill was triggered by analyzing tool calls.
@@ -21,20 +22,7 @@ export class TriggerGrader {
    */
   gradeTrigger(transcript: AgentTranscript): boolean {
     const rawOutput = transcript.raw_output || '';
-    const lines = rawOutput.split('\n').filter(l => l.trim() !== '');
-    
-    const events: any[] = [];
-    for (const line of lines) {
-      try {
-        // Find JSON part in the line (it might contain other text or prefixes)
-        const jsonMatch = line.match(/\{.*\}/);
-        if (jsonMatch) {
-          events.push(JSON.parse(jsonMatch[0]));
-        }
-      } catch (e) {
-        // Skip invalid JSON lines
-      }
-    }
+    const events = parseNdjsonEvents(rawOutput);
 
     // 1. Look for tool_use event for activate_skill
     let foundToolUse = false;
@@ -123,18 +111,13 @@ export class TriggerGrader {
    */
   detectSkillAttempt(transcript: AgentTranscript): boolean {
     const rawOutput = transcript.raw_output || '';
-    for (const line of rawOutput.split('\n')) {
-      try {
-        const m = line.match(/\{.*\}/);
-        if (!m) continue;
-        const event = JSON.parse(m[0]);
-        if (
-          event.type === 'tool_use' &&
-          event.tool_name === 'activate_skill' &&
-          event.parameters?.name &&
-          this.targetToolKeys.some(k => event.parameters.name.toLowerCase() === k.toLowerCase())
-        ) return true;
-      } catch { }
+    for (const event of parseNdjsonEvents(rawOutput)) {
+      if (
+        event.type === 'tool_use' &&
+        event.tool_name === 'activate_skill' &&
+        event.parameters?.name &&
+        this.targetToolKeys.some(k => event.parameters.name.toLowerCase() === k.toLowerCase())
+      ) return true;
     }
     return false;
   }

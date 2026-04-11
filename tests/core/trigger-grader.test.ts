@@ -78,3 +78,15 @@ test('TriggerGrader.gradeTrigger should fail if tool_result is missing', () => {
 
   assert.strictEqual(grader.gradeTrigger(transcript), false);
 });
+
+test('TriggerGrader.gradeTrigger should handle JSON with deeply nested braces in parameters', () => {
+  const grader = new TriggerGrader('mock-skill');
+  const transcript: AgentTranscript = {
+    response: 'mock response',
+    raw_output:
+      JSON.stringify({ type: 'tool_use', tool_id: '99', tool_name: 'activate_skill', parameters: { name: 'mock-skill', opts: { nested: {} } } }) + '\n' +
+      JSON.stringify({ type: 'tool_result', tool_id: '99', status: 'success' })
+  };
+
+  assert.strictEqual(grader.gradeTrigger(transcript), true);
+});
