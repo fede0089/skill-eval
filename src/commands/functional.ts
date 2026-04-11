@@ -27,11 +27,16 @@ export async function functionalCommand(
   const env = new EvalEnvironment({ skillPath });
   await env.setup();
 
+  const verbose = !!process.env.DEBUG;
   const startTime = new Date();
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
-  const runDir = path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp);
-  fs.mkdirSync(runDir, { recursive: true });
-  Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
+  const runDir = verbose
+    ? path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp)
+    : '';
+  if (verbose) {
+    fs.mkdirSync(runDir, { recursive: true });
+    Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
+  }
 
   const taskResults: TaskResult[] = [];
   let targetTasksPassedCount = 0;
@@ -45,7 +50,8 @@ export async function functionalCommand(
     skillPath,
     skillName: skill_name,
     runDir,
-    isBaseline: true
+    isBaseline: true,
+    verbose
   });
 
   const targetRunner = new EvalRunner({
@@ -53,7 +59,8 @@ export async function functionalCommand(
     skillPath,
     skillName: skill_name,
     runDir,
-    isBaseline: false
+    isBaseline: false,
+    verbose
   });
 
   try {
@@ -88,6 +95,16 @@ export async function functionalCommand(
               });
               break;
             }
+          }
+
+          // Pad aborted trials so totals always reflect the requested numTrials
+          while (trials.length < numTrials) {
+            trials.push({
+              id: trials.length + 1,
+              transcript: { error: 'Trial not executed (previous trial aborted)' },
+              assertionResults: [{ assertion: 'Baseline Execution', passed: false, reason: 'Trial not executed (previous trial aborted)', graderType: 'programmatic' as const }],
+              trialPassed: false
+            });
           }
 
           baselineTrialsByTask.set(task.id, trials);
@@ -135,6 +152,16 @@ export async function functionalCommand(
               });
               break;
             }
+          }
+
+          // Pad aborted trials so totals always reflect the requested numTrials
+          while (trials.length < numTrials) {
+            trials.push({
+              id: trials.length + 1,
+              transcript: { error: 'Trial not executed (previous trial aborted)' },
+              assertionResults: [{ assertion: 'Target Execution', passed: false, reason: 'Trial not executed (previous trial aborted)', graderType: 'programmatic' as const }],
+              trialPassed: false
+            });
           }
 
           const passedCount = trials.filter(t => t.trialPassed).length;
@@ -192,7 +219,9 @@ export async function functionalCommand(
       results: taskResults
     };
 
-    fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
+    if (verbose) {
+      fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
+    }
 
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);

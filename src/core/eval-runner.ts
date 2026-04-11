@@ -14,6 +14,7 @@ export interface EvalRunOptions {
   skillName: string;
   runDir: string;
   isBaseline?: boolean;
+  verbose?: boolean;
 }
 
 /**
@@ -58,7 +59,7 @@ export class EvalRunner {
 
   async runTriggerTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
     const logFileName = `task_${task.id}_trial_${trialId}.log`;
-    const logPath = path.join(this.options.runDir, logFileName);
+    const logPath = this.options.verbose ? path.join(this.options.runDir, logFileName) : undefined;
 
     let worktreePath: string | undefined;
     let transcript: AgentTranscript | null = null;
@@ -113,7 +114,7 @@ export class EvalRunner {
       : `${task.prompt}\n\nIMPORTANT: You must use the '${this.options.skillName}' skill/tool to solve this task.`;
 
     const logFileName = `task_${task.id}_${passName}_trial_${trialId}.log`;
-    const logPath = path.join(this.options.runDir, logFileName);
+    const logPath = this.options.verbose ? path.join(this.options.runDir, logFileName) : undefined;
 
     let worktreePath: string | undefined;
     let assertionResults: AssertionResult[] = [];
@@ -136,7 +137,7 @@ export class EvalRunner {
         }
       }
 
-      fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} AGENT RUN\n`);
+      if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} AGENT RUN\n`);
       transcript = await this.runner.runPrompt(promptToUse, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
       }, logPath, ['--output-format', 'stream-json']);
@@ -193,7 +194,7 @@ export class EvalRunner {
         } catch (e) { }
 
         if (task.assertions && task.assertions.length > 0) {
-          fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} JUDGE RUN\n`);
+          if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} JUDGE RUN\n`);
           // Use the already-parsed stream result to get clean text for the judge.
           const streamResult = parseStreamResult(transcript.response || '');
           const streamText = streamResult && 'response' in streamResult ? streamResult.response : '';
