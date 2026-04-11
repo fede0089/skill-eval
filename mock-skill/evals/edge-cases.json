@@ -1,20 +1,13 @@
 {
-  "skill_name": "mock-skill",
-  "tasks": [
+  "skill_name": "license-generator",
+  "evals": [
     {
       "id": 3,
-      "prompt": "I'm having a wonderful day today, by the way, I'm Alice.",
-      "assertions": [
-        "The response must include 'Hello dear Alice!'",
-        "The response should ideally start with 'Hello'"
-      ]
-    },
-    {
-      "id": 4,
-      "prompt": "Hi! My name is Robert but please call me Bob.",
-      "assertions": [
-        "The response must include 'Hello dear Bob!'",
-        "The response should not say 'Hello dear Robert!'"
+      "prompt": "Generate a license file for John Doe.",
+      "expectations": [
+        "A file named LICENSE was created in the working directory",
+        "The LICENSE file contains 'John Doe'",
+        "The LICENSE file contains the current year (2026) since no year was specified in the prompt"
       ]
     }
   ]
