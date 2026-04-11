@@ -3,33 +3,48 @@
 ## Build and test commands
 - `npm install` - Install all dependencies.
 - `npm run build` - Build the project using `tsc`.
+- `npm start` - Run CLI directly without building.
 - `npm run test:unit` - Run the unit test suite using tsx.
 - `npm run test:trigger` - Run skill triggering evaluation with the mock skill.
 - `npm run test:functional` - Run functional evaluation with the mock skill.
 
 ## Project overview
 - A Node.js CLI tool built to evaluate Agent Skills locally using the Gemini CLI, measuring both triggering reliability and functional correctness through an LLM judge.
+- Both `trigger` and `functional` commands accept `--trials <number>` (default: 3) to run multiple trials per task and compute pass@k metrics.
 - Entrypoints for understanding the system:
   - `src/index.ts` - Main CLI entrypoint.
   - `src/commands/trigger.ts` - Skill triggering evaluation logic.
   - `src/commands/functional.ts` - Functional evaluation and expectations logic.
   - `src/core/evaluator.ts` - Core evaluation logic including functional judge prompts.
+  - `src/core/eval-runner.ts` - Orchestrates trial runs, parses stream-json output, coordinates grading.
+  - `src/core/environment.ts` - Manages git worktree isolation and skill symlinks per evaluation.
+  - `src/core/statistics.ts` - Implements pass@k metric computation.
+  - `src/core/errors.ts` - Custom error types (AppError, ConfigError, ExecutionError, ValidationError).
+  - `src/core/runners/` - Agent runner abstraction (interface, factory, Gemini CLI implementation).
+  - `src/utils/` - Shared utilities: eval-loader, exec, ndjson, ui, logger.
   - `mock-skill/SKILL.md` - Example skill structure for testing.
 
 ### Repository layout
 ```
 .
 ├── .project-skill-evals/  # evaluation run results
-├── conductor/             # conductor metadata
-├── mock-skill/           # mock skill for evaluation tests
-├── src/                  # source code
-│   ├── commands/         # CLI command definitions
-│   ├── core/            # core evaluation and runner logic
-│   └── types/           # shared TypeScript types
-├── tests/                # test suite
-├── package.json          # project manifest
-├── tsconfig.json         # TypeScript configuration
-└── README.md             # project documentation
+├── conductor/             # project management metadata (tracks, backlog, docs)
+├── mock-skill/            # mock skill for evaluation tests
+├── src/                   # source code
+│   ├── commands/          # CLI command definitions (trigger, functional)
+│   ├── core/              # core evaluation and runner logic
+│   │   ├── evaluator.ts   # LLM judge prompts and grading
+│   │   ├── eval-runner.ts # trial orchestration and stream-json parsing
+│   │   ├── environment.ts # git worktree isolation and skill symlinks
+│   │   ├── statistics.ts  # pass@k metric computation
+│   │   ├── errors.ts      # custom error types
+│   │   └── runners/       # agent runner abstraction (interface, factory, Gemini CLI)
+│   ├── utils/             # shared utilities (eval-loader, exec, ndjson, ui, logger)
+│   └── types/             # shared TypeScript types
+├── tests/                 # test suite (mirrors src/ structure)
+├── package.json           # project manifest
+├── tsconfig.json          # TypeScript configuration
+└── README.md              # project documentation
 ```
 
 ## Key technologies
@@ -38,7 +53,13 @@
 - **Package manager:** npm (`package-lock.json`)
 - **Framework:** [Commander.js](https://www.npmjs.com/package/commander) - CLI framework (`package.json`)
 - **Testing:** [tsx](https://tsx.is/) for unit tests (`package.json`, `npm run test:unit`).
-- **Other notable libraries/tools:** [Gemini CLI](https://github.com/google/gemini-cli) is used as the runner for the agents being evaluated.
+- **Other notable libraries/tools:**
+  - [Gemini CLI](https://github.com/google/gemini-cli) - runner for the agents being evaluated
+  - [listr2](https://listr2.kilic.dev/) - task list UI renderer
+  - [ora](https://github.com/sindresorhus/ora) - CLI spinner
+  - [p-limit](https://github.com/sindresorhus/p-limit) - concurrency control for parallel evaluations
+  - [chalk](https://github.com/chalk/chalk) - terminal colors
+  - [cli-table3](https://github.com/cli-table/cli-table3) - ASCII table rendering
 
 ## Code style guidelines
 - Refer to `tsconfig.json` for TypeScript compilation settings.
