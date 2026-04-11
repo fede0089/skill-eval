@@ -205,7 +205,8 @@ export class EvalRunner {
             task.assertions,
             context,
             (log) => { uiCtx.updateLog(`Grading: ${log}`); },
-            logPath
+            logPath,
+            worktreePath
           );
           trialPassed = assertionResults.every(r => r.passed);
         } else {

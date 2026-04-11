@@ -138,7 +138,8 @@ export class ModelBasedGrader {
     assertions: string[],
     workspaceContext: string,
     onLog?: (log: string) => void,
-    logPath?: string
+    logPath?: string,
+    worktreePath?: string
   ): Promise<AssertionResult[]> {
     if (!assertions || assertions.length === 0) {
       return [];
@@ -147,7 +148,7 @@ export class ModelBasedGrader {
     const judgePrompt = this.buildJudgePrompt(prompt, transcript.response || '', assertions, workspaceContext);
     const runner = RunnerFactory.create('gemini-cli');
     
-    const judgeRawOutput = await runner.runPrompt(judgePrompt, undefined, onLog, logPath);
+    const judgeRawOutput = await runner.runPrompt(judgePrompt, worktreePath, onLog, logPath);
     
     if (!judgeRawOutput || !judgeRawOutput.response) {
       const errorMsg = judgeRawOutput?.error ? ` (Error: ${judgeRawOutput.error})` : '';
@@ -195,7 +196,8 @@ Assertions to evaluate:
 ${assertions.map((a, i) => `${i + 1}. ${a}`).join('\n')}
 
 INSTRUCTIONS:
-1. Analyze the Response and the Workspace Context.
+1. Analyze the Agent Response and the Workspace Context below.
+   You are running in the directory where the agent worked. If any assertion references file content or file existence, you MUST use the read_file tool to verify directly — do not rely solely on the agent's response text.
    IMPORTANT: The Agent Response string might contain CLI system noise, telemetry errors, or tool status warnings (e.g., initialization logs) prepended or appended to the actual reply. You MUST ignore any system-level noise and evaluate the assertions STRICTLY against the agent's intended message and actions.
 2. For each assertion, determine if it was met (passed: true) or not (passed: false).
 3. Provide a brief reasoning for your judgment.
