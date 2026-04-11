@@ -31,9 +31,13 @@ test('triggerCommand should use worktrees for each task', async (t) => {
   };
   mock.method(EvalRunner.prototype, 'runTriggerTask', runnerMock.runTriggerTask);
 
-  await triggerCommand('gemini-cli', 'mock-skill', 1, injectedSuite, 1);
+  try {
+    await triggerCommand('gemini-cli', 'mock-skill', 1, injectedSuite, 1);
 
-  // Verify runner was called once (numTrials=1)
-  assert.strictEqual(runnerMock.runTriggerTask.mock.callCount(), 1);
-  assert.strictEqual(runnerMock.runTriggerTask.mock.calls[0].arguments[0].prompt, 'test prompt');
+    // Verify runner was called once (numTrials=1)
+    assert.strictEqual(runnerMock.runTriggerTask.mock.callCount(), 1);
+    assert.strictEqual(runnerMock.runTriggerTask.mock.calls[0].arguments[0].prompt, 'test prompt');
+  } finally {
+    mock.reset();
+  }
 });

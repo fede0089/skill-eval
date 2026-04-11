@@ -8,13 +8,16 @@ import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
 import { computePassAtK } from '../core/statistics.js';
+import type { Reporter } from '../core/reporters/index.js';
+import { JsonReporter } from '../core/reporters/index.js';
 
 export async function functionalCommand(
   agent: string,
   skillPath: string,
   concurrency: number = 5,
   injectedSuite?: EvalSuite,
-  numTrials: number = 3
+  numTrials: number = 3,
+  reporter: Reporter = new JsonReporter()
 ): Promise<void> {
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
 
@@ -225,6 +228,7 @@ export async function functionalCommand(
     };
 
     fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
+    reporter.generate(report, runDir);
 
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);

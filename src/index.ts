@@ -2,8 +2,11 @@
 import { Command } from 'commander';
 import { triggerCommand } from './commands/trigger.js';
 import { functionalCommand } from './commands/functional.js';
+import { showCommand } from './commands/show.js';
 import { Logger } from './utils/logger.js';
 import { AppError } from './core/errors.js';
+import { createReporter } from './core/reporters/index.js';
+import type { ReportFormat } from './types/index.js';
 
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -38,11 +41,13 @@ program
   .requiredOption('--skill <path>', 'Path to the skill directory')
   .option('--concurrency <number>', 'Number of concurrent tasks', '5')
   .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
+  .option('--report <format>', 'Report format: html or json', 'html')
   .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
     const concurrency = parseInt(options.concurrency, 10);
     const numTrials = parseInt(options.trials, 10);
-    triggerCommand(selectedAgent, options.skill, concurrency, undefined, numTrials).catch(errorHandler);
+    const reporter = createReporter(options.report as ReportFormat);
+    triggerCommand(selectedAgent, options.skill, concurrency, undefined, numTrials, reporter).catch(errorHandler);
   });
 
 program
@@ -51,11 +56,22 @@ program
   .requiredOption('--skill <path>', 'Path to the skill directory')
   .option('--concurrency <number>', 'Number of concurrent tasks', '5')
   .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
+  .option('--report <format>', 'Report format: html or json', 'html')
   .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
     const concurrency = parseInt(options.concurrency, 10);
     const numTrials = parseInt(options.trials, 10);
-    functionalCommand(selectedAgent, options.skill, concurrency, undefined, numTrials).catch(errorHandler);
+    const reporter = createReporter(options.report as ReportFormat);
+    functionalCommand(selectedAgent, options.skill, concurrency, undefined, numTrials, reporter).catch(errorHandler);
+  });
+
+program
+  .command('show')
+  .description('Display results of the latest evaluation run')
+  .option('--report <format>', 'Report format: html or json', 'html')
+  .action((options) => {
+    const reporter = createReporter(options.report as ReportFormat);
+    showCommand(reporter).catch(errorHandler);
   });
 
 const isMain = process.argv[1] && (

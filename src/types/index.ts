@@ -117,6 +117,8 @@ export interface EvalSuiteReport {
   results: TaskResult[];
 }
 
+export type ReportFormat = 'html' | 'json';
+
 // Deprecated interfaces for backwards compatibility during refactor
 export type Eval = EvalTask;
 export type ExpectationResult = AssertionResult;

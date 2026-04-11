@@ -31,8 +31,12 @@ test('functionalCommand should handle tasks and trials', async (t) => {
   };
   mock.method(EvalRunner.prototype, 'runFunctionalTask', runnerMock.runFunctionalTask);
 
-  await functionalCommand('gemini-cli', 'mock-skill', 1, injectedSuite, 1);
+  try {
+    await functionalCommand('gemini-cli', 'mock-skill', 1, injectedSuite, 1);
 
-  // Verify baseline and target runs: 1 task × 1 trial × 2 passes = 2 calls
-  assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 2);
+    // Verify baseline and target runs: 1 task × 1 trial × 2 passes = 2 calls
+    assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 2);
+  } finally {
+    mock.reset();
+  }
 });
