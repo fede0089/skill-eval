@@ -128,12 +128,12 @@ export async function triggerCommand(
     await ui.run(concurrency);
 
     // Final Report Rendering (outside of UI)
-    const percentage = tasks.length > 0 ? Math.round((tasksPassedCount / tasks.length) * 100) : 0;
-
-    // Compute aggregate pass@k (k=1 by default; average across tasks)
+    // Compute aggregate pass@1 (average across tasks) and use it as the success rate
     const passAtK = taskResults.length > 0
       ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials.map(t => ({ ...t, trialPassed: t.trialPassed })), 1), 0) / taskResults.length
       : 0;
+
+    const percentage = Math.round(passAtK * 100);
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
@@ -172,7 +172,7 @@ export async function triggerCommand(
 
     Logger.table(tableData);
 
-    const triggerRateLine = `\n   Trigger Success Rate:   ${percentage}% (${tasksPassedCount}/${tasks.length})`;
+    const triggerRateLine = `\n   Trigger Success Rate:   ${percentage}%`;
     Logger.write(`${triggerRateLine}\n\n`);
 
   } finally {

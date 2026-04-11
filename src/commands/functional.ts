@@ -190,17 +190,17 @@ export async function functionalCommand(
     await targetUI.run(concurrency);
 
     // ==== REPORTING ====
-    const targetPercentage = tasks.length > 0 ? Math.round((targetTasksPassedCount / tasks.length) * 100) : 0;
-    const baselinePercentage = tasks.length > 0 ? Math.round((baselineTasksPassedCount / tasks.length) * 100) : 0;
-    const skillUplift = targetPercentage - baselinePercentage;
-
-    // Aggregate pass@k (k=1, average across tasks)
+    // Aggregate pass@1 (average across tasks) used as the success rate
     const passAtK = taskResults.length > 0
       ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials, 1), 0) / taskResults.length
       : 0;
     const baselinePassAtK = taskResults.length > 0
       ? taskResults.reduce((sum, r) => sum + computePassAtK(r.baselineTrials ?? [], 1), 0) / taskResults.length
       : 0;
+
+    const targetPercentage = Math.round(passAtK * 100);
+    const baselinePercentage = Math.round(baselinePassAtK * 100);
+    const skillUplift = targetPercentage - baselinePercentage;
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
@@ -251,8 +251,8 @@ export async function functionalCommand(
 
     Logger.table(tableData);
 
-    const baselineRateLine = `\n   Baseline Success Rate:   ${baselinePercentage}%  (${baselineTasksPassedCount}/${tasks.length})`;
-    const targetRateLine   = `   Target Success Rate:     ${targetPercentage}% (${targetTasksPassedCount}/${tasks.length})`;
+    const baselineRateLine = `\n   Baseline Success Rate:   ${baselinePercentage}%`;
+    const targetRateLine   = `   Target Success Rate:     ${targetPercentage}%`;
 
     Logger.write(`${baselineRateLine}\n`);
     Logger.write(`${targetRateLine}\n`);
