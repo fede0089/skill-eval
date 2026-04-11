@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { spawnSync } from 'child_process';
+import { executor } from '../utils/exec.js';
 import * as path from 'path';
 import { Logger } from '../utils/logger.js';
 import { ExecutionError } from './errors.js';
@@ -71,9 +71,9 @@ export class EvalEnvironment {
     
     // Ensure the path is clean before adding a worktree
     // We try to remove it first in case a previous run crashed
-    spawnSync('git', ['worktree', 'remove', '--force', worktreePath], { stdio: 'ignore' });
+    executor.spawnSync('git', ['worktree', 'remove', '--force', worktreePath], { stdio: 'ignore' });
     
-    const child = spawnSync('git', ['worktree', 'add', worktreePath, '-f'], {
+    const child = executor.spawnSync('git', ['worktree', 'add', worktreePath, '-f'], {
       stdio: 'ignore',
       encoding: 'utf-8'
     });
@@ -91,7 +91,7 @@ export class EvalEnvironment {
   public removeWorktree(worktreePath: string): void {
     Logger.debug(`Removing worktree: ${worktreePath}`);
     
-    const child = spawnSync('git', ['worktree', 'remove', '--force', worktreePath], {
+    const child = executor.spawnSync('git', ['worktree', 'remove', '--force', worktreePath], {
       stdio: 'ignore',
       encoding: 'utf-8'
     });

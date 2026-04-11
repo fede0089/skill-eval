@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
+import { executor } from '../utils/exec.js';
 import { EvalEnvironment } from './environment.js';
 import { RunnerFactory, AgentRunner } from './runners/index.js';
 import { AgentTranscript, EvalTask, EvalTrial, AssertionResult } from '../types/index.js';
@@ -96,6 +96,16 @@ export class EvalRunner {
       worktreePath = this.env.createWorktree(`task-${task.id}-${passName}`);
       if (!isBaseline) {
         await this.env.linkSkill(worktreePath);
+      } else {
+        // Strict isolation: disable the skill in the project scope of the temporary worktree
+        try {
+          executor.execSync(`gemini skills disable ${this.options.skillName} --scope project`, {
+            cwd: worktreePath,
+            stdio: 'ignore'
+          });
+        } catch (err) {
+          // If the skill is not installed/already disabled, ignore
+        }
       }
 
       fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} AGENT RUN\n`);
@@ -107,8 +117,8 @@ export class EvalRunner {
         let context = 'No changes detected or git not available.';
         try {
           if (worktreePath) {
-            const diff = execSync('git diff HEAD', { encoding: 'utf-8', cwd: worktreePath });
-            const untracked = execSync('git ls-files --others --exclude-standard', { encoding: 'utf-8', cwd: worktreePath });
+            const diff = executor.execSync('git diff HEAD', { encoding: 'utf-8', cwd: worktreePath });
+            const untracked = executor.execSync('git ls-files --others --exclude-standard', { encoding: 'utf-8', cwd: worktreePath });
             if (diff || untracked) {
               context = `[DIFF]\n${diff}\n\n[UNTRACKED FILES]\n${untracked}`;
             } else {

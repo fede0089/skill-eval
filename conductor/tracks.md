@@ -19,5 +19,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Implement strict isolation for the Baseline pass in skill evaluations.**
+- [~] **Track: Implement strict isolation for the Baseline pass in skill evaluations.**
 *Link: [./tracks/baseline_isolation_20260410/](./tracks/baseline_isolation_20260410/)*

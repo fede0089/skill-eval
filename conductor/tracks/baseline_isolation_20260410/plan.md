@@ -1,7 +1,7 @@
 # Implementation Plan: Strict Isolation in Baseline Pass
 
 ## Phase 1: Environment Isolation (Skill Disable)
-- [ ] Task: Update `EvalRunner` (e.g. `runFunctionalTask`) to execute `gemini skills disable <skill-name> --scope project` **inside the newly created worktree** before starting the Baseline trial.
+- [x] Task: Update `EvalRunner` (e.g. `runFunctionalTask`) to execute `gemini skills disable <skill-name> --scope project` **inside the newly created worktree** before starting the Baseline trial. b8778b0
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Environment Isolation' (Protocol in workflow.md)
 
 ## Phase 2: System Prompt Restriction
