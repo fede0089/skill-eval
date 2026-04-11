@@ -27,16 +27,13 @@ export async function functionalCommand(
   const env = new EvalEnvironment({ skillPath });
   await env.setup();
 
+  // Setup Artifacts Directory (Always create, even if not verbose, for 'show' command)
   const verbose = !!process.env.DEBUG;
   const startTime = new Date();
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
-  const runDir = verbose
-    ? path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp)
-    : '';
-  if (verbose) {
-    fs.mkdirSync(runDir, { recursive: true });
-    Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
-  }
+  const runDir = path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp);
+  fs.mkdirSync(runDir, { recursive: true });
+  Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
 
   const taskResults: TaskResult[] = [];
   let targetTasksPassedCount = 0;
@@ -227,9 +224,7 @@ export async function functionalCommand(
       results: taskResults
     };
 
-    if (verbose) {
-      fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
-    }
+    fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
 
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
@@ -271,8 +266,12 @@ export async function functionalCommand(
       ? `   Target Success Rate:     pass@1: ${targetPercentage}%   pass@${numTrials}: ${Math.round(passAtN * 100)}%`
       : `   Target Success Rate:     ${targetPercentage}%`;
 
+    const upliftSign = skillUplift > 0 ? '+' : '';
+    const upliftLine = `   Skill Uplift:            ${upliftSign}${skillUplift}%`;
+
     Logger.write(`${baselineRateLine}\n`);
     Logger.write(`${targetRateLine}\n`);
+    Logger.write(`${upliftLine}\n`);
     Logger.write('\n');
 
   } finally {
