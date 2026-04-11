@@ -107,6 +107,9 @@ export interface EvalSuiteReport {
     skillUplift?: string;
     passedCount: number;
     totalCount: number;
+    numTrials?: number; // Number of trials per task
+    passAtK?: number; // Average pass@k across tasks (k = numTrials)
+    baselinePassAtK?: number; // Average baseline pass@k (functional only)
     [key: string]: any;
   };
   results: TaskResult[];

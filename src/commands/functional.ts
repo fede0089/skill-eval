@@ -7,12 +7,14 @@ import { Logger } from '../utils/logger.js';
 import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
+import { computePassAtK } from '../core/statistics.js';
 
 export async function functionalCommand(
-  agent: string, 
+  agent: string,
   skillPath: string,
   concurrency: number = 5,
-  injectedSuite?: EvalSuite
+  injectedSuite?: EvalSuite,
+  numTrials: number = 3
 ): Promise<void> {
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
 
@@ -35,6 +37,9 @@ export async function functionalCommand(
   let targetTasksPassedCount = 0;
   let baselineTasksPassedCount = 0;
 
+  // Per-task trial storage, indexed by task.id
+  const baselineTrialsByTask = new Map<number, EvalTrial[]>();
+
   const baselineRunner = new EvalRunner({
     agent,
     skillPath,
@@ -53,42 +58,49 @@ export async function functionalCommand(
 
   try {
     Logger.write(`\n${chalk.bold(`FUNCTIONAL EVALUATION: ${skillPath}`)}\n`);
-    
+
     // ==== BASELINE RUN ====
     Logger.write(`\n--- Baseline Pass (No Skill) ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
-    const baselineTrials: EvalTrial[] = new Array(tasks.length);
     const baselineUI = new ListrEvalUI();
 
     for (let i = 0; i < tasks.length; i++) {
-        const task = tasks[i];
-        const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
-        const taskLabel = `${promptSnippet} (#${task.id})`;
-        baselineUI.addTask({
-            id: `baseline-${task.id}`,
-            title: `Baseline ${taskLabel}`,
-            task: async (uiCtx) => {
-                let trial;
-                try {
-                    trial = await baselineRunner.runFunctionalTask(task, i, uiCtx);
-                } catch (error) {
-                    baselineTrials[i] = {
-                        id: 1,
-                        transcript: { error: error instanceof Error ? error.message : String(error) },
-                        assertionResults: [{ assertion: 'Baseline Execution', passed: false, reason: String(error) }],
-                        trialPassed: false
-                    };
-                    throw error;
-                }
-                baselineTrials[i] = trial;
-                if (trial.trialPassed) {
-                    baselineTasksPassedCount++;
-                } else {
-                    const failureReason = trial.assertionResults.find(r => !r.passed)?.reason || 'Baseline failed';
-                    throw new Error(failureReason);
-                }
+      const task = tasks[i];
+      const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
+      const taskLabel = `${promptSnippet} (#${task.id})`;
+      baselineUI.addTask({
+        id: `baseline-${task.id}`,
+        title: `Baseline ${taskLabel}`,
+        task: async (uiCtx) => {
+          const trials: EvalTrial[] = [];
+
+          for (let trialId = 1; trialId <= numTrials; trialId++) {
+            if (numTrials > 1) uiCtx.updateLog(`Trial ${trialId}/${numTrials}...`);
+            try {
+              const trial = await baselineRunner.runFunctionalTask(task, i, trialId, uiCtx);
+              trials.push(trial);
+            } catch (error) {
+              trials.push({
+                id: trialId,
+                transcript: { error: error instanceof Error ? error.message : String(error) },
+                assertionResults: [{ assertion: 'Baseline Execution', passed: false, reason: String(error) }],
+                trialPassed: false
+              });
+              break;
             }
-        });
+          }
+
+          baselineTrialsByTask.set(task.id, trials);
+
+          const passedCount = trials.filter(t => t.trialPassed).length;
+          if (passedCount === trials.length) {
+            baselineTasksPassedCount++;
+          } else {
+            const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'Baseline failed';
+            throw new Error(failureReason);
+          }
+        }
+      });
     }
 
     await baselineUI.run(concurrency);
@@ -96,68 +108,72 @@ export async function functionalCommand(
     // ==== TARGET RUN ====
     Logger.write(`\n--- Target Pass (w/Skill) ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
-    
+
     const targetUI = new ListrEvalUI();
 
     for (let i = 0; i < tasks.length; i++) {
-        const task = tasks[i];
-        const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
-        const taskLabel = `${promptSnippet} (#${task.id})`;
-        targetUI.addTask({
-            id: `target-${task.id}`,
-            title: `Target ${taskLabel}`,
-            task: async (uiCtx) => {
-                let trial;
-                try {
-                    trial = await targetRunner.runFunctionalTask(task, i, uiCtx);
-                } catch (error) {
-                    const taskResult: TaskResult = {
-                        taskId: task.id,
-                        prompt: task.prompt,
-                        score: 0.0,
-                        trials: [{
-                            id: 1,
-                            transcript: { error: error instanceof Error ? error.message : String(error) },
-                            assertionResults: [{ assertion: 'Target Execution', passed: false, reason: String(error) }],
-                            trialPassed: false
-                        }],
-                        baselineTrials: [
-                            { ...baselineTrials[i], transcript: undefined as any }
-                        ]
-                    };
-                    taskResults.push(taskResult);
-                    throw error;
-                }
-                
-                const taskResult: TaskResult = {
-                    taskId: task.id,
-                    prompt: task.prompt,
-                    score: trial.trialPassed ? 1.0 : 0.0,
-                    trials: [
-                        { ...trial, transcript: undefined as any }
-                    ],
-                    baselineTrials: [
-                        { ...baselineTrials[i], transcript: undefined as any }
-                    ]
-                };
-                taskResults.push(taskResult);
+      const task = tasks[i];
+      const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
+      const taskLabel = `${promptSnippet} (#${task.id})`;
+      targetUI.addTask({
+        id: `target-${task.id}`,
+        title: `Target ${taskLabel}`,
+        task: async (uiCtx) => {
+          const trials: EvalTrial[] = [];
 
-                if (trial.trialPassed) {
-                    targetTasksPassedCount++;
-                } else {
-                    const failureReason = trial.assertionResults.find(r => !r.passed)?.reason || 'Target failed';
-                    throw new Error(failureReason);
-                }
+          for (let trialId = 1; trialId <= numTrials; trialId++) {
+            if (numTrials > 1) uiCtx.updateLog(`Trial ${trialId}/${numTrials}...`);
+            try {
+              const trial = await targetRunner.runFunctionalTask(task, i, trialId, uiCtx);
+              trials.push(trial);
+            } catch (error) {
+              trials.push({
+                id: trialId,
+                transcript: { error: error instanceof Error ? error.message : String(error) },
+                assertionResults: [{ assertion: 'Target Execution', passed: false, reason: String(error) }],
+                trialPassed: false
+              });
+              break;
             }
-        });
+          }
+
+          const passedCount = trials.filter(t => t.trialPassed).length;
+          const score = trials.length > 0 ? passedCount / trials.length : 0;
+          const baselineTrials = baselineTrialsByTask.get(task.id) ?? [];
+
+          const taskResult: TaskResult = {
+            taskId: task.id,
+            prompt: task.prompt,
+            score,
+            trials: trials.map(t => ({ ...t, transcript: undefined as any })),
+            baselineTrials: baselineTrials.map(t => ({ ...t, transcript: undefined as any }))
+          };
+          taskResults.push(taskResult);
+
+          if (passedCount === trials.length) {
+            targetTasksPassedCount++;
+          } else {
+            const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'Target failed';
+            throw new Error(failureReason);
+          }
+        }
+      });
     }
 
     await targetUI.run(concurrency);
 
     // ==== REPORTING ====
-    const targetPercentage = Math.round((targetTasksPassedCount / tasks.length) * 100);
-    const baselinePercentage = Math.round((baselineTasksPassedCount / tasks.length) * 100);
+    const targetPercentage = tasks.length > 0 ? Math.round((targetTasksPassedCount / tasks.length) * 100) : 0;
+    const baselinePercentage = tasks.length > 0 ? Math.round((baselineTasksPassedCount / tasks.length) * 100) : 0;
     const skillUplift = targetPercentage - baselinePercentage;
+
+    // Aggregate pass@k (k=1, average across tasks)
+    const passAtK = taskResults.length > 0
+      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials, 1), 0) / taskResults.length
+      : 0;
+    const baselinePassAtK = taskResults.length > 0
+      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.baselineTrials ?? [], 1), 0) / taskResults.length
+      : 0;
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
@@ -168,7 +184,10 @@ export async function functionalCommand(
         baselineScore: `${baselinePercentage}%`,
         skillUplift: `${skillUplift > 0 ? '+' : ''}${skillUplift}%`,
         passedCount: targetTasksPassedCount,
-        totalCount: tasks.length
+        totalCount: tasks.length,
+        numTrials,
+        passAtK: Math.round(passAtK * 1000) / 1000,
+        baselinePassAtK: Math.round(baselinePassAtK * 1000) / 1000
       },
       results: taskResults
     };
@@ -185,8 +204,19 @@ export async function functionalCommand(
     for (const result of taskResults) {
       const task = tasks.find(t => t.id === result.taskId);
       const promptSnippet = task ? `${task.prompt.substring(0, 40)}${task.prompt.length > 40 ? '...' : ''}` : '-';
-      const baselineStatus = result.baselineTrials?.[0].trialPassed ? chalk.green('PASS') : chalk.red('FAIL');
-      const targetStatus = result.trials?.[0].trialPassed ? chalk.green('PASS') : chalk.red('FAIL');
+
+      const baselineTrials = result.baselineTrials ?? [];
+      const targetTrials = result.trials;
+
+      const baselineStr = numTrials > 1
+        ? `${baselineTrials.filter(t => t.trialPassed).length}/${baselineTrials.length}`
+        : (baselineTrials[0]?.trialPassed ? 'PASS' : 'FAIL');
+      const targetStr = numTrials > 1
+        ? `${targetTrials.filter(t => t.trialPassed).length}/${targetTrials.length}`
+        : (targetTrials[0]?.trialPassed ? 'PASS' : 'FAIL');
+
+      const baselineStatus = baselineTrials.every(t => t.trialPassed) ? chalk.green(baselineStr) : chalk.red(baselineStr);
+      const targetStatus = targetTrials.every(t => t.trialPassed) ? chalk.green(targetStr) : chalk.red(targetStr);
       tableData.push([result.taskId.toString(), promptSnippet, baselineStatus, targetStatus]);
     }
 

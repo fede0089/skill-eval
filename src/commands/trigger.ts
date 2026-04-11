@@ -2,18 +2,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { EvalEnvironment } from '../core/environment.js';
-import { TriggerGrader } from '../core/evaluator.js';
-import { EvalSuiteReport, TaskResult, AssertionResult, EvalSuite } from '../types/index.js';
+import { EvalSuiteReport, TaskResult, EvalTrial, EvalSuite } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
 import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
+import { computePassAtK } from '../core/statistics.js';
 
 export async function triggerCommand(
-  agent: string, 
+  agent: string,
   skillPath: string,
   concurrency: number = 5,
-  injectedSuite?: EvalSuite
+  injectedSuite?: EvalSuite,
+  numTrials: number = 3
 ): Promise<void> {
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
 
@@ -59,16 +60,16 @@ export async function triggerCommand(
         id: task.id,
         title: taskLabel,
         task: async (uiCtx) => {
-          let trial;
-          try {
-            trial = await runner.runTriggerTask(task, i, uiCtx);
-          } catch (error) {
-            const taskResult: TaskResult = {
-              taskId: task.id,
-              prompt: task.prompt,
-              score: 0.0,
-              trials: [{
-                id: 1,
+          const trials: EvalTrial[] = [];
+
+          for (let trialId = 1; trialId <= numTrials; trialId++) {
+            if (numTrials > 1) uiCtx.updateLog(`Trial ${trialId}/${numTrials}...`);
+            try {
+              const trial = await runner.runTriggerTask(task, i, trialId, uiCtx);
+              trials.push(trial);
+            } catch (error) {
+              trials.push({
+                id: trialId,
                 transcript: { error: error instanceof Error ? error.message : String(error) },
                 assertionResults: [{
                   assertion: 'Runner Execution',
@@ -76,30 +77,27 @@ export async function triggerCommand(
                   reason: error instanceof Error ? error.message : String(error)
                 }],
                 trialPassed: false
-              }]
-            };
-            taskResults.push(taskResult);
-            throw error;
+              });
+              // Abort remaining trials on execution error
+              break;
+            }
           }
-          
+
+          const passedCount = trials.filter(t => t.trialPassed).length;
+          const score = trials.length > 0 ? passedCount / trials.length : 0;
+
           const taskResult: TaskResult = {
             taskId: task.id,
             prompt: task.prompt,
-            score: trial.trialPassed ? 1.0 : 0.0,
-            trials: [
-              {
-                ...trial,
-                transcript: undefined as any // Remove transcript from summary to reduce redundancy
-              }
-            ]
+            score,
+            trials: trials.map(t => ({ ...t, transcript: undefined as any }))
           };
-
           taskResults.push(taskResult);
-          if (trial.trialPassed) {
+
+          if (passedCount === trials.length) {
             tasksPassedCount++;
           } else {
-            // Find the reason for the failure from assertion results
-            const failureReason = trial.assertionResults.find(r => !r.passed)?.reason || 'Task failed evaluation';
+            const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'Task failed evaluation';
             throw new Error(failureReason);
           }
         }
@@ -109,7 +107,12 @@ export async function triggerCommand(
     await ui.run(concurrency);
 
     // Final Report Rendering (outside of UI)
-    const percentage = Math.round((tasksPassedCount / tasks.length) * 100);
+    const percentage = tasks.length > 0 ? Math.round((tasksPassedCount / tasks.length) * 100) : 0;
+
+    // Compute aggregate pass@k (k=1 by default; average across tasks)
+    const passAtK = taskResults.length > 0
+      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials.map(t => ({ ...t, trialPassed: t.trialPassed })), 1), 0) / taskResults.length
+      : 0;
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
@@ -118,7 +121,9 @@ export async function triggerCommand(
       metrics: {
         targetScore: `${percentage}%`,
         passedCount: tasksPassedCount,
-        totalCount: tasks.length
+        totalCount: tasks.length,
+        numTrials,
+        passAtK: Math.round(passAtK * 1000) / 1000
       },
       results: taskResults
     };
@@ -135,7 +140,10 @@ export async function triggerCommand(
     for (const result of taskResults) {
       const task = tasks.find(t => t.id === result.taskId);
       const promptSnippet = task ? `${task.prompt.substring(0, 40)}${task.prompt.length > 40 ? '...' : ''}` : '-';
-      const status = result.score === 1.0 ? chalk.green('PASS') : chalk.red('FAIL');
+      const statusStr = numTrials > 1
+        ? `${result.trials.filter(t => t.trialPassed).length}/${result.trials.length}`
+        : (result.score === 1.0 ? 'PASS' : 'FAIL');
+      const status = result.score === 1.0 ? chalk.green(statusStr) : chalk.red(statusStr);
       tableData.push([result.taskId.toString(), promptSnippet, status]);
     }
 

@@ -37,10 +37,12 @@ program
   .description('Evaluate triggering of an agent skill')
   .requiredOption('--skill <path>', 'Path to the skill directory')
   .option('--concurrency <number>', 'Number of concurrent tasks', '5')
+  .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
   .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
     const concurrency = parseInt(options.concurrency, 10);
-    triggerCommand(selectedAgent, options.skill, concurrency).catch(errorHandler);
+    const numTrials = parseInt(options.trials, 10);
+    triggerCommand(selectedAgent, options.skill, concurrency, undefined, numTrials).catch(errorHandler);
   });
 
 program
@@ -48,10 +50,12 @@ program
   .description('Evaluate functional correctness of an agent skill based on assertions')
   .requiredOption('--skill <path>', 'Path to the skill directory')
   .option('--concurrency <number>', 'Number of concurrent tasks', '5')
+  .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
   .action((agent, options) => {
     const selectedAgent = agent || 'gemini-cli';
     const concurrency = parseInt(options.concurrency, 10);
-    functionalCommand(selectedAgent, options.skill, concurrency).catch(errorHandler);
+    const numTrials = parseInt(options.trials, 10);
+    functionalCommand(selectedAgent, options.skill, concurrency, undefined, numTrials).catch(errorHandler);
   });
 
 const isMain = process.argv[1] && (
