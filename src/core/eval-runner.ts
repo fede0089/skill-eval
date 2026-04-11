@@ -15,6 +15,28 @@ export interface EvalRunOptions {
   isBaseline?: boolean;
 }
 
+/**
+ * Extracts the clean text response from a Gemini CLI stream-json output.
+ * Looks for assistant message events and result response fields.
+ * Falls back to the raw output if nothing is found.
+ */
+function extractResponseFromStreamJson(output: string): string {
+  const parts: string[] = [];
+  for (const line of output.split('\n')) {
+    try {
+      const m = line.match(/\{.*\}/);
+      if (!m) continue;
+      const event = JSON.parse(m[0]);
+      if (event.type === 'message' && event.role === 'assistant' && typeof event.content === 'string') {
+        parts.push(event.content);
+      } else if (event.type === 'result' && typeof event.response === 'string') {
+        parts.push(event.response);
+      }
+    } catch { }
+  }
+  return parts.join('\n').trim();
+}
+
 export class EvalRunner {
   private env: EvalEnvironment;
   private runner: AgentRunner;
@@ -156,9 +178,13 @@ export class EvalRunner {
 
         if (task.assertions && task.assertions.length > 0) {
           fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} JUDGE RUN\n`);
+          // Extract clean text from stream-json; the runner sets response = raw stdout which
+          // in stream-json mode contains JSON events rather than plain text.
+          const streamText = extractResponseFromStreamJson(transcript.response || '');
+          const gradingTranscript = streamText ? { ...transcript, response: streamText } : transcript;
           assertionResults = await this.functionalGrader.gradeModelBased(
             task.prompt,
-            transcript,
+            gradingTranscript,
             task.assertions,
             context,
             (log) => { uiCtx.updateLog(`Grading: ${log}`); },
