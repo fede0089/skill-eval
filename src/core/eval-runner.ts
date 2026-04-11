@@ -16,12 +16,14 @@ export interface EvalRunOptions {
 }
 
 /**
- * Extracts the clean text response from a Gemini CLI stream-json output.
- * Looks for assistant message events and result response fields.
- * Falls back to the raw output if nothing is found.
+ * Parses the Gemini CLI stream-json result event from stdout.
+ * Returns { error } if the run failed, or { response } with the clean text on success.
+ * Returns null if no result event is found (non-stream output).
  */
-function extractResponseFromStreamJson(output: string): string {
+function parseStreamResult(output: string): { error: string } | { response: string } | null {
   const parts: string[] = [];
+  let resultEvent: any = null;
+
   for (const line of output.split('\n')) {
     try {
       const m = line.match(/\{.*\}/);
@@ -29,12 +31,20 @@ function extractResponseFromStreamJson(output: string): string {
       const event = JSON.parse(m[0]);
       if (event.type === 'message' && event.role === 'assistant' && typeof event.content === 'string') {
         parts.push(event.content);
-      } else if (event.type === 'result' && typeof event.response === 'string') {
-        parts.push(event.response);
+      } else if (event.type === 'result') {
+        resultEvent = event;
       }
     } catch { }
   }
-  return parts.join('\n').trim();
+
+  if (!resultEvent) return null;
+  if (resultEvent.status === 'error') {
+    const msg = resultEvent.error?.message || 'Agent run failed';
+    return { error: msg };
+  }
+  // Success: prefer collected assistant messages, fall back to result.response
+  const text = parts.join('\n').trim() || (typeof resultEvent.response === 'string' ? resultEvent.response : '');
+  return { response: text };
 }
 
 export class EvalRunner {
@@ -135,6 +145,16 @@ export class EvalRunner {
         uiCtx.updateLog(log);
       }, logPath, ['--output-format', 'stream-json']);
 
+      // Propagate stream-json errors: when the agent fails (e.g. quota), Gemini CLI still
+      // writes a {"type":"result","status":"error",...} event to stdout so transcript.error
+      // is never set by the runner. Parse it here so the grading path is skipped correctly.
+      if (transcript && !transcript.error) {
+        const streamResult = parseStreamResult(transcript.response || '');
+        if (streamResult && 'error' in streamResult) {
+          transcript.error = streamResult.error;
+        }
+      }
+
       if (transcript && !transcript.error) {
         if (isBaseline && this.triggerGrader.detectSkillAttempt(transcript)) {
           return {
@@ -178,9 +198,9 @@ export class EvalRunner {
 
         if (task.assertions && task.assertions.length > 0) {
           fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} JUDGE RUN\n`);
-          // Extract clean text from stream-json; the runner sets response = raw stdout which
-          // in stream-json mode contains JSON events rather than plain text.
-          const streamText = extractResponseFromStreamJson(transcript.response || '');
+          // Use the already-parsed stream result to get clean text for the judge.
+          const streamResult = parseStreamResult(transcript.response || '');
+          const streamText = streamResult && 'response' in streamResult ? streamResult.response : '';
           const gradingTranscript = streamText ? { ...transcript, response: streamText } : transcript;
           assertionResults = await this.functionalGrader.gradeModelBased(
             task.prompt,
