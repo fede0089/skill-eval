@@ -190,12 +190,18 @@ export async function functionalCommand(
     await targetUI.run(concurrency);
 
     // ==== REPORTING ====
-    // Aggregate pass@1 (average across tasks) used as the success rate
+    // Aggregate pass@1 and pass@n (average across tasks)
     const passAtK = taskResults.length > 0
       ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials, 1), 0) / taskResults.length
       : 0;
+    const passAtN = taskResults.length > 0
+      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials, numTrials), 0) / taskResults.length
+      : 0;
     const baselinePassAtK = taskResults.length > 0
       ? taskResults.reduce((sum, r) => sum + computePassAtK(r.baselineTrials ?? [], 1), 0) / taskResults.length
+      : 0;
+    const baselinePassAtN = taskResults.length > 0
+      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.baselineTrials ?? [], numTrials), 0) / taskResults.length
       : 0;
 
     const targetPercentage = Math.round(passAtK * 100);
@@ -214,7 +220,9 @@ export async function functionalCommand(
         totalCount: tasks.length,
         numTrials,
         passAtK: Math.round(passAtK * 1000) / 1000,
-        baselinePassAtK: Math.round(baselinePassAtK * 1000) / 1000
+        passAtN: Math.round(passAtN * 1000) / 1000,
+        baselinePassAtK: Math.round(baselinePassAtK * 1000) / 1000,
+        baselinePassAtN: Math.round(baselinePassAtN * 1000) / 1000
       },
       results: taskResults
     };
@@ -226,9 +234,9 @@ export async function functionalCommand(
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
 
-    const tableData = [
-      ['ID', 'Prompt', 'Baseline', 'Target']
-    ];
+    const tableData = numTrials > 1
+      ? [['ID', 'Prompt', 'Base p@1', `Base p@${numTrials}`, 'Tgt p@1', `Tgt p@${numTrials}`]]
+      : [['ID', 'Prompt', 'Baseline', 'Target']];
 
     for (const result of taskResults) {
       const task = tasks.find(t => t.id === result.taskId);
@@ -237,22 +245,31 @@ export async function functionalCommand(
       const baselineTrials = result.baselineTrials ?? [];
       const targetTrials = result.trials;
 
-      const baselineStr = numTrials > 1
-        ? `${baselineTrials.filter(t => t.trialPassed).length}/${baselineTrials.length}`
-        : (baselineTrials[0]?.trialPassed ? 'PASS' : 'FAIL');
-      const targetStr = numTrials > 1
-        ? `${targetTrials.filter(t => t.trialPassed).length}/${targetTrials.length}`
-        : (targetTrials[0]?.trialPassed ? 'PASS' : 'FAIL');
-
-      const baselineStatus = baselineTrials.every(t => t.trialPassed) ? chalk.green(baselineStr) : chalk.red(baselineStr);
-      const targetStatus = targetTrials.every(t => t.trialPassed) ? chalk.green(targetStr) : chalk.red(targetStr);
-      tableData.push([result.taskId.toString(), promptSnippet, baselineStatus, targetStatus]);
+      if (numTrials > 1) {
+        const bp1 = `${Math.round(computePassAtK(baselineTrials, 1) * 100)}%`;
+        const bpn = `${Math.round(computePassAtK(baselineTrials, numTrials) * 100)}%`;
+        const tp1 = `${Math.round(computePassAtK(targetTrials, 1) * 100)}%`;
+        const tpn = `${Math.round(computePassAtK(targetTrials, numTrials) * 100)}%`;
+        const bColor = baselineTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
+        const tColor = targetTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
+        tableData.push([result.taskId.toString(), promptSnippet, bColor(bp1), bColor(bpn), tColor(tp1), tColor(tpn)]);
+      } else {
+        const baselineStr = baselineTrials[0]?.trialPassed ? 'PASS' : 'FAIL';
+        const targetStr = targetTrials[0]?.trialPassed ? 'PASS' : 'FAIL';
+        const baselineStatus = baselineTrials.every(t => t.trialPassed) ? chalk.green(baselineStr) : chalk.red(baselineStr);
+        const targetStatus = targetTrials.every(t => t.trialPassed) ? chalk.green(targetStr) : chalk.red(targetStr);
+        tableData.push([result.taskId.toString(), promptSnippet, baselineStatus, targetStatus]);
+      }
     }
 
     Logger.table(tableData);
 
-    const baselineRateLine = `\n   Baseline Success Rate:   ${baselinePercentage}%`;
-    const targetRateLine   = `   Target Success Rate:     ${targetPercentage}%`;
+    const baselineRateLine = numTrials > 1
+      ? `\n   Baseline Success Rate:   pass@1: ${baselinePercentage}%   pass@${numTrials}: ${Math.round(baselinePassAtN * 100)}%`
+      : `\n   Baseline Success Rate:   ${baselinePercentage}%`;
+    const targetRateLine = numTrials > 1
+      ? `   Target Success Rate:     pass@1: ${targetPercentage}%   pass@${numTrials}: ${Math.round(passAtN * 100)}%`
+      : `   Target Success Rate:     ${targetPercentage}%`;
 
     Logger.write(`${baselineRateLine}\n`);
     Logger.write(`${targetRateLine}\n`);

@@ -108,8 +108,10 @@ export interface EvalSuiteReport {
     passedCount: number;
     totalCount: number;
     numTrials?: number; // Number of trials per task
-    passAtK?: number; // Average pass@1 across tasks (probability a single trial passes)
-    baselinePassAtK?: number; // Average baseline pass@1 (functional only)
+    passAtK?: number;          // Average pass@1 across tasks (probability a single trial passes)
+    passAtN?: number;          // Average pass@numTrials across tasks (probability at least one trial passes)
+    baselinePassAtK?: number;  // Average baseline pass@1 (functional only)
+    baselinePassAtN?: number;  // Average baseline pass@numTrials (functional only)
     [key: string]: any;
   };
   results: TaskResult[];

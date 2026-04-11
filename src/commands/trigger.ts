@@ -128,9 +128,12 @@ export async function triggerCommand(
     await ui.run(concurrency);
 
     // Final Report Rendering (outside of UI)
-    // Compute aggregate pass@1 (average across tasks) and use it as the success rate
+    // Compute aggregate pass@1 and pass@n (average across tasks)
     const passAtK = taskResults.length > 0
-      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials.map(t => ({ ...t, trialPassed: t.trialPassed })), 1), 0) / taskResults.length
+      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials, 1), 0) / taskResults.length
+      : 0;
+    const passAtN = taskResults.length > 0
+      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials, numTrials), 0) / taskResults.length
       : 0;
 
     const percentage = Math.round(passAtK * 100);
@@ -144,7 +147,8 @@ export async function triggerCommand(
         passedCount: tasksPassedCount,
         totalCount: tasks.length,
         numTrials,
-        passAtK: Math.round(passAtK * 1000) / 1000
+        passAtK: Math.round(passAtK * 1000) / 1000,
+        passAtN: Math.round(passAtN * 1000) / 1000
       },
       results: taskResults
     };
@@ -156,23 +160,31 @@ export async function triggerCommand(
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
 
-    const tableData = [
-      ['ID', 'Prompt', 'Status']
-    ];
+    const tableData = numTrials > 1
+      ? [['ID', 'Prompt', 'Trials', 'pass@1', `pass@${numTrials}`]]
+      : [['ID', 'Prompt', 'Status']];
 
     for (const result of taskResults) {
       const task = tasks.find(t => t.id === result.taskId);
       const promptSnippet = task ? `${task.prompt.substring(0, 40)}${task.prompt.length > 40 ? '...' : ''}` : '-';
-      const statusStr = numTrials > 1
-        ? `${result.trials.filter(t => t.trialPassed).length}/${result.trials.length}`
-        : (result.score === 1.0 ? 'PASS' : 'FAIL');
-      const status = result.score === 1.0 ? chalk.green(statusStr) : chalk.red(statusStr);
-      tableData.push([result.taskId.toString(), promptSnippet, status]);
+      if (numTrials > 1) {
+        const trialsStr = `${result.trials.filter(t => t.trialPassed).length}/${result.trials.length}`;
+        const trials = result.score === 1.0 ? chalk.green(trialsStr) : chalk.red(trialsStr);
+        const p1 = `${Math.round(computePassAtK(result.trials, 1) * 100)}%`;
+        const pn = `${Math.round(computePassAtK(result.trials, numTrials) * 100)}%`;
+        tableData.push([result.taskId.toString(), promptSnippet, trials, p1, pn]);
+      } else {
+        const statusStr = result.score === 1.0 ? 'PASS' : 'FAIL';
+        const status = result.score === 1.0 ? chalk.green(statusStr) : chalk.red(statusStr);
+        tableData.push([result.taskId.toString(), promptSnippet, status]);
+      }
     }
 
     Logger.table(tableData);
 
-    const triggerRateLine = `\n   Trigger Success Rate:   ${percentage}%`;
+    const triggerRateLine = numTrials > 1
+      ? `\n   Trigger Success Rate:   pass@1: ${percentage}%   pass@${numTrials}: ${Math.round(passAtN * 100)}%`
+      : `\n   Trigger Success Rate:   ${percentage}%`;
     Logger.write(`${triggerRateLine}\n\n`);
 
   } finally {
