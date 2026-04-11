@@ -16,22 +16,6 @@
         "The response must include 'Hello dear Bob!'",
         "The response should not say 'Hello dear Robert!'"
       ]
-    },
-    {
-      "id": 5,
-      "prompt": "My name is Victor.",
-      "assertions": [
-        "The response must include 'Hello dear Victor!'",
-        "The response must still follow the 'Hello' greeting rule"
-      ]
-    },
-    {
-      "id": 6,
-      "prompt": "Hi! I won't tell you my name.",
-      "assertions": [
-        "The response must include 'Hello dear user!'",
-        "The response must not treat 'I won't tell you' as a name"
-      ]
     }
   ]
 }

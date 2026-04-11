@@ -80,8 +80,8 @@ export class EvalRunner {
   async runFunctionalTask(task: EvalTask, index: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
     const isBaseline = this.options.isBaseline;
     const passName = isBaseline ? 'baseline' : 'target';
-    const promptToUse = isBaseline 
-      ? task.prompt 
+    const promptToUse = isBaseline
+      ? `${task.prompt}\n\nIMPORTANT: For this task, you MUST NOT use the '${this.options.skillName}' skill/tool, even if it appears available.`
       : `${task.prompt}\n\nIMPORTANT: You must use the '${this.options.skillName}' skill/tool to solve this task.`;
 
     const logFileName = `task_${task.id}.log`;
@@ -111,9 +111,36 @@ export class EvalRunner {
       fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} AGENT RUN\n`);
       transcript = await this.runner.runPrompt(promptToUse, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
-      }, logPath);
+      }, logPath, ['--output-format', 'stream-json']);
 
       if (transcript && !transcript.error) {
+        if (isBaseline && this.triggerGrader.detectSkillAttempt(transcript)) {
+          return {
+            id: 1,
+            transcript,
+            assertionResults: [{
+              assertion: 'Baseline must not invoke the restricted skill',
+              passed: false,
+              reason: `Invalid Baseline: '${this.options.skillName}' activation detected during baseline run`,
+              graderType: 'programmatic'
+            }],
+            trialPassed: false
+          };
+        }
+        if (!isBaseline && !this.triggerGrader.gradeTrigger(transcript)) {
+          return {
+            id: 1,
+            transcript,
+            assertionResults: [{
+              assertion: 'Target pass must invoke the skill',
+              passed: false,
+              reason: `Invalid Target: '${this.options.skillName}' was not successfully activated`,
+              graderType: 'programmatic'
+            }],
+            trialPassed: false
+          };
+        }
+
         let context = 'No changes detected or git not available.';
         try {
           if (worktreePath) {

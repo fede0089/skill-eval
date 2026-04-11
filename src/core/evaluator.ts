@@ -115,6 +115,29 @@ export class TriggerGrader {
 
     return false;
   }
+
+  /**
+   * Checks whether the skill was attempted (any tool_use event for activate_skill matching the skill name).
+   * Unlike gradeTrigger, does NOT require a successful tool_result — any attempt counts.
+   * Used to detect invalid baseline runs where the agent tried to invoke the restricted skill.
+   */
+  detectSkillAttempt(transcript: AgentTranscript): boolean {
+    const rawOutput = transcript.raw_output || '';
+    for (const line of rawOutput.split('\n')) {
+      try {
+        const m = line.match(/\{.*\}/);
+        if (!m) continue;
+        const event = JSON.parse(m[0]);
+        if (
+          event.type === 'tool_use' &&
+          event.tool_name === 'activate_skill' &&
+          event.parameters?.name &&
+          this.targetToolKeys.some(k => event.parameters.name.toLowerCase() === k.toLowerCase())
+        ) return true;
+      } catch { }
+    }
+    return false;
+  }
 }
 
 /**
