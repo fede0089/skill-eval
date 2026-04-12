@@ -37,24 +37,19 @@ Evaluations are defined via an `evals/evals.json` file inside your target skill 
        evals.json
    ```
 
-2. Execute the CLI from anywhere **outside** the skill referencing its relative or absolute path. You can run trigger evaluations, functional evaluations, or view the latest results:
+2. Run evaluations by specifying the workspace (the repo the agent will run in) and the skill path:
 
    **Evaluate Triggers (Trigger Command):**
    ```sh
-   skill-eval trigger --skill ../path/to/skill
+   skill-eval trigger --workspace /path/to/repo --skill /path/to/skill
    ```
 
    **Evaluate Functional Correctness (Functional Command):**
    ```sh
-   skill-eval functional --skill ../path/to/skill
+   skill-eval functional --workspace /path/to/repo --skill /path/to/skill
    ```
 
-   **Display Latest Results (Show Command):**
-   ```sh
-   skill-eval show
-   ```
-
-   Both `trigger` and `functional` support `--trials <number>` (default: 3) to run multiple trials per task and compute **pass@k** metrics, and `--concurrency <number>` (default: 5) to control parallel execution.
+   Both commands support `--trials <number>` (default: 3) to run multiple trials per task and compute **pass@k** metrics, and `--concurrency <number>` (default: 5) to control parallel execution.
 
 3. `skill-eval` will automatically:
    - Validate the agent binary and skill directory structure before starting (pre-flight check).
@@ -96,31 +91,13 @@ For functional evaluations, include `expectations`:
 }
 ```
 
-## Configuration
+## CLI flags
 
-Instead of passing flags every time, you can create a `.skill-eval.json` file in the directory where you run `skill-eval`. CLI flags always take precedence over config file values.
-
-```json
-{
-  "skill": "./path/to/my-skill",
-  "agent": "gemini-cli",
-  "concurrency": 3,
-  "trials": 5,
-  "report": "html"
-}
-```
-
-All fields are optional. With a config file in place, you can run evaluations without any flags:
-
-```sh
-skill-eval trigger
-skill-eval functional
-```
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `skill` | string | — | Path to the skill directory |
-| `agent` | string | `gemini-cli` | Agent backend to use |
-| `concurrency` | number | `5` | Concurrent tasks |
-| `trials` | number | `3` | Trials per task (for pass@k) |
-| `report` | `html` \| `json` | `html` | Output report format |
+| Flag | Required | Default | Description |
+|------|----------|---------|-------------|
+| `--workspace <path>` | yes | — | Path to the repo the agent will run in |
+| `--skill <path>` | yes | — | Path to the skill directory |
+| `--concurrency <number>` | no | `5` | Concurrent tasks |
+| `--trials <number>` | no | `3` | Trials per task (for pass@k) |
+| `--report <format>` | no | `html` | Output format: `html` or `json` |
+| `[agent]` | no | `gemini-cli` | Agent backend to use |

@@ -10,22 +10,20 @@
 
 ## Project overview
 - A Node.js CLI tool built to evaluate Agent Skills locally using the Gemini CLI, measuring both triggering reliability and functional correctness through an LLM judge.
-- Both `trigger` and `functional` commands accept `--trials <number>` (default: 3, resolved via config fallback in the action handler) to run multiple trials per task and compute pass@k metrics.
+- Both `trigger` and `functional` commands require `--workspace <path>` and `--skill <path>`, and accept `--trials <number>` (default: 3) and `--concurrency <number>` (default: 5).
 - Entrypoints for understanding the system:
-  - `src/index.ts` - Main CLI entrypoint; applies config file defaults via `loadConfig`.
+  - `src/index.ts` - Main CLI entrypoint; defines `trigger` and `functional` commands.
   - `src/commands/trigger.ts` - Skill triggering evaluation logic.
   - `src/commands/functional.ts` - Functional evaluation and expectations logic.
-  - `src/commands/show.ts` - Display results of the latest evaluation run.
   - `src/core/evaluator.ts` - Core evaluation logic including functional judge prompts; `ModelBasedGrader` accepts an injected `AgentRunner`.
   - `src/core/eval-runner.ts` - Orchestrates trial runs, parses NDJSON stream output, coordinates grading.
   - `src/core/environment.ts` - Manages git worktree isolation and skill symlinks per evaluation.
   - `src/core/statistics.ts` - Implements `computePassAtK` and `aggregatePassAtK` metric computation.
   - `src/core/trial-utils.ts` - Shared helper: `padAbortedTrials` fills trial arrays to a consistent denominator.
   - `src/core/preflight.ts` - Pre-flight validation of agent binary and skill directory structure.
-  - `src/core/config.ts` - Loads `.skill-eval.json` config file; returns `{}` if absent, throws `ConfigError` on invalid input.
   - `src/core/errors.ts` - Custom error types (AppError, ConfigError, ExecutionError, ValidationError).
   - `src/core/runners/` - Agent runner abstraction (interface, factory, Gemini CLI implementation).
-  - `src/utils/table-renderer.ts` - Shared `renderTriggerTable` / `renderFunctionalTable` used by all three commands.
+  - `src/utils/table-renderer.ts` - Shared `renderTriggerTable` / `renderFunctionalTable` used by both commands.
   - `src/utils/` - Shared utilities: eval-loader, exec, ndjson, ui, logger.
   - `src/types/index.ts` - Shared TypeScript types including the `NdjsonEvent` discriminated union.
   - `mock-skill/SKILL.md` - Example skill structure for testing.
@@ -45,7 +43,6 @@
 │   │   ├── statistics.ts  # pass@k metric computation (computePassAtK, aggregatePassAtK)
 │   │   ├── trial-utils.ts # shared trial padding helper (padAbortedTrials)
 │   │   ├── preflight.ts   # agent binary + skill path validation before trials
-│   │   ├── config.ts      # .skill-eval.json config file loading
 │   │   ├── errors.ts      # custom error types
 │   │   └── runners/       # agent runner abstraction (interface, factory, Gemini CLI)
 │   ├── utils/             # shared utilities (eval-loader, exec, ndjson, ui, logger, table-renderer)
