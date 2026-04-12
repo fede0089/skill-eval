@@ -7,7 +7,10 @@ import { Logger } from '../utils/logger.js';
 import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
-import { computePassAtK } from '../core/statistics.js';
+import { aggregatePassAtK } from '../core/statistics.js';
+import { padAbortedTrials } from '../core/trial-utils.js';
+import { preflight } from '../core/preflight.js';
+import { renderTriggerTable } from '../utils/table-renderer.js';
 import type { Reporter } from '../core/reporters/index.js';
 import { JsonReporter } from '../core/reporters/index.js';
 
@@ -19,6 +22,7 @@ export async function triggerCommand(
   numTrials: number = 3,
   reporter: Reporter = new JsonReporter()
 ): Promise<void> {
+  if (!injectedSuite) preflight(agent, skillPath);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
 
   const { skill_name, tasks } = suite;
@@ -88,20 +92,7 @@ export async function triggerCommand(
             }
           }
 
-          // Pad aborted trials so totals always reflect the requested numTrials
-          while (trials.length < numTrials) {
-            trials.push({
-              id: trials.length + 1,
-              transcript: { error: 'Trial not executed (previous trial aborted)' },
-              assertionResults: [{
-                assertion: 'Runner Execution',
-                passed: false,
-                reason: 'Trial not executed (previous trial aborted)',
-                graderType: 'programmatic'
-              }],
-              trialPassed: false
-            });
-          }
+          padAbortedTrials(trials, numTrials, 'Runner Execution');
 
           const passedCount = trials.filter(t => t.trialPassed).length;
           const score = trials.length > 0 ? passedCount / trials.length : 0;
@@ -126,15 +117,8 @@ export async function triggerCommand(
 
     await ui.run(concurrency);
 
-    // Final Report Rendering (outside of UI)
-    // Compute aggregate pass@1 and pass@n (average across tasks)
-    const passAtK = taskResults.length > 0
-      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials, 1), 0) / taskResults.length
-      : 0;
-    const passAtN = taskResults.length > 0
-      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials, numTrials), 0) / taskResults.length
-      : 0;
-
+    // Compute aggregate metrics and build report
+    const { passAtK, passAtN } = aggregatePassAtK(taskResults, numTrials, r => r.trials);
     const percentage = Math.round(passAtK * 100);
 
     const report: EvalSuiteReport = {
@@ -157,33 +141,8 @@ export async function triggerCommand(
 
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
-
-    const tableData = numTrials > 1
-      ? [['ID', 'Prompt', 'Trials', 'pass@1', `pass@${numTrials}`]]
-      : [['ID', 'Prompt', 'Status']];
-
-    for (const result of taskResults) {
-      const task = tasks.find(t => t.id === result.taskId);
-      const promptSnippet = task ? `${task.prompt.substring(0, 40)}${task.prompt.length > 40 ? '...' : ''}` : '-';
-      if (numTrials > 1) {
-        const trialsStr = `${result.trials.filter(t => t.trialPassed).length}/${result.trials.length}`;
-        const trials = result.score === 1.0 ? chalk.green(trialsStr) : chalk.red(trialsStr);
-        const p1 = `${Math.round(computePassAtK(result.trials, 1) * 100)}%`;
-        const pn = `${Math.round(computePassAtK(result.trials, numTrials) * 100)}%`;
-        tableData.push([result.taskId.toString(), promptSnippet, trials, p1, pn]);
-      } else {
-        const statusStr = result.score === 1.0 ? 'PASS' : 'FAIL';
-        const status = result.score === 1.0 ? chalk.green(statusStr) : chalk.red(statusStr);
-        tableData.push([result.taskId.toString(), promptSnippet, status]);
-      }
-    }
-
-    Logger.table(tableData);
-
-    const triggerRateLine = numTrials > 1
-      ? `\n   Trigger Success Rate:   pass@1: ${percentage}%   pass@${numTrials}: ${Math.round(passAtN * 100)}%`
-      : `\n   Trigger Success Rate:   ${percentage}%`;
-    Logger.write(`${triggerRateLine}\n\n`);
+    renderTriggerTable(report);
+    Logger.write('\n\n');
 
   } finally {
     await env.teardown();

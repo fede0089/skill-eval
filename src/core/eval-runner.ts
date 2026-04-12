@@ -3,10 +3,11 @@ import * as path from 'path';
 import { executor } from '../utils/exec.js';
 import { EvalEnvironment } from './environment.js';
 import { RunnerFactory, AgentRunner } from './runners/index.js';
-import { AgentTranscript, EvalTask, EvalTrial, AssertionResult } from '../types/index.js';
+import { AgentTranscript, EvalTask, EvalTrial, AssertionResult, NdjsonResultEvent } from '../types/index.js';
 import { TriggerGrader, ModelBasedGrader } from './evaluator.js';
 import { EvalTaskContext } from '../utils/ui.js';
 import { parseNdjsonEvents } from '../utils/ndjson.js';
+import { Logger } from '../utils/logger.js';
 
 export interface EvalRunOptions {
   agent: string;
@@ -24,7 +25,7 @@ export interface EvalRunOptions {
  */
 function parseStreamResult(output: string): { error: string } | { response: string } | null {
   const parts: string[] = [];
-  let resultEvent: any = null;
+  let resultEvent: NdjsonResultEvent | null = null;
 
   for (const event of parseNdjsonEvents(output)) {
     if (event.type === 'message' && event.role === 'assistant' && typeof event.content === 'string') {
@@ -54,7 +55,8 @@ export class EvalRunner {
     this.env = new EvalEnvironment({ skillPath: options.skillPath });
     this.runner = RunnerFactory.create(options.agent);
     this.triggerGrader = new TriggerGrader(options.skillName);
-    this.functionalGrader = new ModelBasedGrader(options.skillName);
+    // Inject the same runner for judging so swapping the agent backend works end-to-end
+    this.functionalGrader = new ModelBasedGrader(options.skillName, this.runner);
   }
 
   async runTriggerTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
@@ -133,7 +135,7 @@ export class EvalRunner {
             stdio: 'ignore'
           });
         } catch (err) {
-          // If the skill is not installed/already disabled, ignore
+          Logger.warn(`Could not disable skill '${this.options.skillName}' in worktree — baseline may be unreliable. Reason: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
 

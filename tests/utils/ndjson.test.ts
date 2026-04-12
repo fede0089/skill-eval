@@ -40,7 +40,17 @@ test('parseNdjsonEvents: handles JSON objects with deeply nested braces', () => 
   };
   const events = parseNdjsonEvents(JSON.stringify(nested));
   assert.strictEqual(events.length, 1);
-  assert.deepStrictEqual(events[0].parameters.options.nested.deep, {});
+  // Cast to access non-standard nested properties — behavior test, not type test
+  assert.deepStrictEqual((events[0] as any).parameters.options.nested.deep, {});
+});
+
+test('parseNdjsonEvents: unknown event types are parsed and returned without error', () => {
+  const unknownEvent = JSON.stringify({ type: 'thinking', content: 'internal reasoning' });
+  const knownEvent = JSON.stringify({ type: 'result', status: 'success' });
+  const events = parseNdjsonEvents(`${unknownEvent}\n${knownEvent}`);
+  assert.strictEqual(events.length, 2, 'Both known and unknown event types should be included');
+  assert.strictEqual(events[0].type, 'thinking');
+  assert.strictEqual(events[1].type, 'result');
 });
 
 test('parseNdjsonEvents: handles empty string', () => {

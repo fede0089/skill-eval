@@ -4,7 +4,8 @@ import { triggerCommand } from './commands/trigger.js';
 import { functionalCommand } from './commands/functional.js';
 import { showCommand } from './commands/show.js';
 import { Logger } from './utils/logger.js';
-import { AppError } from './core/errors.js';
+import { AppError, ConfigError } from './core/errors.js';
+import { loadConfig } from './core/config.js';
 import { createReporter } from './core/reporters/index.js';
 import type { ReportFormat } from './types/index.js';
 
@@ -38,31 +39,37 @@ program.on('option:verbose', () => {
 program
   .command('trigger [agent]')
   .description('Evaluate triggering of an agent skill')
-  .requiredOption('--skill <path>', 'Path to the skill directory')
-  .option('--concurrency <number>', 'Number of concurrent tasks', '5')
-  .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
-  .option('--report <format>', 'Report format: html or json', 'html')
+  .option('--skill <path>', 'Path to the skill directory (or set in .skill-eval.json)')
+  .option('--concurrency <number>', 'Number of concurrent tasks')
+  .option('--trials <number>', 'Number of trials per task for pass@k calculation')
+  .option('--report <format>', 'Report format: html or json')
   .action((agent, options) => {
-    const selectedAgent = agent || 'gemini-cli';
-    const concurrency = parseInt(options.concurrency, 10);
-    const numTrials = parseInt(options.trials, 10);
-    const reporter = createReporter(options.report as ReportFormat);
-    triggerCommand(selectedAgent, options.skill, concurrency, undefined, numTrials, reporter).catch(errorHandler);
+    const config = loadConfig(process.cwd());
+    const skillPath = options.skill || config.skill;
+    if (!skillPath) throw new ConfigError("No skill path provided. Use --skill <path> or set 'skill' in .skill-eval.json.");
+    const selectedAgent = agent || config.agent || 'gemini-cli';
+    const concurrency = parseInt(options.concurrency, 10) || config.concurrency || 5;
+    const numTrials = parseInt(options.trials, 10) || config.trials || 3;
+    const reporter = createReporter((options.report || config.report || 'html') as ReportFormat);
+    triggerCommand(selectedAgent, skillPath, concurrency, undefined, numTrials, reporter).catch(errorHandler);
   });
 
 program
   .command('functional [agent]')
   .description('Evaluate functional correctness of an agent skill based on assertions')
-  .requiredOption('--skill <path>', 'Path to the skill directory')
-  .option('--concurrency <number>', 'Number of concurrent tasks', '5')
-  .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
-  .option('--report <format>', 'Report format: html or json', 'html')
+  .option('--skill <path>', 'Path to the skill directory (or set in .skill-eval.json)')
+  .option('--concurrency <number>', 'Number of concurrent tasks')
+  .option('--trials <number>', 'Number of trials per task for pass@k calculation')
+  .option('--report <format>', 'Report format: html or json')
   .action((agent, options) => {
-    const selectedAgent = agent || 'gemini-cli';
-    const concurrency = parseInt(options.concurrency, 10);
-    const numTrials = parseInt(options.trials, 10);
-    const reporter = createReporter(options.report as ReportFormat);
-    functionalCommand(selectedAgent, options.skill, concurrency, undefined, numTrials, reporter).catch(errorHandler);
+    const config = loadConfig(process.cwd());
+    const skillPath = options.skill || config.skill;
+    if (!skillPath) throw new ConfigError("No skill path provided. Use --skill <path> or set 'skill' in .skill-eval.json.");
+    const selectedAgent = agent || config.agent || 'gemini-cli';
+    const concurrency = parseInt(options.concurrency, 10) || config.concurrency || 5;
+    const numTrials = parseInt(options.trials, 10) || config.trials || 3;
+    const reporter = createReporter((options.report || config.report || 'html') as ReportFormat);
+    functionalCommand(selectedAgent, skillPath, concurrency, undefined, numTrials, reporter).catch(errorHandler);
   });
 
 program

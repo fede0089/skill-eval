@@ -1,6 +1,6 @@
-import { AgentTranscript, ToolMetrics, AssertionResult } from '../types/index.js';
+import { AgentTranscript, ToolMetrics, AssertionResult, NdjsonToolUseEvent } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
-import { RunnerFactory } from './runners/factory.js';
+import { AgentRunner } from './runners/runner.interface.js';
 import { parseNdjsonEvents } from '../utils/ndjson.js';
 
 /**
@@ -29,14 +29,14 @@ export class TriggerGrader {
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       if (
-        event.type === 'tool_use' && 
+        event.type === 'tool_use' &&
         event.tool_name === 'activate_skill' &&
-        event.parameters?.name &&
-        this.targetToolKeys.some(key => event.parameters.name.toLowerCase() === key.toLowerCase())
+        typeof event.parameters?.name === 'string' &&
+        this.targetToolKeys.some(key => (event as NdjsonToolUseEvent).parameters!.name!.toLowerCase() === key.toLowerCase())
       ) {
         foundToolUse = true;
         const toolId = event.tool_id;
-        
+
         // 2. Look for subsequent tool_result with matching ID and status success
         for (let j = i + 1; j < events.length; j++) {
           const resultEvent = events[j];
@@ -115,8 +115,8 @@ export class TriggerGrader {
       if (
         event.type === 'tool_use' &&
         event.tool_name === 'activate_skill' &&
-        event.parameters?.name &&
-        this.targetToolKeys.some(k => event.parameters.name.toLowerCase() === k.toLowerCase())
+        typeof event.parameters?.name === 'string' &&
+        this.targetToolKeys.some(k => (event as NdjsonToolUseEvent).parameters!.name!.toLowerCase() === k.toLowerCase())
       ) return true;
     }
     return false;
@@ -125,9 +125,11 @@ export class TriggerGrader {
 
 /**
  * Model-based grader that uses an LLM Judge to verify functional assertions.
+ * The judgeRunner is injected so the grader uses the same agent backend as the evaluation,
+ * making it easy to swap the runner (e.g. gemini-cli → claude) without touching this class.
  */
 export class ModelBasedGrader {
-  constructor(private skillName: string) {}
+  constructor(private skillName: string, private judgeRunner: AgentRunner) {}
 
   /**
    * Invokes an LLM Judge to evaluate if assertions are met.
@@ -146,9 +148,8 @@ export class ModelBasedGrader {
     }
 
     const judgePrompt = this.buildJudgePrompt(prompt, transcript.response || '', assertions, workspaceContext);
-    const runner = RunnerFactory.create('gemini-cli');
-    
-    const judgeRawOutput = await runner.runPrompt(judgePrompt, worktreePath, onLog, logPath);
+
+    const judgeRawOutput = await this.judgeRunner.runPrompt(judgePrompt, worktreePath, onLog, logPath);
     
     if (!judgeRawOutput || !judgeRawOutput.response) {
       const errorMsg = judgeRawOutput?.error ? ` (Error: ${judgeRawOutput.error})` : '';

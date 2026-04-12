@@ -119,6 +119,42 @@ export interface EvalSuiteReport {
 
 export type ReportFormat = 'html' | 'json';
 
+/**
+ * Typed representations of Gemini CLI stream-json events.
+ * parseNdjsonEvents returns NdjsonEvent[]; callers narrow with event.type checks.
+ */
+export interface NdjsonToolUseEvent {
+  type: 'tool_use';
+  tool_id: string;
+  tool_name: string;
+  parameters?: { name?: string; [key: string]: unknown };
+}
+
+export interface NdjsonToolResultEvent {
+  type: 'tool_result';
+  tool_id: string;
+  status: string;
+}
+
+export interface NdjsonMessageEvent {
+  type: 'message';
+  role?: string;
+  content?: string;
+}
+
+export interface NdjsonResultEvent {
+  type: 'result';
+  status: string;
+  response?: string;
+  error?: { message?: string };
+}
+
+export type NdjsonEvent =
+  | NdjsonToolUseEvent
+  | NdjsonToolResultEvent
+  | NdjsonMessageEvent
+  | NdjsonResultEvent;
+
 // Deprecated interfaces for backwards compatibility during refactor
 export type Eval = EvalTask;
 export type ExpectationResult = AssertionResult;

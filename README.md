@@ -37,23 +37,32 @@ Evaluations are defined via an `evals/evals.json` file inside your target skill 
        evals.json
    ```
 
-2. Execute the CLI from anywhere **outside** the skill referencing its relative or absolute path. You can run trigger evaluations or functional evaluations:
+2. Execute the CLI from anywhere **outside** the skill referencing its relative or absolute path. You can run trigger evaluations, functional evaluations, or view the latest results:
 
    **Evaluate Triggers (Trigger Command):**
    ```sh
-   skill-eval trigger --skill ../ruta/al/skill
+   skill-eval trigger --skill ../path/to/skill
    ```
 
    **Evaluate Functional Correctness (Functional Command):**
    ```sh
-   skill-eval functional --skill ../ruta/al/skill
+   skill-eval functional --skill ../path/to/skill
    ```
 
+   **Display Latest Results (Show Command):**
+   ```sh
+   skill-eval show
+   ```
+
+   Both `trigger` and `functional` support `--trials <number>` (default: 3) to run multiple trials per task and compute **pass@k** metrics, and `--concurrency <number>` (default: 5) to control parallel execution.
+
 3. `skill-eval` will automatically:
+   - Validate the agent binary and skill directory structure before starting (pre-flight check).
    - Create isolated git worktrees for each evaluation to prevent destructive changes to your main workspace.
    - Fire up the agent in a headless mode reading the eval prompts.
-   - Detect if the skill tools actually fired (via plain text logs or stats).
+   - Detect if the skill tools actually fired (via NDJSON stream output).
    - Evaluate expectations via an LLM judge (for the `functional` command).
+   - Compute pass@k metrics across multiple trials per task.
    - Create a local directory `.project-skill-evals/runs/<timestamp>/` and dump the raw full evaluation JSONs, logs, and a summary report there for deeper debugging.
 
 ## JSON Valid Structure (evals.json)
@@ -86,3 +95,32 @@ For functional evaluations, include `expectations`:
   ]
 }
 ```
+
+## Configuration
+
+Instead of passing flags every time, you can create a `.skill-eval.json` file in the directory where you run `skill-eval`. CLI flags always take precedence over config file values.
+
+```json
+{
+  "skill": "./path/to/my-skill",
+  "agent": "gemini-cli",
+  "concurrency": 3,
+  "trials": 5,
+  "report": "html"
+}
+```
+
+All fields are optional. With a config file in place, you can run evaluations without any flags:
+
+```sh
+skill-eval trigger
+skill-eval functional
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `skill` | string | — | Path to the skill directory |
+| `agent` | string | `gemini-cli` | Agent backend to use |
+| `concurrency` | number | `5` | Concurrent tasks |
+| `trials` | number | `3` | Trials per task (for pass@k) |
+| `report` | `html` \| `json` | `html` | Output report format |

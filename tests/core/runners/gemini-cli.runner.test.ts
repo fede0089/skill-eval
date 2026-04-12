@@ -123,13 +123,13 @@ test('GeminiCliRunner.runPrompt should return raw output in response and raw_out
 test('GeminiCliRunner.runPrompt should write to logPath if provided', async (t) => {
   const mockChild = createMockChild();
   const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
-  
+
   const runner = new GeminiCliRunner();
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-'));
   const logPath = path.join(tempDir, 'test.log');
 
   const promise = runner.runPrompt('test prompt', undefined, undefined, logPath);
-  
+
   setImmediate(() => {
     mockChild.stdout.push('stdout data');
     mockChild.stdout.push(null);
@@ -137,14 +137,49 @@ test('GeminiCliRunner.runPrompt should write to logPath if provided', async (t) 
     mockChild.stderr.push(null);
     mockChild.emit('close', 0);
   });
-  
+
   await promise;
-  
+
   assert.ok(fs.existsSync(logPath), 'Log file should exist');
   const content = fs.readFileSync(logPath, 'utf-8');
   assert.ok(content.includes('stdout data'), 'Log should contain stdout');
   assert.ok(!content.includes('stderr data'), 'Log should not contain stderr noise');
-  
+
   spawnMock.mock.restore();
   fs.rmSync(tempDir, { recursive: true, force: true });
+});
+
+test('GeminiCliRunner.runPrompt should warn (not throw) when log file creation fails', async (t) => {
+  const { Logger } = await import('../../../src/utils/logger.js');
+  const mockChild = createMockChild();
+  const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
+  const warnMock = mock.fn();
+  mock.method(Logger, 'warn', warnMock);
+
+  const runner = new GeminiCliRunner();
+  // A path with a null byte causes createWriteStream to throw synchronously
+  // (Node.js rejects null bytes in file paths), simulating a log creation failure
+  // without needing to mock the non-configurable fs.createWriteStream.
+  const invalidLogPath = '/tmp/test\x00invalid.log';
+  const promise = runner.runPrompt('test prompt', undefined, undefined, invalidLogPath);
+
+  setImmediate(() => {
+    mockChild.stdout.push('result output');
+    mockChild.stdout.push(null);
+    mockChild.stderr.push(null);
+    mockChild.emit('close', 0);
+  });
+
+  // Should resolve normally — log failure must not abort the run
+  const result = await promise;
+  assert.ok(result, 'Should return a result even when log file creation fails');
+
+  const warnCalls = warnMock.mock.calls.map(c => c.arguments[0] as string);
+  assert.ok(
+    warnCalls.some(msg => msg.includes('verbose output will not be saved')),
+    `Expected a warn about missing log output, got: ${JSON.stringify(warnCalls)}`
+  );
+
+  spawnMock.mock.restore();
+  mock.reset();
 });

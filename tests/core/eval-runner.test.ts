@@ -4,6 +4,7 @@ import { executor } from '../../src/utils/exec.js';
 import { EvalRunner } from '../../src/core/eval-runner.js';
 import { EvalEnvironment } from '../../src/core/environment.js';
 import { RunnerFactory } from '../../src/core/runners/index.js';
+import { Logger } from '../../src/utils/logger.js';
 
 test('EvalRunner.runFunctionalTask should disable skill in baseline', async (t) => {
   const runnerOptions = {
@@ -159,4 +160,36 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
 
   assert.ok(!result.assertionResults.some(r => r.reason.includes('Invalid With Skill')), 'Should not flag valid with-skill as invalid');
   assert.strictEqual(result.trialPassed, true);
+});
+
+test('EvalRunner.runFunctionalTask baseline skill-disable failure should warn, not throw', async (t) => {
+  const agentRunnerMock = {
+    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' }))
+  };
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: true
+  });
+
+  const warnMock = mock.fn();
+  mock.method(Logger, 'warn', warnMock);
+
+  // execSync throws when trying to disable the skill
+  mock.method(executor, 'execSync', mock.fn(() => { throw new Error('command not found: gemini'); }));
+  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+
+  // Should not throw — warning is surfaced, trial continues
+  const result = await runner.runFunctionalTask({ id: 6, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.ok(result, 'Trial should still return a result when skill-disable fails');
+  const warnCalls = warnMock.mock.calls.map(c => c.arguments[0] as string);
+  assert.ok(
+    warnCalls.some(msg => msg.includes('baseline may be unreliable')),
+    `Expected a warn about baseline reliability, got: ${JSON.stringify(warnCalls)}`
+  );
+
+  mock.reset();
 });

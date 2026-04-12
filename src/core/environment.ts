@@ -97,7 +97,7 @@ export class EvalEnvironment {
     });
 
     if (child.status !== 0) {
-      Logger.debug(`Failed to remove worktree at ${worktreePath}. Process exited with code ${child.status}`);
+      Logger.warn(`Failed to remove worktree at ${worktreePath}. Process exited with code ${child.status}. Manual cleanup may be required.`);
     }
   }
 }
