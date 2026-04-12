@@ -37,7 +37,7 @@ function passColorClass(val: number): string {
 }
 
 function isFunctional(report: EvalSuiteReport): boolean {
-  return report.metrics.baselineScore !== undefined;
+  return report.metrics.withoutSkillScore !== undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,19 +54,19 @@ function renderMetricsCards(report: EvalSuiteReport): string {
   const cards: string[] = [];
 
   if (isFunctional(report)) {
-    const bk = metrics.baselinePassAtK ?? 0;
+    const bk = metrics.withoutSkillPassAtK ?? 0;
     const tk = metrics.passAtK ?? 0;
     const upliftRaw = parseInt(metrics.skillUplift ?? '0', 10);
     const upliftClass = upliftRaw > 0 ? 'green' : upliftRaw < 0 ? 'red' : 'amber';
-    cards.push(renderCard('Baseline pass@1', formatPercent(bk), passColorClass(bk)));
+    cards.push(renderCard('Without Skill p@1', formatPercent(bk), passColorClass(bk)));
     if (numTrials > 1) {
-      const bn = metrics.baselinePassAtN ?? 0;
-      cards.push(renderCard(`Baseline pass@${numTrials}`, formatPercent(bn), passColorClass(bn)));
+      const bn = metrics.withoutSkillPassAtN ?? 0;
+      cards.push(renderCard(`Without Skill p@${numTrials}`, formatPercent(bn), passColorClass(bn)));
     }
-    cards.push(renderCard('Target pass@1', formatPercent(tk), passColorClass(tk)));
+    cards.push(renderCard('With Skill p@1', formatPercent(tk), passColorClass(tk)));
     if (numTrials > 1) {
       const tn = metrics.passAtN ?? 0;
-      cards.push(renderCard(`Target pass@${numTrials}`, formatPercent(tn), passColorClass(tn)));
+      cards.push(renderCard(`With Skill p@${numTrials}`, formatPercent(tn), passColorClass(tn)));
     }
     cards.push(renderCard('Skill Uplift', escapeHtml(metrics.skillUplift ?? '0%'), upliftClass));
   } else {
@@ -94,16 +94,16 @@ function renderChart(report: EvalSuiteReport): string {
   let datasets: object[];
 
   if (isFunctional(report)) {
-    const baselineData = results.map(r => {
-      const bt = r.baselineTrials ?? [];
+    const withoutSkillData = results.map(r => {
+      const bt = r.withoutSkillTrials ?? [];
       return bt.length === 0 ? 0 : Math.round((bt.filter(t => t.trialPassed).length / bt.length) * 100);
     });
-    const targetData = results.map(r =>
+    const withSkillData = results.map(r =>
       Math.round((r.trials.filter(t => t.trialPassed).length / Math.max(r.trials.length, 1)) * 100)
     );
     datasets = [
-      { label: 'Baseline pass@1', data: baselineData, backgroundColor: '#94a3b8', borderRadius: 4 },
-      { label: 'Target pass@1', data: targetData, backgroundColor: '#3b82f6', borderRadius: 4 },
+      { label: 'Without Skill p@1', data: withoutSkillData, backgroundColor: '#94a3b8', borderRadius: 4 },
+      { label: 'With Skill p@1', data: withSkillData, backgroundColor: '#3b82f6', borderRadius: 4 },
     ];
   } else {
     const passData = results.map(r =>
@@ -160,13 +160,13 @@ function renderTrial(trial: EvalTrial, prefix: string): string {
 function renderTaskDetails(result: TaskResult, isFunctionalEval: boolean): string {
   const sections: string[] = [];
 
-  if (isFunctionalEval && result.baselineTrials && result.baselineTrials.length > 0) {
-    sections.push('<div class="trial-group-label">Baseline</div>');
-    sections.push(...result.baselineTrials.map(t => renderTrial(t, 'Baseline')));
-    sections.push('<div class="trial-group-label">Target</div>');
+  if (isFunctionalEval && result.withoutSkillTrials && result.withoutSkillTrials.length > 0) {
+    sections.push('<div class="trial-group-label">Without Skill</div>');
+    sections.push(...result.withoutSkillTrials.map(t => renderTrial(t, 'Without Skill')));
+    sections.push('<div class="trial-group-label">With Skill</div>');
   }
 
-  sections.push(...result.trials.map(t => renderTrial(t, 'Target')));
+  sections.push(...result.trials.map(t => renderTrial(t, 'With Skill')));
 
   return `<div class="task-details" id="details-${result.taskId}">${sections.join('')}</div>`;
 }
@@ -181,7 +181,7 @@ function renderTaskTable(report: EvalSuiteReport): string {
   const functional = isFunctional(report);
 
   const headerCells = functional
-    ? ['#', 'Prompt', 'Base p@1', 'Tgt p@1', 'Details']
+    ? ['#', 'Prompt', 'W/o p@1', 'W/ p@1', 'Details']
     : numTrials > 1
       ? ['#', 'Prompt', 'pass@1', `pass@${numTrials}`, 'Details']
       : ['#', 'Prompt', 'Status', 'Details'];
@@ -191,7 +191,7 @@ function renderTaskTable(report: EvalSuiteReport): string {
   const rows = results.map(result => {
     const prompt = escapeHtml(result.prompt);
     const trials = result.trials;
-    const bt = result.baselineTrials ?? [];
+    const bt = result.withoutSkillTrials ?? [];
 
     let statCells: string;
     if (functional) {
@@ -326,7 +326,7 @@ tr:last-child td { border-bottom: none; }
       <span><b>Agent</b> ${escapeHtml(agent)}</span>
       <span><b>Type</b> ${evalType}</span>
       <span><b>Date</b> ${escapeHtml(formattedDate)}</span>
-      <span><b>Score</b> ${escapeHtml(metrics.targetScore)}</span>
+      <span><b>Score</b> ${escapeHtml(metrics.withSkillScore)}</span>
     </div>
     <div class="status-bar ${statusClass}"></div>
   </div>

@@ -142,7 +142,7 @@ export async function triggerCommand(
       skill_name,
       agent,
       metrics: {
-        targetScore: `${percentage}%`,
+        withSkillScore: `${percentage}%`,
         passedCount: tasksPassedCount,
         totalCount: tasks.length,
         numTrials,

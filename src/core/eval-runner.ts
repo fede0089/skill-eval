@@ -108,7 +108,7 @@ export class EvalRunner {
 
   async runFunctionalTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
     const isBaseline = this.options.isBaseline;
-    const passName = isBaseline ? 'baseline' : 'target';
+    const passName = isBaseline ? 'without-skill' : 'with-skill';
     const promptToUse = isBaseline
       ? `${task.prompt}\n\nIMPORTANT: For this task, you MUST NOT use the '${this.options.skillName}' skill/tool, even if it appears available.`
       : `${task.prompt}\n\nIMPORTANT: You must use the '${this.options.skillName}' skill/tool to solve this task.`;
@@ -160,7 +160,7 @@ export class EvalRunner {
             assertionResults: [{
               assertion: 'Baseline must not invoke the restricted skill',
               passed: false,
-              reason: `Invalid Baseline: '${this.options.skillName}' activation detected during baseline run`,
+              reason: `Invalid Without Skill: '${this.options.skillName}' activation detected during without-skill run`,
               graderType: 'programmatic'
             }],
             trialPassed: false
@@ -173,7 +173,7 @@ export class EvalRunner {
             assertionResults: [{
               assertion: 'Target pass must invoke the skill',
               passed: false,
-              reason: `Invalid Target: '${this.options.skillName}' was not successfully activated`,
+              reason: `Invalid With Skill: '${this.options.skillName}' was not successfully activated`,
               graderType: 'programmatic'
             }],
             trialPassed: false

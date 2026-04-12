@@ -9,7 +9,7 @@ function makeTriggerReport(overrides: Partial<EvalSuiteReport> = {}): EvalSuiteR
     skill_name: 'test-skill',
     agent: 'gemini-cli',
     metrics: {
-      targetScore: '67%',
+      withSkillScore: '67%',
       passedCount: 2,
       totalCount: 3,
       numTrials: 3,
@@ -45,16 +45,16 @@ function makeFunctionalReport(): EvalSuiteReport {
     skill_name: 'func-skill',
     agent: 'gemini-cli',
     metrics: {
-      targetScore: '80%',
-      baselineScore: '60%',
+      withSkillScore: '80%',
+      withoutSkillScore: '60%',
       skillUplift: '+20%',
       passedCount: 4,
       totalCount: 5,
       numTrials: 2,
       passAtK: 0.8,
       passAtN: 0.9,
-      baselinePassAtK: 0.6,
-      baselinePassAtN: 0.7,
+      withoutSkillPassAtK: 0.6,
+      withoutSkillPassAtN: 0.7,
     },
     results: [
       {
@@ -62,10 +62,10 @@ function makeFunctionalReport(): EvalSuiteReport {
         prompt: 'Functional prompt',
         score: 1.0,
         trials: [
-          { id: 1, transcript: {}, assertionResults: [{ assertion: 'Target assertion', passed: true, reason: 'Passed' }], trialPassed: true },
+          { id: 1, transcript: {}, assertionResults: [{ assertion: 'With Skill assertion', passed: true, reason: 'Passed' }], trialPassed: true },
         ],
-        baselineTrials: [
-          { id: 1, transcript: {}, assertionResults: [{ assertion: 'Baseline assertion', passed: false, reason: 'Not triggered' }], trialPassed: false },
+        withoutSkillTrials: [
+          { id: 1, transcript: {}, assertionResults: [{ assertion: 'Without Skill assertion', passed: false, reason: 'Not triggered' }], trialPassed: false },
         ],
       },
     ],
@@ -90,16 +90,16 @@ test('generateHtml produces functional report with baseline and uplift data', ()
   const html = generateHtml(report);
 
   assert.ok(html.includes('Functional'), 'should indicate Functional eval type');
-  assert.ok(html.includes('Baseline'), 'should contain Baseline label');
-  assert.ok(html.includes('Target'), 'should contain Target label');
+  assert.ok(html.includes('Without Skill'), 'should contain Without Skill label');
+  assert.ok(html.includes('With Skill'), 'should contain With Skill label');
   assert.ok(html.includes('+20%'), 'should contain skill uplift value');
   assert.ok(html.includes('Functional prompt'), 'should contain task prompt');
-  assert.ok(html.includes('Baseline assertion'), 'should contain baseline assertion text');
-  assert.ok(html.includes('Target assertion'), 'should contain target assertion text');
+  assert.ok(html.includes('Without Skill assertion'), 'should contain without-skill assertion text');
+  assert.ok(html.includes('With Skill assertion'), 'should contain with-skill assertion text');
 });
 
 test('generateHtml handles empty results without throwing', () => {
-  const report = makeTriggerReport({ results: [], metrics: { targetScore: '0%', passedCount: 0, totalCount: 0 } });
+  const report = makeTriggerReport({ results: [], metrics: { withSkillScore: '0%', passedCount: 0, totalCount: 0 } });
   assert.doesNotThrow(() => generateHtml(report));
   const html = generateHtml(report);
   assert.ok(html.includes('<!DOCTYPE html>'));

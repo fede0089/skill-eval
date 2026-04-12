@@ -39,13 +39,13 @@ export async function functionalCommand(
   Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
 
   const taskResults: TaskResult[] = [];
-  let targetTasksPassedCount = 0;
-  let baselineTasksPassedCount = 0;
+  let withSkillTasksPassedCount = 0;
+  let withoutSkillTasksPassedCount = 0;
 
   // Per-task trial storage, indexed by task.id
-  const baselineTrialsByTask = new Map<number, EvalTrial[]>();
+  const withoutSkillTrialsByTask = new Map<number, EvalTrial[]>();
 
-  const baselineRunner = new EvalRunner({
+  const withoutSkillRunner = new EvalRunner({
     agent,
     skillPath,
     skillName: skill_name,
@@ -54,7 +54,7 @@ export async function functionalCommand(
     verbose
   });
 
-  const targetRunner = new EvalRunner({
+  const withSkillRunner = new EvalRunner({
     agent,
     skillPath,
     skillName: skill_name,
@@ -66,31 +66,31 @@ export async function functionalCommand(
   try {
     Logger.write(`\n${chalk.bold(`FUNCTIONAL EVALUATION: ${skillPath}`)}\n`);
 
-    // ==== BASELINE RUN ====
-    Logger.write(`\n--- Baseline Pass (No Skill) ---\n`);
+    // ==== WITHOUT SKILL RUN ====
+    Logger.write(`\n--- Without Skill ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
-    const baselineUI = new ListrEvalUI();
+    const withoutSkillUI = new ListrEvalUI();
 
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
       const taskLabel = `${promptSnippet} (#${task.id})`;
-      baselineUI.addTask({
-        id: `baseline-${task.id}`,
-        title: `Baseline ${taskLabel}`,
+      withoutSkillUI.addTask({
+        id: `without-skill-${task.id}`,
+        title: `Without Skill: ${taskLabel}`,
         task: async (uiCtx) => {
           const trials: EvalTrial[] = [];
 
           for (let trialId = 1; trialId <= numTrials; trialId++) {
             if (numTrials > 1) uiCtx.updateLog(`Trial ${trialId}/${numTrials}...`);
             try {
-              const trial = await baselineRunner.runFunctionalTask(task, i, trialId, uiCtx);
+              const trial = await withoutSkillRunner.runFunctionalTask(task, i, trialId, uiCtx);
               trials.push(trial);
             } catch (error) {
               trials.push({
                 id: trialId,
                 transcript: { error: error instanceof Error ? error.message : String(error) },
-                assertionResults: [{ assertion: 'Baseline Execution', passed: false, reason: String(error) }],
+                assertionResults: [{ assertion: 'Without Skill Execution', passed: false, reason: String(error) }],
                 trialPassed: false
               });
               break;
@@ -102,52 +102,52 @@ export async function functionalCommand(
             trials.push({
               id: trials.length + 1,
               transcript: { error: 'Trial not executed (previous trial aborted)' },
-              assertionResults: [{ assertion: 'Baseline Execution', passed: false, reason: 'Trial not executed (previous trial aborted)', graderType: 'programmatic' as const }],
+              assertionResults: [{ assertion: 'Without Skill Execution', passed: false, reason: 'Trial not executed (previous trial aborted)', graderType: 'programmatic' as const }],
               trialPassed: false
             });
           }
 
-          baselineTrialsByTask.set(task.id, trials);
+          withoutSkillTrialsByTask.set(task.id, trials);
 
           const passedCount = trials.filter(t => t.trialPassed).length;
           if (passedCount === trials.length) {
-            baselineTasksPassedCount++;
+            withoutSkillTasksPassedCount++;
           } else {
-            const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'Baseline failed';
+            const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'Without Skill failed';
             throw new Error(failureReason);
           }
         }
       });
     }
 
-    await baselineUI.run(concurrency);
+    await withoutSkillUI.run(concurrency);
 
-    // ==== TARGET RUN ====
-    Logger.write(`\n--- Target Pass (w/Skill) ---\n`);
+    // ==== WITH SKILL RUN ====
+    Logger.write(`\n--- With Skill ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
 
-    const targetUI = new ListrEvalUI();
+    const withSkillUI = new ListrEvalUI();
 
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
       const taskLabel = `${promptSnippet} (#${task.id})`;
-      targetUI.addTask({
-        id: `target-${task.id}`,
-        title: `Target ${taskLabel}`,
+      withSkillUI.addTask({
+        id: `with-skill-${task.id}`,
+        title: `With Skill: ${taskLabel}`,
         task: async (uiCtx) => {
           const trials: EvalTrial[] = [];
 
           for (let trialId = 1; trialId <= numTrials; trialId++) {
             if (numTrials > 1) uiCtx.updateLog(`Trial ${trialId}/${numTrials}...`);
             try {
-              const trial = await targetRunner.runFunctionalTask(task, i, trialId, uiCtx);
+              const trial = await withSkillRunner.runFunctionalTask(task, i, trialId, uiCtx);
               trials.push(trial);
             } catch (error) {
               trials.push({
                 id: trialId,
                 transcript: { error: error instanceof Error ? error.message : String(error) },
-                assertionResults: [{ assertion: 'Target Execution', passed: false, reason: String(error) }],
+                assertionResults: [{ assertion: 'With Skill Execution', passed: false, reason: String(error) }],
                 trialPassed: false
               });
               break;
@@ -159,35 +159,35 @@ export async function functionalCommand(
             trials.push({
               id: trials.length + 1,
               transcript: { error: 'Trial not executed (previous trial aborted)' },
-              assertionResults: [{ assertion: 'Target Execution', passed: false, reason: 'Trial not executed (previous trial aborted)', graderType: 'programmatic' as const }],
+              assertionResults: [{ assertion: 'With Skill Execution', passed: false, reason: 'Trial not executed (previous trial aborted)', graderType: 'programmatic' as const }],
               trialPassed: false
             });
           }
 
           const passedCount = trials.filter(t => t.trialPassed).length;
           const score = trials.length > 0 ? passedCount / trials.length : 0;
-          const baselineTrials = baselineTrialsByTask.get(task.id) ?? [];
+          const withoutSkillTrials = withoutSkillTrialsByTask.get(task.id) ?? [];
 
           const taskResult: TaskResult = {
             taskId: task.id,
             prompt: task.prompt,
             score,
             trials: trials.map(t => ({ ...t, transcript: undefined as any })),
-            baselineTrials: baselineTrials.map(t => ({ ...t, transcript: undefined as any }))
+            withoutSkillTrials: withoutSkillTrials.map(t => ({ ...t, transcript: undefined as any }))
           };
           taskResults.push(taskResult);
 
           if (passedCount === trials.length) {
-            targetTasksPassedCount++;
+            withSkillTasksPassedCount++;
           } else {
-            const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'Target failed';
+            const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'With Skill failed';
             throw new Error(failureReason);
           }
         }
       });
     }
 
-    await targetUI.run(concurrency);
+    await withSkillUI.run(concurrency);
 
     // ==== REPORTING ====
     // Aggregate pass@1 and pass@n (average across tasks)
@@ -197,32 +197,32 @@ export async function functionalCommand(
     const passAtN = taskResults.length > 0
       ? taskResults.reduce((sum, r) => sum + computePassAtK(r.trials, numTrials), 0) / taskResults.length
       : 0;
-    const baselinePassAtK = taskResults.length > 0
-      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.baselineTrials ?? [], 1), 0) / taskResults.length
+    const withoutSkillPassAtK = taskResults.length > 0
+      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.withoutSkillTrials ?? [], 1), 0) / taskResults.length
       : 0;
-    const baselinePassAtN = taskResults.length > 0
-      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.baselineTrials ?? [], numTrials), 0) / taskResults.length
+    const withoutSkillPassAtN = taskResults.length > 0
+      ? taskResults.reduce((sum, r) => sum + computePassAtK(r.withoutSkillTrials ?? [], numTrials), 0) / taskResults.length
       : 0;
 
-    const targetPercentage = Math.round(passAtK * 100);
-    const baselinePercentage = Math.round(baselinePassAtK * 100);
-    const skillUplift = targetPercentage - baselinePercentage;
+    const withSkillPercentage = Math.round(passAtK * 100);
+    const withoutSkillPercentage = Math.round(withoutSkillPassAtK * 100);
+    const skillUplift = withSkillPercentage - withoutSkillPercentage;
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
       skill_name,
       agent,
       metrics: {
-        targetScore: `${targetPercentage}%`,
-        baselineScore: `${baselinePercentage}%`,
+        withSkillScore: `${withSkillPercentage}%`,
+        withoutSkillScore: `${withoutSkillPercentage}%`,
         skillUplift: `${skillUplift > 0 ? '+' : ''}${skillUplift}%`,
-        passedCount: targetTasksPassedCount,
+        passedCount: withSkillTasksPassedCount,
         totalCount: tasks.length,
         numTrials,
         passAtK: Math.round(passAtK * 1000) / 1000,
         passAtN: Math.round(passAtN * 1000) / 1000,
-        baselinePassAtK: Math.round(baselinePassAtK * 1000) / 1000,
-        baselinePassAtN: Math.round(baselinePassAtN * 1000) / 1000
+        withoutSkillPassAtK: Math.round(withoutSkillPassAtK * 1000) / 1000,
+        withoutSkillPassAtN: Math.round(withoutSkillPassAtN * 1000) / 1000
       },
       results: taskResults
     };
@@ -234,47 +234,47 @@ export async function functionalCommand(
     Logger.write(`──────────────────────────────────────────────────\n`);
 
     const tableData = numTrials > 1
-      ? [['ID', 'Prompt', 'Base p@1', `Base p@${numTrials}`, 'Tgt p@1', `Tgt p@${numTrials}`]]
-      : [['ID', 'Prompt', 'Baseline', 'Target']];
+      ? [['ID', 'Prompt', 'W/o p@1', `W/o p@${numTrials}`, 'W/ p@1', `W/ p@${numTrials}`]]
+      : [['ID', 'Prompt', 'W/o Skill', 'W/ Skill']];
 
     for (const result of taskResults) {
       const task = tasks.find(t => t.id === result.taskId);
       const promptSnippet = task ? `${task.prompt.substring(0, 40)}${task.prompt.length > 40 ? '...' : ''}` : '-';
 
-      const baselineTrials = result.baselineTrials ?? [];
-      const targetTrials = result.trials;
+      const withoutSkillTrials = result.withoutSkillTrials ?? [];
+      const withSkillTrials = result.trials;
 
       if (numTrials > 1) {
-        const bp1 = `${Math.round(computePassAtK(baselineTrials, 1) * 100)}%`;
-        const bpn = `${Math.round(computePassAtK(baselineTrials, numTrials) * 100)}%`;
-        const tp1 = `${Math.round(computePassAtK(targetTrials, 1) * 100)}%`;
-        const tpn = `${Math.round(computePassAtK(targetTrials, numTrials) * 100)}%`;
-        const bColor = baselineTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
-        const tColor = targetTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
+        const bp1 = `${Math.round(computePassAtK(withoutSkillTrials, 1) * 100)}%`;
+        const bpn = `${Math.round(computePassAtK(withoutSkillTrials, numTrials) * 100)}%`;
+        const tp1 = `${Math.round(computePassAtK(withSkillTrials, 1) * 100)}%`;
+        const tpn = `${Math.round(computePassAtK(withSkillTrials, numTrials) * 100)}%`;
+        const bColor = withoutSkillTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
+        const tColor = withSkillTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
         tableData.push([result.taskId.toString(), promptSnippet, bColor(bp1), bColor(bpn), tColor(tp1), tColor(tpn)]);
       } else {
-        const baselineStr = baselineTrials[0]?.trialPassed ? 'PASS' : 'FAIL';
-        const targetStr = targetTrials[0]?.trialPassed ? 'PASS' : 'FAIL';
-        const baselineStatus = baselineTrials.every(t => t.trialPassed) ? chalk.green(baselineStr) : chalk.red(baselineStr);
-        const targetStatus = targetTrials.every(t => t.trialPassed) ? chalk.green(targetStr) : chalk.red(targetStr);
-        tableData.push([result.taskId.toString(), promptSnippet, baselineStatus, targetStatus]);
+        const withoutSkillStr = withoutSkillTrials[0]?.trialPassed ? 'PASS' : 'FAIL';
+        const withSkillStr = withSkillTrials[0]?.trialPassed ? 'PASS' : 'FAIL';
+        const withoutSkillStatus = withoutSkillTrials.every(t => t.trialPassed) ? chalk.green(withoutSkillStr) : chalk.red(withoutSkillStr);
+        const withSkillStatus = withSkillTrials.every(t => t.trialPassed) ? chalk.green(withSkillStr) : chalk.red(withSkillStr);
+        tableData.push([result.taskId.toString(), promptSnippet, withoutSkillStatus, withSkillStatus]);
       }
     }
 
     Logger.table(tableData);
 
-    const baselineRateLine = numTrials > 1
-      ? `\n   Baseline Success Rate:   pass@1: ${baselinePercentage}%   pass@${numTrials}: ${Math.round(baselinePassAtN * 100)}%`
-      : `\n   Baseline Success Rate:   ${baselinePercentage}%`;
-    const targetRateLine = numTrials > 1
-      ? `   Target Success Rate:     pass@1: ${targetPercentage}%   pass@${numTrials}: ${Math.round(passAtN * 100)}%`
-      : `   Target Success Rate:     ${targetPercentage}%`;
+    const withoutSkillRateLine = numTrials > 1
+      ? `\n   Without Skill Rate:   pass@1: ${withoutSkillPercentage}%   pass@${numTrials}: ${Math.round(withoutSkillPassAtN * 100)}%`
+      : `\n   Without Skill Rate:   ${withoutSkillPercentage}%`;
+    const withSkillRateLine = numTrials > 1
+      ? `   With Skill Rate:      pass@1: ${withSkillPercentage}%   pass@${numTrials}: ${Math.round(passAtN * 100)}%`
+      : `   With Skill Rate:      ${withSkillPercentage}%`;
 
     const upliftSign = skillUplift > 0 ? '+' : '';
     const upliftLine = `   Skill Uplift:            ${upliftSign}${skillUplift}%`;
 
-    Logger.write(`${baselineRateLine}\n`);
-    Logger.write(`${targetRateLine}\n`);
+    Logger.write(`${withoutSkillRateLine}\n`);
+    Logger.write(`${withSkillRateLine}\n`);
     Logger.write(`${upliftLine}\n`);
     Logger.write('\n');
 

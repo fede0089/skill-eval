@@ -93,7 +93,7 @@ test('EvalRunner.runFunctionalTask baseline with skill activation → Invalid Ba
   const result = await runner.runFunctionalTask({ id: 2, prompt: 'test', assertions: ['anything'] }, 0, 1, { updateLog: () => {} } as any);
 
   assert.strictEqual(result.trialPassed, false);
-  assert.ok(result.assertionResults[0].reason.includes('Invalid Baseline'), `Expected 'Invalid Baseline', got: ${result.assertionResults[0].reason}`);
+  assert.ok(result.assertionResults[0].reason.includes('Invalid Without Skill'), `Expected 'Invalid Without Skill', got: ${result.assertionResults[0].reason}`);
 });
 
 test('EvalRunner.runFunctionalTask baseline with clean log → validation passes', async () => {
@@ -113,7 +113,7 @@ test('EvalRunner.runFunctionalTask baseline with clean log → validation passes
 
   const result = await runner.runFunctionalTask({ id: 3, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
 
-  assert.ok(!result.assertionResults.some(r => r.reason.includes('Invalid Baseline')), 'Should not flag clean baseline as invalid');
+  assert.ok(!result.assertionResults.some(r => r.reason.includes('Invalid Without Skill')), 'Should not flag clean without-skill as invalid');
   assert.strictEqual(result.trialPassed, true);
 });
 
@@ -136,7 +136,7 @@ test('EvalRunner.runFunctionalTask target with no skill activation → Invalid T
   const result = await runner.runFunctionalTask({ id: 4, prompt: 'test', assertions: ['anything'] }, 0, 1, { updateLog: () => {} } as any);
 
   assert.strictEqual(result.trialPassed, false);
-  assert.ok(result.assertionResults[0].reason.includes('Invalid Target'), `Expected 'Invalid Target', got: ${result.assertionResults[0].reason}`);
+  assert.ok(result.assertionResults[0].reason.includes('Invalid With Skill'), `Expected 'Invalid With Skill', got: ${result.assertionResults[0].reason}`);
 });
 
 test('EvalRunner.runFunctionalTask target with successful skill activation → validation passes', async () => {
@@ -157,6 +157,6 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
 
   const result = await runner.runFunctionalTask({ id: 5, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
 
-  assert.ok(!result.assertionResults.some(r => r.reason.includes('Invalid Target')), 'Should not flag valid target as invalid');
+  assert.ok(!result.assertionResults.some(r => r.reason.includes('Invalid With Skill')), 'Should not flag valid with-skill as invalid');
   assert.strictEqual(result.trialPassed, true);
 });

@@ -33,7 +33,7 @@ export interface TaskResult {
   prompt: string;
   score: number; // Trials passed / Total trials (0.0 to 1.0)
   trials: EvalTrial[];
-  baselineTrials?: EvalTrial[];
+  withoutSkillTrials?: EvalTrial[];
 }
 
 export interface EvalSuite {
@@ -102,16 +102,16 @@ export interface EvalSuiteReport {
   skill_name: string;
   agent: string;
   metrics: {
-    targetScore: string; // Aggregate score with skill
-    baselineScore?: string; // Aggregate score without skill
+    withSkillScore: string; // Aggregate score with skill
+    withoutSkillScore?: string; // Aggregate score without skill
     skillUplift?: string;
     passedCount: number;
     totalCount: number;
     numTrials?: number; // Number of trials per task
-    passAtK?: number;          // Average pass@1 across tasks (probability a single trial passes)
-    passAtN?: number;          // Average pass@numTrials across tasks (probability at least one trial passes)
-    baselinePassAtK?: number;  // Average baseline pass@1 (functional only)
-    baselinePassAtN?: number;  // Average baseline pass@numTrials (functional only)
+    passAtK?: number;              // Average pass@1 across tasks (probability a single trial passes)
+    passAtN?: number;              // Average pass@numTrials across tasks (probability at least one trial passes)
+    withoutSkillPassAtK?: number;  // Average without-skill pass@1 (functional only)
+    withoutSkillPassAtN?: number;  // Average without-skill pass@numTrials (functional only)
     [key: string]: any;
   };
   results: TaskResult[];

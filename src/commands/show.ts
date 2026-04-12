@@ -33,7 +33,7 @@ export async function showCommand(reporter: Reporter = new JsonReporter()): Prom
   const report: EvalSuiteReport = JSON.parse(fs.readFileSync(summaryPath, 'utf-8'));
   const { skill_name, agent, metrics, results, timestamp } = report;
   const numTrials = metrics.numTrials || 1;
-  const isFunctional = metrics.baselineScore !== undefined;
+  const isFunctional = metrics.withoutSkillScore !== undefined;
 
   Logger.write(`\n${chalk.bold('LATEST EVALUATION RESULTS')}\n`);
   Logger.write(`Timestamp:  ${new Date(timestamp).toLocaleString()}\n`);
@@ -91,43 +91,43 @@ function renderFunctionalTable(report: EvalSuiteReport) {
   const numTrials = metrics.numTrials || 1;
 
   const tableData = numTrials > 1
-    ? [['ID', 'Prompt', 'Base p@1', `Base p@${numTrials}`, 'Tgt p@1', `Tgt p@${numTrials}`]]
-    : [['ID', 'Prompt', 'Baseline', 'Target']];
+    ? [['ID', 'Prompt', 'W/o p@1', `W/o p@${numTrials}`, 'W/ p@1', `W/ p@${numTrials}`]]
+    : [['ID', 'Prompt', 'W/o Skill', 'W/ Skill']];
 
   for (const result of results) {
     const promptSnippet = result.prompt.substring(0, 40) + (result.prompt.length > 40 ? '...' : '');
-    const baselineTrials = result.baselineTrials || [];
-    const targetTrials = result.trials;
+    const withoutSkillTrials = result.withoutSkillTrials || [];
+    const withSkillTrials = result.trials;
 
     if (numTrials > 1) {
-      const bp1 = `${Math.round(computePassAtK(baselineTrials, 1) * 100)}%`;
-      const bpn = `${Math.round(computePassAtK(baselineTrials, numTrials) * 100)}%`;
-      const tp1 = `${Math.round(computePassAtK(targetTrials, 1) * 100)}%`;
-      const tpn = `${Math.round(computePassAtK(targetTrials, numTrials) * 100)}%`;
-      const bColor = baselineTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
-      const tColor = targetTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
+      const bp1 = `${Math.round(computePassAtK(withoutSkillTrials, 1) * 100)}%`;
+      const bpn = `${Math.round(computePassAtK(withoutSkillTrials, numTrials) * 100)}%`;
+      const tp1 = `${Math.round(computePassAtK(withSkillTrials, 1) * 100)}%`;
+      const tpn = `${Math.round(computePassAtK(withSkillTrials, numTrials) * 100)}%`;
+      const bColor = withoutSkillTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
+      const tColor = withSkillTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
       tableData.push([result.taskId.toString(), promptSnippet, bColor(bp1), bColor(bpn), tColor(tp1), tColor(tpn)]);
     } else {
-      const baselineStr = (baselineTrials[0]?.trialPassed) ? 'PASS' : 'FAIL';
-      const targetStr = (targetTrials[0]?.trialPassed) ? 'PASS' : 'FAIL';
-      const baselineStatus = baselineTrials.every(t => t.trialPassed) ? chalk.green(baselineStr) : chalk.red(baselineStr);
-      const targetStatus = targetTrials.every(t => t.trialPassed) ? chalk.green(targetStr) : chalk.red(targetStr);
-      tableData.push([result.taskId.toString(), promptSnippet, baselineStatus, targetStatus]);
+      const withoutSkillStr = (withoutSkillTrials[0]?.trialPassed) ? 'PASS' : 'FAIL';
+      const withSkillStr = (withSkillTrials[0]?.trialPassed) ? 'PASS' : 'FAIL';
+      const withoutSkillStatus = withoutSkillTrials.every(t => t.trialPassed) ? chalk.green(withoutSkillStr) : chalk.red(withoutSkillStr);
+      const withSkillStatus = withSkillTrials.every(t => t.trialPassed) ? chalk.green(withSkillStr) : chalk.red(withSkillStr);
+      tableData.push([result.taskId.toString(), promptSnippet, withoutSkillStatus, withSkillStatus]);
     }
   }
 
   Logger.table(tableData);
 
-  const baselinePercentage = Math.round((metrics.baselinePassAtK || 0) * 100);
-  const targetPercentage = Math.round((metrics.passAtK || 0) * 100);
+  const withoutSkillPercentage = Math.round((metrics.withoutSkillPassAtK || 0) * 100);
+  const withSkillPercentage = Math.round((metrics.passAtK || 0) * 100);
 
-  const baselineRateLine = numTrials > 1
-    ? `\n   Baseline Success Rate:   pass@1: ${baselinePercentage}%   pass@${numTrials}: ${Math.round((metrics.baselinePassAtN || 0) * 100)}%`
-    : `\n   Baseline Success Rate:   ${baselinePercentage}%`;
-  const targetRateLine = numTrials > 1
-    ? `   Target Success Rate:     pass@1: ${targetPercentage}%   pass@${numTrials}: ${Math.round((metrics.passAtN || 0) * 100)}%`
-    : `   Target Success Rate:     ${targetPercentage}%`;
+  const withoutSkillRateLine = numTrials > 1
+    ? `\n   Without Skill Rate:   pass@1: ${withoutSkillPercentage}%   pass@${numTrials}: ${Math.round((metrics.withoutSkillPassAtN || 0) * 100)}%`
+    : `\n   Without Skill Rate:   ${withoutSkillPercentage}%`;
+  const withSkillRateLine = numTrials > 1
+    ? `   With Skill Rate:      pass@1: ${withSkillPercentage}%   pass@${numTrials}: ${Math.round((metrics.passAtN || 0) * 100)}%`
+    : `   With Skill Rate:      ${withSkillPercentage}%`;
 
-  Logger.write(baselineRateLine);
-  Logger.write(`\n${targetRateLine}`);
+  Logger.write(withoutSkillRateLine);
+  Logger.write(`\n${withSkillRateLine}`);
 }
