@@ -9,6 +9,7 @@ import { Logger } from '../../src/utils/logger.js';
 test('EvalRunner.runFunctionalTask should disable skill in baseline', async (t) => {
   const runnerOptions = {
     agent: 'gemini-cli',
+    workspace: '/tmp',
     skillPath: './mock-skill',
     skillName: 'mock-skill',
     runDir: './runs',
@@ -54,7 +55,7 @@ test('EvalRunner.runFunctionalTask baseline prompt should include negative instr
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', skillPath: './mock-skill', skillName: 'mock-skill',
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: true
   });
 
@@ -83,7 +84,7 @@ test('EvalRunner.runFunctionalTask baseline with skill activation → Invalid Ba
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', skillPath: './mock-skill', skillName: 'mock-skill',
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: true
   });
 
@@ -104,7 +105,7 @@ test('EvalRunner.runFunctionalTask baseline with clean log → validation passes
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', skillPath: './mock-skill', skillName: 'mock-skill',
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: true
   });
 
@@ -125,7 +126,7 @@ test('EvalRunner.runFunctionalTask target with no skill activation → Invalid T
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', skillPath: './mock-skill', skillName: 'mock-skill',
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: false
   });
 
@@ -147,7 +148,7 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', skillPath: './mock-skill', skillName: 'mock-skill',
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: false
   });
 
@@ -169,7 +170,7 @@ test('EvalRunner.runFunctionalTask baseline skill-disable failure should warn, n
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', skillPath: './mock-skill', skillName: 'mock-skill',
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: true
   });
 

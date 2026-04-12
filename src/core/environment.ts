@@ -5,16 +5,19 @@ import { Logger } from '../utils/logger.js';
 import { ExecutionError } from './errors.js';
 
 export interface EnvironmentOptions {
+  workspace: string;
   skillPath: string;
 }
 
 export class EvalEnvironment {
+  private workspace: string;
   private skillPath: string;
   private absoluteSkillPath: string;
 
   constructor(options: EnvironmentOptions) {
+    this.workspace = options.workspace;
     this.skillPath = options.skillPath;
-    this.absoluteSkillPath = path.resolve(process.cwd(), this.skillPath);
+    this.absoluteSkillPath = path.resolve(this.workspace, this.skillPath);
   }
 
   public async setup(): Promise<void> {
@@ -65,17 +68,18 @@ export class EvalEnvironment {
    * This provides isolation by ensuring each test runs in its own clean copy of the repo.
    */
   public createWorktree(evalId: string): string {
-    const worktreePath = path.resolve(process.cwd(), '.project-skill-evals', 'worktrees', evalId);
-    
+    const worktreePath = path.resolve(this.workspace, '.project-skill-evals', 'worktrees', evalId);
+
     Logger.debug(`Creating worktree at: ${worktreePath}`);
-    
+
     // Ensure the path is clean before adding a worktree
     // We try to remove it first in case a previous run crashed
-    executor.spawnSync('git', ['worktree', 'remove', '--force', worktreePath], { stdio: 'ignore' });
-    
+    executor.spawnSync('git', ['worktree', 'remove', '--force', worktreePath], { stdio: 'ignore', cwd: this.workspace });
+
     const child = executor.spawnSync('git', ['worktree', 'add', worktreePath, '-f'], {
       stdio: 'ignore',
-      encoding: 'utf-8'
+      encoding: 'utf-8',
+      cwd: this.workspace
     });
 
     if (child.status !== 0) {

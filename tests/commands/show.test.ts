@@ -39,7 +39,7 @@ test('showCommand should display latest trigger evaluation results', async (t) =
   mock.method(Logger, 'table', () => {});
 
   try {
-    await showCommand();
+    await showCommand('/workspace');
   } finally {
     mock.reset();
   }
@@ -83,7 +83,7 @@ test('showCommand should display latest functional evaluation results', async (t
   mock.method(Logger, 'table', () => {});
 
   try {
-    await showCommand();
+    await showCommand('/workspace');
   } finally {
     mock.reset();
   }
@@ -91,9 +91,9 @@ test('showCommand should display latest functional evaluation results', async (t
 
 test('showCommand should throw error if no runs found', async (t) => {
   mock.method(fs, 'existsSync', (p: string) => false);
-  
+
   try {
-    await showCommand();
+    await showCommand('/workspace');
     assert.fail('Should have thrown an error');
   } catch (err: any) {
     assert.strictEqual(err.message, 'No evaluation runs found. Run an evaluation first.');

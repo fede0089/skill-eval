@@ -14,7 +14,7 @@ test('preflight: throws ExecutionError when agent binary is not on PATH', () => 
   mock.method(executor, 'execSync', mock.fn(() => { throw new Error('not found'); }));
 
   assert.throws(
-    () => preflight('gemini-cli', './mock-skill'),
+    () => preflight('gemini-cli', process.cwd(), './mock-skill'),
     (err) => err instanceof ExecutionError && err.message.includes("'gemini'"),
     'Should throw ExecutionError mentioning the binary name'
   );
@@ -26,7 +26,7 @@ test('preflight: throws ConfigError when skill path does not exist', () => {
   mock.method(executor, 'execSync', mock.fn(() => Buffer.from('/usr/bin/gemini')));
 
   assert.throws(
-    () => preflight('gemini-cli', '/nonexistent/skill-path-that-cannot-exist'),
+    () => preflight('gemini-cli', '/', '/nonexistent/skill-path-that-cannot-exist'),
     (err) => err instanceof ConfigError && err.message.includes('does not exist'),
     'Should throw ConfigError about missing skill path'
   );
@@ -42,7 +42,7 @@ test('preflight: throws ConfigError when evals/ directory is missing', () => {
 
   try {
     assert.throws(
-      () => preflight('gemini-cli', tempDir),
+      () => preflight('gemini-cli', '/', tempDir),
       (err) => err instanceof ConfigError && err.message.includes("evals/"),
       'Should throw ConfigError about missing evals/ directory'
     );
@@ -57,7 +57,7 @@ test('preflight: does not throw when all checks pass', () => {
 
   // mock-skill exists and has an evals/ directory
   assert.doesNotThrow(
-    () => preflight('gemini-cli', './mock-skill'),
+    () => preflight('gemini-cli', process.cwd(), './mock-skill'),
     'Should not throw when agent binary exists and skill path is valid'
   );
 

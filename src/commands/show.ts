@@ -8,8 +8,8 @@ import { renderTriggerTable, renderFunctionalTable } from '../utils/table-render
 import type { Reporter } from '../core/reporters/index.js';
 import { JsonReporter } from '../core/reporters/index.js';
 
-export async function showCommand(reporter: Reporter = new JsonReporter()): Promise<void> {
-  const runsDir = path.resolve(process.cwd(), '.project-skill-evals', 'runs');
+export async function showCommand(workspace: string, reporter: Reporter = new JsonReporter()): Promise<void> {
+  const runsDir = path.resolve(workspace, '.project-skill-evals', 'runs');
 
   if (!fs.existsSync(runsDir)) {
     throw new AppError('No evaluation runs found. Run an evaluation first.');

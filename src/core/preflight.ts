@@ -22,7 +22,7 @@ const AGENT_BINARIES: Record<string, string> = {
  * @throws ExecutionError if the agent binary is not found.
  * @throws ConfigError if the skill path or its evals/ directory is missing.
  */
-export function preflight(agent: string, skillPath: string): void {
+export function preflight(agent: string, workspace: string, skillPath: string): void {
   const binary = AGENT_BINARIES[agent] ?? agent;
 
   try {
@@ -34,7 +34,7 @@ export function preflight(agent: string, skillPath: string): void {
     );
   }
 
-  const absoluteSkillPath = path.resolve(process.cwd(), skillPath);
+  const absoluteSkillPath = path.resolve(workspace, skillPath);
 
   if (!fs.existsSync(absoluteSkillPath)) {
     throw new ConfigError(

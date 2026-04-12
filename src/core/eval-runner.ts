@@ -11,6 +11,7 @@ import { Logger } from '../utils/logger.js';
 
 export interface EvalRunOptions {
   agent: string;
+  workspace: string;
   skillPath: string;
   skillName: string;
   runDir: string;
@@ -52,7 +53,7 @@ export class EvalRunner {
   private functionalGrader: ModelBasedGrader;
 
   constructor(private options: EvalRunOptions) {
-    this.env = new EvalEnvironment({ skillPath: options.skillPath });
+    this.env = new EvalEnvironment({ workspace: options.workspace, skillPath: options.skillPath });
     this.runner = RunnerFactory.create(options.agent);
     this.triggerGrader = new TriggerGrader(options.skillName);
     // Inject the same runner for judging so swapping the agent backend works end-to-end

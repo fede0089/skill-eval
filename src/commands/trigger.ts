@@ -16,13 +16,14 @@ import { JsonReporter } from '../core/reporters/index.js';
 
 export async function triggerCommand(
   agent: string,
+  workspace: string,
   skillPath: string,
   concurrency: number = 5,
   injectedSuite?: EvalSuite,
   numTrials: number = 3,
   reporter: Reporter = new JsonReporter()
 ): Promise<void> {
-  if (!injectedSuite) preflight(agent, skillPath);
+  if (!injectedSuite) preflight(agent, workspace, skillPath);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
 
   const { skill_name, tasks } = suite;
@@ -32,14 +33,14 @@ export async function triggerCommand(
   Logger.debug(`Found ${tasks.length} tasks.\n`);
 
   // Setup Environment (global setup)
-  const env = new EvalEnvironment({ skillPath });
+  const env = new EvalEnvironment({ workspace, skillPath });
   await env.setup();
 
   // Setup Artifacts Directory (Always create, even if not verbose, for 'show' command)
   const verbose = !!process.env.DEBUG;
   const startTime = new Date();
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
-  const runDir = path.resolve(process.cwd(), '.project-skill-evals', 'runs', timestamp);
+  const runDir = path.resolve(workspace, '.project-skill-evals', 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
   Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
 
@@ -48,6 +49,7 @@ export async function triggerCommand(
 
   const runner = new EvalRunner({
     agent,
+    workspace,
     skillPath,
     skillName: skill_name,
     runDir,
