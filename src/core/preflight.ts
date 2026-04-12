@@ -2,14 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { executor } from '../utils/exec.js';
 import { ConfigError, ExecutionError } from './errors.js';
-
-/**
- * Maps agent identifiers to the CLI binary name used to run them.
- * Add new entries here when adding a new runner.
- */
-const AGENT_BINARIES: Record<string, string> = {
-  'gemini-cli': 'gemini',
-};
+import { RUNNER_REGISTRY } from '../runners/registry.js';
 
 /**
  * Validates that the environment is ready to run an evaluation before any
@@ -23,7 +16,7 @@ const AGENT_BINARIES: Record<string, string> = {
  * @throws ConfigError if the skill path or its evals/ directory is missing.
  */
 export function preflight(agent: string, workspace: string, skillPath: string): void {
-  const binary = AGENT_BINARIES[agent] ?? agent;
+  const binary = RUNNER_REGISTRY[agent]?.binary ?? agent;
 
   try {
     executor.execSync(`which ${binary}`, { stdio: 'ignore' });

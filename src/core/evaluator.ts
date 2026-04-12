@@ -1,6 +1,6 @@
 import { AgentTranscript, ToolMetrics, AssertionResult, NdjsonToolUseEvent } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
-import { AgentRunner } from './runners/runner.interface.js';
+import { AgentRunner } from '../runners/runner.interface.js';
 import { parseNdjsonEvents } from '../utils/ndjson.js';
 
 /**

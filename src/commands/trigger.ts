@@ -11,8 +11,8 @@ import { aggregatePassAtK } from '../core/statistics.js';
 import { padAbortedTrials } from '../core/trial-utils.js';
 import { preflight } from '../core/preflight.js';
 import { renderTriggerTable } from '../utils/table-renderer.js';
-import type { Reporter } from '../core/reporters/index.js';
-import { JsonReporter } from '../core/reporters/index.js';
+import type { Reporter } from '../reporters/index.js';
+import { JsonReporter } from '../reporters/index.js';
 
 export async function triggerCommand(
   agent: string,

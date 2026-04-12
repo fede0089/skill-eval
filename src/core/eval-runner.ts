@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { executor } from '../utils/exec.js';
 import { EvalEnvironment } from './environment.js';
-import { RunnerFactory, AgentRunner } from './runners/index.js';
+import { RunnerFactory, AgentRunner } from '../runners/index.js';
 import { AgentTranscript, EvalTask, EvalTrial, AssertionResult, NdjsonResultEvent } from '../types/index.js';
 import { TriggerGrader, ModelBasedGrader } from './evaluator.js';
 import { EvalTaskContext } from '../utils/ui.js';

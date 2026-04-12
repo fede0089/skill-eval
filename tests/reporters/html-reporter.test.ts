@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
-import { generateHtml } from '../../../src/core/reporters/html-reporter.js';
-import type { EvalSuiteReport } from '../../../src/types/index.js';
+import { generateHtml } from '../../src/reporters/html-reporter.js';
+import type { EvalSuiteReport } from '../../src/types/index.js';
 
 function makeTriggerReport(overrides: Partial<EvalSuiteReport> = {}): EvalSuiteReport {
   return {

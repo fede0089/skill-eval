@@ -3,7 +3,7 @@ import * as assert from 'node:assert';
 import { executor } from '../../src/utils/exec.js';
 import { EvalRunner } from '../../src/core/eval-runner.js';
 import { EvalEnvironment } from '../../src/core/environment.js';
-import { RunnerFactory } from '../../src/core/runners/index.js';
+import { RunnerFactory } from '../../src/runners/index.js';
 import { Logger } from '../../src/utils/logger.js';
 
 test('EvalRunner.runFunctionalTask should disable skill in baseline', async (t) => {

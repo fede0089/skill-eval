@@ -91,6 +91,33 @@ For functional evaluations, include `expectations`:
 }
 ```
 
+## Extending
+
+### Adding a new agent runner
+
+1. Create a folder `src/runners/<your-agent>/` with two files:
+   ```
+   src/runners/<your-agent>/
+   ├── runner.ts    # implements AgentRunner interface
+   └── index.ts     # export { YourRunner } from './runner.js'
+   ```
+2. Open `src/runners/registry.ts` and add one entry:
+   ```ts
+   import { YourRunner } from './<your-agent>/index.js';
+
+   export const RUNNER_REGISTRY: Record<string, RunnerEntry> = {
+     'gemini-cli': { Runner: GeminiCliRunner, binary: 'gemini' },
+     '<your-agent>': { Runner: YourRunner, binary: '<cli-binary-name>' },
+   };
+   ```
+3. Done — the factory, preflight check, and CLI all pick it up automatically.
+
+### Adding a new report format
+
+1. Create `src/reporters/<format>-reporter.ts` implementing `Reporter`.
+2. Add it to `src/reporters/index.ts`: export the class and add a case in `createReporter()`.
+3. Add the new format string to `ReportFormat` in `src/types/index.ts`.
+
 ## CLI flags
 
 | Flag | Required | Default | Description |

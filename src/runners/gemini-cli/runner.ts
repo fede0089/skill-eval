@@ -1,14 +1,14 @@
 import * as fs from 'fs';
 import child_process from 'child_process';
 import { AgentTranscript, AgentOutput } from '../../types/index.js';
-import { AgentRunner } from './runner.interface.js';
+import { AgentRunner } from '../runner.interface.js';
 import { Logger } from '../../utils/logger.js';
 
 export class GeminiCliRunner implements AgentRunner {
   /**
    * Runs the prompt through an isolated gemini instance.
    * Default mode is headless using --approval-mode auto_edit.
-   * 
+   *
    * @param prompt The evaluation prompt text
    * @param cwd Optional execution directory
    * @param onLog Callback to receive real-time logs (from stderr)
@@ -16,8 +16,8 @@ export class GeminiCliRunner implements AgentRunner {
    * @returns Raw output from Gemini
    */
   public async runPrompt(
-    prompt: string, 
-    cwd?: string, 
+    prompt: string,
+    cwd?: string,
     onLog?: (log: string) => void,
     logPath?: string,
     extraArgs: string[] = []
@@ -80,14 +80,14 @@ export class GeminiCliRunner implements AgentRunner {
         if (stdoutDone && stderrDone && processDone && logStreamDone && !resolved) {
           resolved = true;
           clearTimeout(timeout);
-          
+
           if (!stdout || stdout.trim() === '') {
             return resolve({ error: 'Empty output from Gemini CLI', raw_output: stderr });
           }
 
-          return resolve({ 
-            response: stdout.trim(), 
-            raw_output: `${stdout}\n--- STDERR ---\n${stderr}` 
+          return resolve({
+            response: stdout.trim(),
+            raw_output: `${stdout}\n--- STDERR ---\n${stderr}`
           } as AgentOutput);
         }
       }
@@ -150,7 +150,7 @@ export class GeminiCliRunner implements AgentRunner {
             Logger.debug(`Gemini CLI Stderr: ${stderr.trim()}`);
           }
         }
-        
+
         processDone = true;
         checkAllDone();
       });

@@ -1,6 +1,6 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert';
-import { GeminiCliRunner } from '../../../src/core/runners/gemini-cli.runner.js';
+import { GeminiCliRunner } from '../../../src/runners/gemini-cli/runner.js';
 import child_process from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
@@ -38,14 +38,14 @@ test('GeminiCliRunner.runPrompt should use --approval-mode auto_edit by default'
   });
 
   await promise;
-  
+
   assert.ok(spawnMock.mock.callCount() >= 1, 'spawn should have been called');
   const lastCall = spawnMock.mock.calls[0];
   const args = lastCall.arguments[1];
-  
+
   assert.ok(args.includes('-p'), 'Should include -p');
   assert.strictEqual(args[args.indexOf('-p') + 1], 'test prompt');
-  
+
   spawnMock.mock.restore();
 });
 
@@ -64,14 +64,14 @@ test('GeminiCliRunner.runPrompt should include --output-format stream-json when 
   });
 
   await promise;
-  
+
   assert.ok(spawnMock.mock.callCount() >= 1, 'spawn should have been called');
   const lastCall = spawnMock.mock.calls[0];
   const args = lastCall.arguments[1];
-  
+
   assert.ok(args.includes('--output-format'), 'Should include --output-format');
   assert.strictEqual(args[args.indexOf('--output-format') + 1], 'stream-json');
-  
+
   spawnMock.mock.restore();
 });
 
@@ -94,7 +94,7 @@ test('GeminiCliRunner.runPrompt should pass cwd to spawn', async (t) => {
   assert.ok(spawnMock.mock.callCount() >= 1, 'spawn should have been called');
   const lastCall = spawnMock.mock.calls[0];
   assert.strictEqual(lastCall.arguments[2]?.cwd, cwd);
-  
+
   spawnMock.mock.restore();
 });
 
@@ -104,19 +104,19 @@ test('GeminiCliRunner.runPrompt should return raw output in response and raw_out
 
   const runner = new GeminiCliRunner();
   const promise = runner.runPrompt('test prompt');
-  
+
   setImmediate(() => {
     mockChild.stdout.push('this is fine now');
     mockChild.stdout.push(null);
     mockChild.stderr.push(null);
     mockChild.emit('close', 0);
   });
-  
+
   const result = await promise;
-  
+
   assert.ok(result, 'result should be defined');
   assert.strictEqual(result?.response, 'this is fine now');
-  
+
   spawnMock.mock.restore();
 });
 

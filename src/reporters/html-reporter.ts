@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import type { AssertionResult, EvalSuiteReport, EvalTrial, TaskResult } from '../../types/index.js';
-import { Logger } from '../../utils/logger.js';
+import type { AssertionResult, EvalSuiteReport, EvalTrial, TaskResult } from '../types/index.js';
+import { Logger } from '../utils/logger.js';
 import type { Reporter } from './reporter.js';
 
 export class HtmlReporter implements Reporter {

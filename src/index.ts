@@ -4,7 +4,7 @@ import { triggerCommand } from './commands/trigger.js';
 import { functionalCommand } from './commands/functional.js';
 import { Logger } from './utils/logger.js';
 import { AppError } from './core/errors.js';
-import { createReporter } from './core/reporters/index.js';
+import { createReporter } from './reporters/index.js';
 import type { ReportFormat } from './types/index.js';
 
 import * as path from 'path';

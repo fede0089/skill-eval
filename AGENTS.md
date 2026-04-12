@@ -22,7 +22,9 @@
   - `src/core/trial-utils.ts` - Shared helper: `padAbortedTrials` fills trial arrays to a consistent denominator.
   - `src/core/preflight.ts` - Pre-flight validation of agent binary and skill directory structure.
   - `src/core/errors.ts` - Custom error types (AppError, ConfigError, ExecutionError, ValidationError).
-  - `src/core/runners/` - Agent runner abstraction (interface, factory, Gemini CLI implementation).
+  - `src/runners/registry.ts` - **Single registration point** for agent runners; add new runners here.
+  - `src/runners/gemini-cli/runner.ts` - Gemini CLI runner implementation.
+  - `src/reporters/index.ts` - Reporter factory; add new report formats here.
   - `src/utils/table-renderer.ts` - Shared `renderTriggerTable` / `renderFunctionalTable` used by both commands.
   - `src/utils/` - Shared utilities: eval-loader, exec, ndjson, ui, logger.
   - `src/types/index.ts` - Shared TypeScript types including the `NdjsonEvent` discriminated union.
@@ -36,15 +38,24 @@
 ├── mock-skill/            # mock skill for evaluation tests
 ├── src/                   # source code
 │   ├── commands/          # CLI command definitions (trigger, functional)
-│   ├── core/              # core evaluation and runner logic
+│   ├── runners/           # ← ADD NEW AGENT RUNNERS HERE (one folder per runner)
+│   │   ├── registry.ts    # single registration point: runner class + binary name
+│   │   ├── runner.interface.ts  # AgentRunner interface
+│   │   ├── gemini-cli/    # Gemini CLI runner implementation
+│   │   └── index.ts       # public re-exports
+│   ├── reporters/         # ← ADD NEW REPORT FORMATS HERE
+│   │   ├── reporter.ts    # Reporter interface
+│   │   ├── html-reporter.ts
+│   │   ├── json-reporter.ts
+│   │   └── index.ts       # createReporter() factory + re-exports
+│   ├── core/              # core evaluation logic
 │   │   ├── evaluator.ts   # LLM judge prompts and grading (ModelBasedGrader)
 │   │   ├── eval-runner.ts # trial orchestration and NDJSON stream parsing
 │   │   ├── environment.ts # git worktree isolation and skill symlinks
 │   │   ├── statistics.ts  # pass@k metric computation (computePassAtK, aggregatePassAtK)
 │   │   ├── trial-utils.ts # shared trial padding helper (padAbortedTrials)
 │   │   ├── preflight.ts   # agent binary + skill path validation before trials
-│   │   ├── errors.ts      # custom error types
-│   │   └── runners/       # agent runner abstraction (interface, factory, Gemini CLI)
+│   │   └── errors.ts      # custom error types
 │   ├── utils/             # shared utilities (eval-loader, exec, ndjson, ui, logger, table-renderer)
 │   └── types/             # shared TypeScript types (NdjsonEvent discriminated union)
 ├── tests/                 # test suite (mirrors src/ structure)
