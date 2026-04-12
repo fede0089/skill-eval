@@ -110,7 +110,6 @@ export class GeminiCliRunner implements AgentRunner {
         child.stderr.on('data', (data) => {
           const chunk = data.toString();
           stderr += chunk;
-          if (logStream) logStream.write(chunk);
           if (onLog) {
             const lines = chunk.split('\n').filter((l: string) => l.trim() !== '');
             if (lines.length > 0) {

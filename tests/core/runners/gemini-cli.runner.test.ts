@@ -143,7 +143,7 @@ test('GeminiCliRunner.runPrompt should write to logPath if provided', async (t) 
   assert.ok(fs.existsSync(logPath), 'Log file should exist');
   const content = fs.readFileSync(logPath, 'utf-8');
   assert.ok(content.includes('stdout data'), 'Log should contain stdout');
-  assert.ok(content.includes('stderr data'), 'Log should contain stderr');
+  assert.ok(!content.includes('stderr data'), 'Log should not contain stderr noise');
   
   spawnMock.mock.restore();
   fs.rmSync(tempDir, { recursive: true, force: true });
