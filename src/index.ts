@@ -8,6 +8,7 @@ import { createReporter } from './core/reporters/index.js';
 import type { ReportFormat } from './types/index.js';
 
 import * as path from 'path';
+import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 
 export const program = new Command();
@@ -69,11 +70,13 @@ program
   });
 
 
-const isMain = process.argv[1] && (
-  process.argv[1] === fileURLToPath(import.meta.url) ||
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) ||
-  process.argv[1].endsWith('dist/index.js')
-);
+const isMain = process.argv[1] && (() => {
+  try {
+    return fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+})();
 
 if (isMain) {
   program.parse(process.argv);
