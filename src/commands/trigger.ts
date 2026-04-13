@@ -8,7 +8,6 @@ import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
 import { aggregatePassAtK } from '../core/statistics.js';
-import { padAbortedTrials } from '../core/trial-utils.js';
 import { preflight } from '../core/preflight.js';
 import { renderTriggerTable } from '../utils/table-renderer.js';
 import type { Reporter } from '../reporters/index.js';
@@ -71,30 +70,28 @@ export async function triggerCommand(
         id: task.id,
         title: taskLabel,
         task: async (uiCtx) => {
-          const trials: EvalTrial[] = [];
-
-          for (let trialId = 1; trialId <= numTrials; trialId++) {
-            if (numTrials > 1) uiCtx.updateLog(`Trial ${trialId}/${numTrials}...`);
-            try {
-              const trial = await runner.runTriggerTask(task, i, trialId, uiCtx);
-              trials.push(trial);
-            } catch (error) {
-              trials.push({
-                id: trialId,
-                transcript: { error: error instanceof Error ? error.message : String(error) },
-                assertionResults: [{
-                  assertion: 'Runner Execution',
-                  passed: false,
-                  reason: error instanceof Error ? error.message : String(error)
-                }],
-                trialPassed: false
-              });
-              // Abort remaining trials on execution error
-              break;
-            }
-          }
-
-          padAbortedTrials(trials, numTrials, 'Runner Execution');
+          let completed = 0;
+          const trials = await Promise.all(
+            Array.from({ length: numTrials }, (_, idx) => {
+              const trialId = idx + 1;
+              return runner.runTriggerTask(task, i, trialId, uiCtx)
+                .catch((error): EvalTrial => ({
+                  id: trialId,
+                  transcript: { error: error instanceof Error ? error.message : String(error) },
+                  assertionResults: [{
+                    assertion: 'Runner Execution',
+                    passed: false,
+                    reason: error instanceof Error ? error.message : String(error)
+                  }],
+                  trialPassed: false
+                }))
+                .then(trial => {
+                  completed++;
+                  if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
+                  return trial;
+                });
+            })
+          );
 
           const passedCount = trials.filter(t => t.trialPassed).length;
           const score = trials.length > 0 ? passedCount / trials.length : 0;

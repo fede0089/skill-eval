@@ -8,7 +8,6 @@ import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
 import { aggregatePassAtK } from '../core/statistics.js';
-import { padAbortedTrials } from '../core/trial-utils.js';
 import { preflight } from '../core/preflight.js';
 import { renderFunctionalTable } from '../utils/table-renderer.js';
 import type { Reporter } from '../reporters/index.js';
@@ -86,25 +85,24 @@ export async function functionalCommand(
         id: `without-skill-${task.id}`,
         title: `Without Skill: ${taskLabel}`,
         task: async (uiCtx) => {
-          const trials: EvalTrial[] = [];
-
-          for (let trialId = 1; trialId <= numTrials; trialId++) {
-            if (numTrials > 1) uiCtx.updateLog(`Trial ${trialId}/${numTrials}...`);
-            try {
-              const trial = await withoutSkillRunner.runFunctionalTask(task, i, trialId, uiCtx);
-              trials.push(trial);
-            } catch (error) {
-              trials.push({
-                id: trialId,
-                transcript: { error: error instanceof Error ? error.message : String(error) },
-                assertionResults: [{ assertion: 'Without Skill Execution', passed: false, reason: String(error) }],
-                trialPassed: false
-              });
-              break;
-            }
-          }
-
-          padAbortedTrials(trials, numTrials, 'Without Skill Execution');
+          let completed = 0;
+          const trials = await Promise.all(
+            Array.from({ length: numTrials }, (_, idx) => {
+              const trialId = idx + 1;
+              return withoutSkillRunner.runFunctionalTask(task, i, trialId, uiCtx)
+                .catch((error): EvalTrial => ({
+                  id: trialId,
+                  transcript: { error: error instanceof Error ? error.message : String(error) },
+                  assertionResults: [{ assertion: 'Without Skill Execution', passed: false, reason: String(error) }],
+                  trialPassed: false
+                }))
+                .then(trial => {
+                  completed++;
+                  if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
+                  return trial;
+                });
+            })
+          );
 
           withoutSkillTrialsByTask.set(task.id, trials);
 
@@ -135,25 +133,24 @@ export async function functionalCommand(
         id: `with-skill-${task.id}`,
         title: `With Skill: ${taskLabel}`,
         task: async (uiCtx) => {
-          const trials: EvalTrial[] = [];
-
-          for (let trialId = 1; trialId <= numTrials; trialId++) {
-            if (numTrials > 1) uiCtx.updateLog(`Trial ${trialId}/${numTrials}...`);
-            try {
-              const trial = await withSkillRunner.runFunctionalTask(task, i, trialId, uiCtx);
-              trials.push(trial);
-            } catch (error) {
-              trials.push({
-                id: trialId,
-                transcript: { error: error instanceof Error ? error.message : String(error) },
-                assertionResults: [{ assertion: 'With Skill Execution', passed: false, reason: String(error) }],
-                trialPassed: false
-              });
-              break;
-            }
-          }
-
-          padAbortedTrials(trials, numTrials, 'With Skill Execution');
+          let completed = 0;
+          const trials = await Promise.all(
+            Array.from({ length: numTrials }, (_, idx) => {
+              const trialId = idx + 1;
+              return withSkillRunner.runFunctionalTask(task, i, trialId, uiCtx)
+                .catch((error): EvalTrial => ({
+                  id: trialId,
+                  transcript: { error: error instanceof Error ? error.message : String(error) },
+                  assertionResults: [{ assertion: 'With Skill Execution', passed: false, reason: String(error) }],
+                  trialPassed: false
+                }))
+                .then(trial => {
+                  completed++;
+                  if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
+                  return trial;
+                });
+            })
+          );
 
           const passedCount = trials.filter(t => t.trialPassed).length;
           const score = trials.length > 0 ? passedCount / trials.length : 0;

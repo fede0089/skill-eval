@@ -11,7 +11,7 @@ test('functionalCommand should handle tasks and trials', async (t) => {
   mock.method(fs, 'writeFileSync', () => {});
   mock.method(fs, 'readdirSync', () => ['evals.json']);
   mock.method(fs, 'existsSync', (p: string) => true);
-  
+
   const injectedSuite = {
     skill_name: 'mock-skill',
     tasks: [{ id: 1, prompt: 'test prompt', expectations: ['is correct'] }]
@@ -22,11 +22,11 @@ test('functionalCommand should handle tasks and trials', async (t) => {
   mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
 
   const runnerMock = {
-    runFunctionalTask: mock.fn(async () => ({ 
+    runFunctionalTask: mock.fn(async () => ({
       id: 1,
       transcript: { response: 'Mock response' },
       assertionResults: [],
-      trialPassed: true 
+      trialPassed: true
     }))
   };
   mock.method(EvalRunner.prototype, 'runFunctionalTask', runnerMock.runFunctionalTask);
@@ -36,6 +36,40 @@ test('functionalCommand should handle tasks and trials', async (t) => {
 
     // Verify baseline and target runs: 1 task × 1 trial × 2 passes = 2 calls
     assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 2);
+  } finally {
+    mock.reset();
+  }
+});
+
+test('functionalCommand should run all trials in parallel (no early abort on error)', async (t) => {
+  mock.method(fs, 'mkdirSync', () => {});
+  mock.method(fs, 'writeFileSync', () => {});
+  mock.method(fs, 'readdirSync', () => ['evals.json']);
+  mock.method(fs, 'existsSync', () => true);
+
+  const injectedSuite = {
+    skill_name: 'mock-skill',
+    tasks: [{ id: 1, prompt: 'test prompt', expectations: ['is correct'] }]
+  };
+
+  mock.method(EvalEnvironment.prototype, 'setup', async () => {});
+  mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
+
+  let callCount = 0;
+  const runnerMock = {
+    runFunctionalTask: mock.fn(async () => {
+      callCount++;
+      if (callCount === 2) throw new Error('trial 2 failed');
+      return { id: callCount, transcript: { response: 'ok' }, assertionResults: [], trialPassed: true };
+    })
+  };
+  mock.method(EvalRunner.prototype, 'runFunctionalTask', runnerMock.runFunctionalTask);
+
+  try {
+    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 3);
+
+    // 1 task × 3 trials × 2 passes (without + with) = 6 calls, all attempted
+    assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 6);
   } finally {
     mock.reset();
   }

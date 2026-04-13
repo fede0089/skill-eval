@@ -1,5 +1,6 @@
 import { executor } from '../utils/exec.js';
 import * as path from 'path';
+import * as fs from 'fs';
 import { Logger } from '../utils/logger.js';
 import { ExecutionError } from './errors.js';
 
@@ -19,7 +20,14 @@ export class EvalEnvironment {
   }
 
   public async teardown(): Promise<void> {
-    // Global unlink is no longer needed as worktree deletion cleans up local symlinks
+    const worktreesDir = path.resolve(this.workspace, '.project-skill-evals', 'worktrees');
+    if (!fs.existsSync(worktreesDir)) return;
+
+    for (const entry of fs.readdirSync(worktreesDir)) {
+      this.removeWorktree(path.join(worktreesDir, entry));
+    }
+
+    executor.spawnSync('git', ['worktree', 'prune'], { stdio: 'ignore', cwd: this.workspace });
   }
 
   /**
@@ -56,7 +64,8 @@ export class EvalEnvironment {
     
     const child = executor.spawnSync('git', ['worktree', 'remove', '--force', worktreePath], {
       stdio: 'ignore',
-      encoding: 'utf-8'
+      encoding: 'utf-8',
+      cwd: this.workspace
     });
 
     if (child.status !== 0) {
