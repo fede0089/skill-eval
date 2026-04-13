@@ -5,6 +5,7 @@ import { functionalCommand } from './commands/functional.js';
 import { Logger } from './utils/logger.js';
 import { AppError } from './core/errors.js';
 import { createReporter } from './reporters/index.js';
+import { DEFAULT_AGENT } from './runners/registry.js';
 import type { ReportFormat } from './types/index.js';
 
 import * as path from 'path';
@@ -45,7 +46,7 @@ program
   .option('--report <format>', 'Report format: html or json')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
-    const selectedAgent = agent || 'gemini-cli';
+    const selectedAgent = agent || DEFAULT_AGENT;
     const concurrency = parseInt(options.concurrency, 10) || 5;
     const numTrials = parseInt(options.trials, 10) || 3;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
@@ -62,7 +63,7 @@ program
   .option('--report <format>', 'Report format: html or json')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
-    const selectedAgent = agent || 'gemini-cli';
+    const selectedAgent = agent || DEFAULT_AGENT;
     const concurrency = parseInt(options.concurrency, 10) || 5;
     const numTrials = parseInt(options.trials, 10) || 3;
     const reporter = createReporter((options.report || 'html') as ReportFormat);

@@ -174,7 +174,7 @@ export class GeminiCliRunner implements AgentRunner {
     fs.symlinkSync(absoluteSkillPath, symlinkPath, 'dir');
   }
 
-  async disableSkill(skillName: string, cwd: string): Promise<void> {
-    executor.execSync(`gemini skills disable ${skillName} --scope project`, { cwd, stdio: 'ignore' });
+  async disableSkill(skillName: string, worktreePath: string): Promise<void> {
+    executor.execSync(`gemini skills disable ${skillName} --scope project`, { cwd: worktreePath, stdio: 'ignore' });
   }
 }

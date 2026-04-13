@@ -20,6 +20,9 @@ export const RUNNER_REGISTRY: Record<string, RunnerEntry> = {
   'gemini-cli': { Runner: GeminiCliRunner, binary: 'gemini' },
 };
 
+/** Default agent name used when none is specified on the CLI. */
+export const DEFAULT_AGENT = Object.keys(RUNNER_REGISTRY)[0];
+
 export type AgentName = keyof typeof RUNNER_REGISTRY;
 
 export class RunnerFactory {
