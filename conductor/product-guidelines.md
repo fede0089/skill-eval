@@ -1,7 +1,7 @@
 # Product Guidelines
 
 ## 1. CLI Output Verbosity
-**Minimalist:** The CLI should default to minimal, essential output. For deeper debugging or detailed logs, users should be required to pass explicit flags (e.g., `--verbose`). This ensures the tool remains non-intrusive when integrated into workflows.
+**Minimalist:** The CLI should default to minimal, essential output. For deeper debugging or detailed logs, users should be required to pass explicit flags (e.g., `--debug`). This ensures the tool remains non-intrusive when integrated into workflows.
 
 ## 2. Error Handling UX
 **Actionable Errors:** When errors occur, the CLI must provide clear, human-readable explanations of what went wrong. Furthermore, it should suggest actionable fixes or next steps rather than simply failing silently or dumping raw stack traces.

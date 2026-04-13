@@ -9,8 +9,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "test:trigger": "npm run build && node ./dist/index.js trigger --skill ./mock-skill --verbose",
-    "test:functional": "npm run build && node ./dist/index.js functional --skill ./mock-skill --verbose",
+    "test:trigger": "npm run build && node ./dist/index.js trigger --skill ./mock-skill --debug",
+    "test:functional": "npm run build && node ./dist/index.js functional --skill ./mock-skill --debug",
     "test:unit": "tsx --test \"tests/**/*.test.ts\""
   },
   "type": "module",

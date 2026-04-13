@@ -36,8 +36,8 @@ export async function triggerCommand(
   const env = new EvalEnvironment({ workspace });
   await env.setup();
 
-  // Setup Artifacts Directory (Always create, even if not verbose, for 'show' command)
-  const verbose = !!process.env.DEBUG;
+  // Setup Artifacts Directory (Always create, even if not in debug mode, for 'show' command)
+  const debug = !!process.env.DEBUG;
   const startTime = new Date();
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
   const runDir = path.resolve(workspace, '.project-skill-evals', 'runs', timestamp);
@@ -53,7 +53,7 @@ export async function triggerCommand(
     skillPath,
     skillName: skill_name,
     runDir,
-    verbose
+    debug
   });
 
   const ui = new ListrEvalUI();

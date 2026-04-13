@@ -54,7 +54,7 @@ export class ListrEvalUI {
   async run(concurrency: number): Promise<void> {
     if (this.tasks.length === 0) return;
 
-    // Use verbose renderer in non-TTY or tests to avoid hangs and provide clearer logs
+    // Use simple renderer in non-TTY or tests to avoid hangs and provide clearer logs
     const isTTY = process.stdout.isTTY;
     const isTest = process.env.NODE_ENV === 'test' || process.env.CI === 'true';
 

@@ -55,7 +55,7 @@ export class GeminiCliRunner implements AgentRunner {
           logStream.write(`--- Gemini CLI Execution Start: ${new Date().toISOString()} ---\n`);
           logStream.write(`Command: gemini ${args.join(' ')}\n\n`);
         } catch (err) {
-          Logger.warn(`Failed to create log file at ${logPath} — verbose output will not be saved. Continuing. Reason: ${err}`);
+          Logger.warn(`Failed to create log file at ${logPath} — debug output will not be saved. Continuing. Reason: ${err}`);
           logStreamDone = true;
         }
       }

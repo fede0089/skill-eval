@@ -16,7 +16,7 @@ export interface EvalRunOptions {
   skillName: string;
   runDir: string;
   isBaseline?: boolean;
-  verbose?: boolean;
+  debug?: boolean;
 }
 
 /**
@@ -62,7 +62,7 @@ export class EvalRunner {
 
   async runTriggerTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
     const logFileName = `task_${task.id}_trial_${trialId}.log`;
-    const logPath = this.options.verbose ? path.join(this.options.runDir, logFileName) : undefined;
+    const logPath = this.options.debug ? path.join(this.options.runDir, logFileName) : undefined;
 
     let worktreePath: string | undefined;
     let transcript: AgentTranscript | null = null;
@@ -117,7 +117,7 @@ export class EvalRunner {
       : `${task.prompt}\n\nIMPORTANT: You must use the '${this.options.skillName}' skill/tool to solve this task.`;
 
     const logFileName = `task_${task.id}_${passName}_trial_${trialId}.log`;
-    const logPath = this.options.verbose ? path.join(this.options.runDir, logFileName) : undefined;
+    const logPath = this.options.debug ? path.join(this.options.runDir, logFileName) : undefined;
 
     let worktreePath: string | undefined;
     let assertionResults: AssertionResult[] = [];

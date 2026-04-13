@@ -177,7 +177,7 @@ test('GeminiCliRunner.runPrompt should warn (not throw) when log file creation f
 
   const warnCalls = warnMock.mock.calls.map(c => c.arguments[0] as string);
   assert.ok(
-    warnCalls.some(msg => msg.includes('verbose output will not be saved')),
+    warnCalls.some(msg => msg.includes('debug output will not be saved')),
     `Expected a warn about missing log output, got: ${JSON.stringify(warnCalls)}`
   );
 

@@ -30,9 +30,9 @@ program
   .name('skill-eval')
   .description('CLI to evaluate agent skills triggering and functionality')
   .version('1.0.0')
-  .option('-v, --verbose', 'Enable verbose logging', false);
+  .option('-v, --debug', 'Enable debug logging', false);
 
-program.on('option:verbose', () => {
+program.on('option:debug', () => {
   process.env.DEBUG = 'true';
 });
 

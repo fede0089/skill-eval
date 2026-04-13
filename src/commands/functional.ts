@@ -35,8 +35,8 @@ export async function functionalCommand(
   const env = new EvalEnvironment({ workspace });
   await env.setup();
 
-  // Setup Artifacts Directory (Always create, even if not verbose, for 'show' command)
-  const verbose = !!process.env.DEBUG;
+  // Setup Artifacts Directory (Always create, even if not in debug mode, for 'show' command)
+  const debug = !!process.env.DEBUG;
   const startTime = new Date();
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
   const runDir = path.resolve(workspace, '.project-skill-evals', 'runs', timestamp);
@@ -57,7 +57,7 @@ export async function functionalCommand(
     skillName: skill_name,
     runDir,
     isBaseline: true,
-    verbose
+    debug
   });
 
   const withSkillRunner = new EvalRunner({
@@ -67,7 +67,7 @@ export async function functionalCommand(
     skillName: skill_name,
     runDir,
     isBaseline: false,
-    verbose
+    debug
   });
 
   try {
