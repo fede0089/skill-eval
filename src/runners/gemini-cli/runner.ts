@@ -1,10 +1,13 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import child_process from 'child_process';
-import { AgentTranscript, AgentOutput } from '../../types/index.js';
+import { AgentOutput } from '../../types/index.js';
 import { AgentRunner } from '../runner.interface.js';
 import { Logger } from '../../utils/logger.js';
+import { executor } from '../../utils/exec.js';
 
 export class GeminiCliRunner implements AgentRunner {
+  readonly skillDispatchToolName = 'activate_skill';
   /**
    * Runs the prompt through an isolated gemini instance.
    * Default mode is headless using --approval-mode auto_edit.
@@ -27,8 +30,8 @@ export class GeminiCliRunner implements AgentRunner {
       let stderr = '';
       let resolved = false;
 
-      // Use -p and --approval-mode auto_edit for headless mode.
-      const args: string[] = ['-p', prompt, '--approval-mode', 'auto_edit', ...extraArgs];
+      // Use -p, --approval-mode auto_edit and --output-format stream-json for headless NDJSON mode.
+      const args: string[] = ['-p', prompt, '--approval-mode', 'auto_edit', '--output-format', 'stream-json', ...extraArgs];
 
       const spawnOptions: any = {
         cwd: cwd,
@@ -155,5 +158,23 @@ export class GeminiCliRunner implements AgentRunner {
         checkAllDone();
       });
     });
+  }
+
+  async linkSkill(absoluteSkillPath: string, worktreePath: string): Promise<void> {
+    const skillName = path.basename(absoluteSkillPath);
+    const localSkillsDir = path.join(worktreePath, '.agents', 'skills');
+    const symlinkPath = path.join(localSkillsDir, skillName);
+
+    if (!fs.existsSync(localSkillsDir)) {
+      fs.mkdirSync(localSkillsDir, { recursive: true });
+    }
+    if (fs.existsSync(symlinkPath)) {
+      fs.unlinkSync(symlinkPath);
+    }
+    fs.symlinkSync(absoluteSkillPath, symlinkPath, 'dir');
+  }
+
+  async disableSkill(skillName: string, cwd: string): Promise<void> {
+    executor.execSync(`gemini skills disable ${skillName} --scope project`, { cwd, stdio: 'ignore' });
   }
 }

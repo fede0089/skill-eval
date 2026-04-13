@@ -8,8 +8,10 @@ import { parseNdjsonEvents } from '../utils/ndjson.js';
  */
 export class TriggerGrader {
   private targetToolKeys: string[];
+  private dispatchToolName: string;
 
-  constructor(skillName: string) {
+  constructor(skillName: string, dispatchToolName: string) {
+    this.dispatchToolName = dispatchToolName;
     this.targetToolKeys = [
       skillName,
       skillName.replace(/-/g, '_')
@@ -24,13 +26,13 @@ export class TriggerGrader {
     const rawOutput = transcript.raw_output || '';
     const events = parseNdjsonEvents(rawOutput);
 
-    // 1. Look for tool_use event for activate_skill
+    // 1. Look for tool_use event for the configured dispatch tool
     let foundToolUse = false;
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       if (
         event.type === 'tool_use' &&
-        event.tool_name === 'activate_skill' &&
+        event.tool_name === this.dispatchToolName &&
         typeof event.parameters?.name === 'string' &&
         this.targetToolKeys.some(key => (event as NdjsonToolUseEvent).parameters!.name!.toLowerCase() === key.toLowerCase())
       ) {
@@ -51,7 +53,7 @@ export class TriggerGrader {
       }
     }
 
-    // If we found a tool_use for activate_skill but no successful tool_result, we should NOT fall back to legacy.
+    // If we found a tool_use for the dispatch tool but no successful tool_result, do NOT fall back to legacy.
     // However, if no JSON events were parsed at all, we fall back.
     if (events.length > 0) {
       return false;
@@ -63,7 +65,7 @@ export class TriggerGrader {
       const byName = transcript.stats.tools.byName;
       const toolNames = Object.keys(byName);
 
-      const dispatchTools = ['activate_skill'];
+      const dispatchTools = [this.dispatchToolName];
       for (const tool of dispatchTools) {
         if (toolNames.includes(tool)) {
           const metrics: ToolMetrics = byName[tool];
@@ -86,7 +88,7 @@ export class TriggerGrader {
     const textToSearch = (transcript.raw_output || transcript.response || '').toLowerCase();
     if (!textToSearch) return false;
 
-    const dispatchTools = ['activate_skill'];
+    const dispatchTools = [this.dispatchToolName];
     for (const tool of dispatchTools) {
       if (textToSearch.includes(tool.toLowerCase())) {
         Logger.debug(`Detected skill dispatch tool "${tool}" in plain text output.`);
@@ -114,7 +116,7 @@ export class TriggerGrader {
     for (const event of parseNdjsonEvents(rawOutput)) {
       if (
         event.type === 'tool_use' &&
-        event.tool_name === 'activate_skill' &&
+        event.tool_name === this.dispatchToolName &&
         typeof event.parameters?.name === 'string' &&
         this.targetToolKeys.some(k => (event as NdjsonToolUseEvent).parameters!.name!.toLowerCase() === k.toLowerCase())
       ) return true;

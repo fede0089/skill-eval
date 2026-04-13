@@ -49,12 +49,13 @@ test('GeminiCliRunner.runPrompt should use --approval-mode auto_edit by default'
   spawnMock.mock.restore();
 });
 
-test('GeminiCliRunner.runPrompt should include --output-format stream-json when passed in extraArgs', async (t) => {
+test('GeminiCliRunner.runPrompt should include --output-format stream-json by default (no extraArgs needed)', async (t) => {
   const mockChild = createMockChild();
   const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
 
   const runner = new GeminiCliRunner();
-  const promise = runner.runPrompt('test prompt', undefined, undefined, undefined, ['--output-format', 'stream-json']);
+  // No extraArgs — the runner should add --output-format stream-json on its own
+  const promise = runner.runPrompt('test prompt');
 
   setImmediate(() => {
     mockChild.stdout.push('{"type": "tool_use", "tool_id": "1", "tool_name": "activate_skill", "parameters": { "name": "mock-skill" }}');

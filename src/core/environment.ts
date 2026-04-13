@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import { executor } from '../utils/exec.js';
 import * as path from 'path';
 import { Logger } from '../utils/logger.js';
@@ -6,18 +5,13 @@ import { ExecutionError } from './errors.js';
 
 export interface EnvironmentOptions {
   workspace: string;
-  skillPath: string;
 }
 
 export class EvalEnvironment {
   private workspace: string;
-  private skillPath: string;
-  private absoluteSkillPath: string;
 
   constructor(options: EnvironmentOptions) {
     this.workspace = options.workspace;
-    this.skillPath = options.skillPath;
-    this.absoluteSkillPath = path.resolve(this.workspace, this.skillPath);
   }
 
   public async setup(): Promise<void> {
@@ -26,41 +20,6 @@ export class EvalEnvironment {
 
   public async teardown(): Promise<void> {
     // Global unlink is no longer needed as worktree deletion cleans up local symlinks
-  }
-
-  /**
-   * Links the target skill locally within the specified worktree.
-   * This provides isolation by avoiding global skill linking.
-   */
-  public async linkSkill(worktreePath: string): Promise<void> {
-    const skillName = path.basename(this.absoluteSkillPath);
-    const localSkillsDir = path.join(worktreePath, '.agents', 'skills');
-    const symlinkPath = path.join(localSkillsDir, skillName);
-
-    Logger.debug(`Linking skill to worktree: ${symlinkPath}`);
-
-    try {
-      if (!fs.existsSync(localSkillsDir)) {
-        fs.mkdirSync(localSkillsDir, { recursive: true });
-      }
-
-      // If a symlink already exists, remove it
-      if (fs.existsSync(symlinkPath)) {
-        fs.unlinkSync(symlinkPath);
-      }
-
-      fs.symlinkSync(this.absoluteSkillPath, symlinkPath, 'dir');
-      Logger.debug(`Skill linked successfully to worktree.`);
-    } catch (err) {
-      const errorMsg = `Failed to link skill to worktree: ${err instanceof Error ? err.message : String(err)}`;
-      Logger.error(errorMsg);
-      throw new ExecutionError(errorMsg);
-    }
-  }
-
-  public async unlinkSkill(): Promise<void> {
-    // Global unlink is deprecated in favor of isolated worktree linking.
-    // This is kept for backward compatibility but does nothing.
   }
 
   /**

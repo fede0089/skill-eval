@@ -53,9 +53,9 @@ export class EvalRunner {
   private functionalGrader: ModelBasedGrader;
 
   constructor(private options: EvalRunOptions) {
-    this.env = new EvalEnvironment({ workspace: options.workspace, skillPath: options.skillPath });
+    this.env = new EvalEnvironment({ workspace: options.workspace });
     this.runner = RunnerFactory.create(options.agent);
-    this.triggerGrader = new TriggerGrader(options.skillName);
+    this.triggerGrader = new TriggerGrader(options.skillName, this.runner.skillDispatchToolName);
     // Inject the same runner for judging so swapping the agent backend works end-to-end
     this.functionalGrader = new ModelBasedGrader(options.skillName, this.runner);
   }
@@ -69,11 +69,11 @@ export class EvalRunner {
 
     try {
       worktreePath = this.env.createWorktree(`task-${task.id}-trial-${trialId}`);
-      await this.env.linkSkill(worktreePath);
+      await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
 
       transcript = await this.runner.runPrompt(task.prompt, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
-      }, logPath, ['--output-format', 'stream-json']);
+      }, logPath);
     } finally {
       if (worktreePath) {
         this.env.removeWorktree(worktreePath);
@@ -127,14 +127,11 @@ export class EvalRunner {
     try {
       worktreePath = this.env.createWorktree(`task-${task.id}-${passName}-trial-${trialId}`);
       if (!isBaseline) {
-        await this.env.linkSkill(worktreePath);
+        await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
       } else {
         // Strict isolation: disable the skill in the project scope of the temporary worktree
         try {
-          executor.execSync(`gemini skills disable ${this.options.skillName} --scope project`, {
-            cwd: worktreePath,
-            stdio: 'ignore'
-          });
+          await this.runner.disableSkill(this.options.skillName, worktreePath);
         } catch (err) {
           Logger.warn(`Could not disable skill '${this.options.skillName}' in worktree — baseline may be unreliable. Reason: ${err instanceof Error ? err.message : String(err)}`);
         }

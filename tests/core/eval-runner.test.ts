@@ -16,41 +16,40 @@ test('EvalRunner.runFunctionalTask should disable skill in baseline', async (t) 
     isBaseline: true
   };
 
+  const disableSkillMock = mock.fn(async () => {});
+  const agentRunnerMock = {
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: 'Mock response' })),
+    disableSkill: disableSkillMock
+  };
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
   const runner = new EvalRunner(runnerOptions);
 
   // Mock dependencies
-  const execSyncMock = mock.fn(() => Buffer.from(''));
-  mock.method(executor, 'execSync', execSyncMock);
-  
+  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
   mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
   mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
-  
-  const agentRunnerMock = {
-    runPrompt: mock.fn(async () => ({ 
-      response: 'Mock response'
-    }))
-  };
-  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const task = { id: 1, prompt: 'test prompt', assertions: [] };
   const uiCtx = { updateLog: () => {} } as any;
 
   await runner.runFunctionalTask(task, 0, 1, uiCtx);
 
-  // Check if gemini skills disable was called
-  const disableCall = execSyncMock.mock.calls.find(call => 
-    call.arguments[0].toString().includes('gemini skills disable mock-skill --scope project')
-  );
-  
-  assert.ok(disableCall, 'gemini skills disable mock-skill --scope project should have been called');
-  assert.strictEqual(disableCall.arguments[1].cwd, '/tmp/worktree', 'Disable command should be run in worktree');
+  // Check if disableSkill was called with correct args
+  assert.strictEqual(disableSkillMock.mock.callCount(), 1, 'disableSkill should have been called once');
+  assert.strictEqual(disableSkillMock.mock.calls[0].arguments[0], 'mock-skill', 'disableSkill should receive the skill name');
+  assert.strictEqual(disableSkillMock.mock.calls[0].arguments[1], '/tmp/worktree', 'disableSkill should receive the worktree path');
 });
 
 // ── Phase 2: System Prompt Restriction ──────────────────────────────────────
 
 test('EvalRunner.runFunctionalTask baseline prompt should include negative instruction', async () => {
   const agentRunnerMock = {
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' }))
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
+    linkSkill: mock.fn(async () => {}),
+    disableSkill: mock.fn(async () => {})
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -79,7 +78,10 @@ const skillActivationLog = (toolId = 'tool-1', includeResult = false) => {
 
 test('EvalRunner.runFunctionalTask baseline with skill activation → Invalid Baseline', async () => {
   const agentRunnerMock = {
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: skillActivationLog() }))
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: skillActivationLog() })),
+    linkSkill: mock.fn(async () => {}),
+    disableSkill: mock.fn(async () => {})
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -100,7 +102,10 @@ test('EvalRunner.runFunctionalTask baseline with skill activation → Invalid Ba
 
 test('EvalRunner.runFunctionalTask baseline with clean log → validation passes', async () => {
   const agentRunnerMock = {
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' }))
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })),
+    linkSkill: mock.fn(async () => {}),
+    disableSkill: mock.fn(async () => {})
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -121,7 +126,10 @@ test('EvalRunner.runFunctionalTask baseline with clean log → validation passes
 
 test('EvalRunner.runFunctionalTask target with no skill activation → Invalid Target', async () => {
   const agentRunnerMock = {
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' }))
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })),
+    linkSkill: mock.fn(async () => {}),
+    disableSkill: mock.fn(async () => {})
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -133,7 +141,6 @@ test('EvalRunner.runFunctionalTask target with no skill activation → Invalid T
   mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
   mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
   mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
-  mock.method(EvalEnvironment.prototype, 'linkSkill', async () => {});
 
   const result = await runner.runFunctionalTask({ id: 4, prompt: 'test', assertions: ['anything'] }, 0, 1, { updateLog: () => {} } as any);
 
@@ -143,7 +150,10 @@ test('EvalRunner.runFunctionalTask target with no skill activation → Invalid T
 
 test('EvalRunner.runFunctionalTask target with successful skill activation → validation passes', async () => {
   const agentRunnerMock = {
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: skillActivationLog('t1', true) }))
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: skillActivationLog('t1', true) })),
+    linkSkill: mock.fn(async () => {}),
+    disableSkill: mock.fn(async () => {})
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -155,7 +165,6 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
   mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
   mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
   mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
-  mock.method(EvalEnvironment.prototype, 'linkSkill', async () => {});
 
   const result = await runner.runFunctionalTask({ id: 5, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
 
@@ -165,7 +174,9 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
 
 test('EvalRunner.runFunctionalTask baseline skill-disable failure should warn, not throw', async (t) => {
   const agentRunnerMock = {
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' }))
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
+    disableSkill: mock.fn(async () => { throw new Error('command not found: gemini'); })
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -177,8 +188,7 @@ test('EvalRunner.runFunctionalTask baseline skill-disable failure should warn, n
   const warnMock = mock.fn();
   mock.method(Logger, 'warn', warnMock);
 
-  // execSync throws when trying to disable the skill
-  mock.method(executor, 'execSync', mock.fn(() => { throw new Error('command not found: gemini'); }));
+  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
   mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
   mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
 

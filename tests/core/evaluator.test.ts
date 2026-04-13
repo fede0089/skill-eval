@@ -1,11 +1,14 @@
 import { test, mock } from 'node:test';
 import * as assert from 'node:assert';
 import { ModelBasedGrader } from '../../src/core/evaluator.js';
-import type { AgentRunner } from '../../src/core/runners/runner.interface.js';
+import type { AgentRunner } from '../../src/runners/runner.interface.js';
 
 function makeJudgeRunner(response: string): AgentRunner {
   return {
-    runPrompt: mock.fn(async () => ({ response }))
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response })),
+    linkSkill: mock.fn(async () => {}),
+    disableSkill: mock.fn(async () => {})
   };
 }
 
@@ -34,7 +37,10 @@ test('ModelBasedGrader.gradeModelBased uses the injected judgeRunner', async () 
 
 test('ModelBasedGrader.gradeModelBased returns failed results when judge returns no response', async () => {
   const judgeRunner: AgentRunner = {
-    runPrompt: mock.fn(async () => null)
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => null),
+    linkSkill: mock.fn(async () => {}),
+    disableSkill: mock.fn(async () => {})
   };
 
   const grader = new ModelBasedGrader('mock-skill', judgeRunner);

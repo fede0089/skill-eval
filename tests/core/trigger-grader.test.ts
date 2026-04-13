@@ -4,7 +4,7 @@ import { TriggerGrader } from '../../src/core/evaluator.js';
 import { AgentTranscript } from '../../src/types/index.js';
 
 test('TriggerGrader.gradeTrigger should pass for correct JSON stream sequence', () => {
-  const grader = new TriggerGrader('mock-skill');
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
   const transcript: AgentTranscript = {
     response: 'mock response',
     raw_output: JSON.stringify({ type: 'tool_use', tool_id: '1', tool_name: 'activate_skill', parameters: { name: 'mock-skill' } }) + '\n' +
@@ -15,7 +15,7 @@ test('TriggerGrader.gradeTrigger should pass for correct JSON stream sequence', 
 });
 
 test('TriggerGrader.gradeTrigger should pass for case-insensitive skill name', () => {
-  const grader = new TriggerGrader('mock-skill');
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
   const transcript: AgentTranscript = {
     response: 'mock response',
     raw_output: JSON.stringify({ type: 'tool_use', tool_id: '1', tool_name: 'activate_skill', parameters: { name: 'Mock-Skill' } }) + '\n' +
@@ -26,7 +26,7 @@ test('TriggerGrader.gradeTrigger should pass for case-insensitive skill name', (
 });
 
 test('TriggerGrader.gradeTrigger should fail if tool_name is not activate_skill', () => {
-  const grader = new TriggerGrader('mock-skill');
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
   const transcript: AgentTranscript = {
     response: 'mock response',
     raw_output: JSON.stringify({ type: 'tool_use', tool_id: '1', tool_name: 'other_tool', parameters: { name: 'mock-skill' } }) + '\n' +
@@ -37,7 +37,7 @@ test('TriggerGrader.gradeTrigger should fail if tool_name is not activate_skill'
 });
 
 test('TriggerGrader.gradeTrigger should fail if skill name does not match', () => {
-  const grader = new TriggerGrader('mock-skill');
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
   const transcript: AgentTranscript = {
     response: 'mock response',
     raw_output: JSON.stringify({ type: 'tool_use', tool_id: '1', tool_name: 'activate_skill', parameters: { name: 'wrong-skill' } }) + '\n' +
@@ -48,7 +48,7 @@ test('TriggerGrader.gradeTrigger should fail if skill name does not match', () =
 });
 
 test('TriggerGrader.gradeTrigger should fail if tool_result status is not success', () => {
-  const grader = new TriggerGrader('mock-skill');
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
   const transcript: AgentTranscript = {
     response: 'mock response',
     raw_output: JSON.stringify({ type: 'tool_use', tool_id: '1', tool_name: 'activate_skill', parameters: { name: 'mock-skill' } }) + '\n' +
@@ -59,7 +59,7 @@ test('TriggerGrader.gradeTrigger should fail if tool_result status is not succes
 });
 
 test('TriggerGrader.gradeTrigger should fail if tool_id does not match', () => {
-  const grader = new TriggerGrader('mock-skill');
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
   const transcript: AgentTranscript = {
     response: 'mock response',
     raw_output: JSON.stringify({ type: 'tool_use', tool_id: '1', tool_name: 'activate_skill', parameters: { name: 'mock-skill' } }) + '\n' +
@@ -70,7 +70,7 @@ test('TriggerGrader.gradeTrigger should fail if tool_id does not match', () => {
 });
 
 test('TriggerGrader.gradeTrigger should fail if tool_result is missing', () => {
-  const grader = new TriggerGrader('mock-skill');
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
   const transcript: AgentTranscript = {
     response: 'mock response',
     raw_output: JSON.stringify({ type: 'tool_use', tool_id: '1', tool_name: 'activate_skill', parameters: { name: 'mock-skill' } })
@@ -80,7 +80,7 @@ test('TriggerGrader.gradeTrigger should fail if tool_result is missing', () => {
 });
 
 test('TriggerGrader.gradeTrigger should handle JSON with deeply nested braces in parameters', () => {
-  const grader = new TriggerGrader('mock-skill');
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
   const transcript: AgentTranscript = {
     response: 'mock response',
     raw_output:

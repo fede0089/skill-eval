@@ -32,7 +32,7 @@ export async function functionalCommand(
   Logger.debug(`Agent: ${agent}`);
   Logger.debug(`Found ${tasks.length} tasks.\n`);
 
-  const env = new EvalEnvironment({ workspace, skillPath });
+  const env = new EvalEnvironment({ workspace });
   await env.setup();
 
   // Setup Artifacts Directory (Always create, even if not verbose, for 'show' command)
