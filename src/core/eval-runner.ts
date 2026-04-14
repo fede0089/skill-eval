@@ -17,6 +17,7 @@ export interface EvalRunOptions {
   runDir: string;
   isBaseline?: boolean;
   debug?: boolean;
+  timeoutMs?: number;
 }
 
 /**
@@ -73,7 +74,7 @@ export class EvalRunner {
 
       transcript = await this.runner.runPrompt(task.prompt, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
-      }, logPath);
+      }, logPath, undefined, this.options.timeoutMs);
     } finally {
       if (worktreePath) {
         this.env.removeWorktree(worktreePath);
@@ -140,7 +141,7 @@ export class EvalRunner {
       if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} AGENT RUN\n`);
       transcript = await this.runner.runPrompt(promptToUse, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
-      }, logPath, ['--output-format', 'stream-json']);
+      }, logPath, undefined, this.options.timeoutMs);
 
       // Propagate stream-json errors: when the agent fails (e.g. quota), Gemini CLI still
       // writes a {"type":"result","status":"error",...} event to stdout so transcript.error

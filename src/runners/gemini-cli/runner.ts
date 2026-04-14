@@ -23,7 +23,8 @@ export class GeminiCliRunner implements AgentRunner {
     cwd?: string,
     onLog?: (log: string) => void,
     logPath?: string,
-    extraArgs: string[] = []
+    extraArgs: string[] = [],
+    timeoutMs: number = 600_000
   ): Promise<AgentOutput | null> {
     return new Promise((resolve) => {
       let stdout = '';
@@ -60,7 +61,7 @@ export class GeminiCliRunner implements AgentRunner {
         }
       }
 
-      // Safety timeout: 5 minutes (300,000 ms)
+      // Safety timeout (default: 10 minutes / 600,000 ms, configurable via timeoutMs)
       const timeout = setTimeout(() => {
         if (!resolved) {
           resolved = true;
@@ -69,10 +70,11 @@ export class GeminiCliRunner implements AgentRunner {
             logStream.write('\n\n--- Gemini CLI process timed out ---\n');
             logStream.end();
           }
-          Logger.error('\nGemini CLI process timed out after 5 minutes.');
-          resolve({ error: 'Process timeout exceeded (5 minutes)', raw_output: stderr });
+          const timeoutSec = timeoutMs / 1000;
+          Logger.error(`\nGemini CLI process timed out after ${timeoutSec} seconds.`);
+          resolve({ error: `Process timeout exceeded (${timeoutSec} seconds)`, raw_output: stderr });
         }
-      }, 300000);
+      }, timeoutMs);
 
       // Track completion of streams
       let stdoutDone = false;
@@ -175,6 +177,6 @@ export class GeminiCliRunner implements AgentRunner {
   }
 
   async disableSkill(skillName: string, worktreePath: string): Promise<void> {
-    executor.execSync(`gemini skills disable ${skillName} --scope project`, { cwd: worktreePath, stdio: 'ignore' });
+    executor.execSync(`gemini skills disable ${skillName} --scope workspace`, { cwd: worktreePath, stdio: 'ignore' });
   }
 }

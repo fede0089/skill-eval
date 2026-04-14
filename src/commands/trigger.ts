@@ -20,7 +20,8 @@ export async function triggerCommand(
   concurrency: number = 5,
   injectedSuite?: EvalSuite,
   numTrials: number = 3,
-  reporter: Reporter = new JsonReporter()
+  reporter: Reporter = new JsonReporter(),
+  timeoutMs?: number
 ): Promise<void> {
   if (!injectedSuite) preflight(agent, workspace, skillPath);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
@@ -52,7 +53,8 @@ export async function triggerCommand(
     skillPath,
     skillName: skill_name,
     runDir,
-    debug
+    debug,
+    timeoutMs
   });
 
   const ui = new ListrEvalUI();

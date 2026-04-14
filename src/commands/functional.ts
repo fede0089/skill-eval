@@ -20,7 +20,8 @@ export async function functionalCommand(
   concurrency: number = 5,
   injectedSuite?: EvalSuite,
   numTrials: number = 3,
-  reporter: Reporter = new JsonReporter()
+  reporter: Reporter = new JsonReporter(),
+  timeoutMs?: number
 ): Promise<void> {
   if (!injectedSuite) preflight(agent, workspace, skillPath);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
@@ -56,7 +57,8 @@ export async function functionalCommand(
     skillName: skill_name,
     runDir,
     isBaseline: true,
-    debug
+    debug,
+    timeoutMs
   });
 
   const withSkillRunner = new EvalRunner({
@@ -66,7 +68,8 @@ export async function functionalCommand(
     skillName: skill_name,
     runDir,
     isBaseline: false,
-    debug
+    debug,
+    timeoutMs
   });
 
   try {

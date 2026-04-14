@@ -44,13 +44,15 @@ program
   .option('--concurrency <number>', 'Number of concurrent tasks')
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
   .option('--report <format>', 'Report format: html or json')
+  .option('--timeout <seconds>', 'Agent timeout in seconds', '600')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
     const concurrency = parseInt(options.concurrency, 10) || 5;
     const numTrials = parseInt(options.trials, 10) || 3;
+    const timeoutMs = (parseInt(options.timeout, 10) || 600) * 1000;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
-    triggerCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter).catch(errorHandler);
+    triggerCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs).catch(errorHandler);
   });
 
 program
@@ -61,13 +63,15 @@ program
   .option('--concurrency <number>', 'Number of concurrent tasks')
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
   .option('--report <format>', 'Report format: html or json')
+  .option('--timeout <seconds>', 'Agent timeout in seconds', '600')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
     const concurrency = parseInt(options.concurrency, 10) || 5;
     const numTrials = parseInt(options.trials, 10) || 3;
+    const timeoutMs = (parseInt(options.timeout, 10) || 600) * 1000;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
-    functionalCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter).catch(errorHandler);
+    functionalCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs).catch(errorHandler);
   });
 
 

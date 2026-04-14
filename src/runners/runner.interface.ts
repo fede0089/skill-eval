@@ -9,7 +9,8 @@ export interface AgentRunner {
     cwd?: string,
     onLog?: (log: string) => void,
     logPath?: string,
-    extraArgs?: string[]
+    extraArgs?: string[],
+    timeoutMs?: number
   ): Promise<AgentOutput | null>;
 
   /**
