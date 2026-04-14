@@ -163,9 +163,19 @@ export class ModelBasedGrader {
       }));
     }
 
+    // Extract only the assistant's text from the NDJSON stream so the regex
+    // doesn't accidentally match [DIFF] or other bracket content in the prompt.
+    const assistantParts: string[] = [];
+    for (const event of parseNdjsonEvents(judgeRawOutput.response)) {
+      if (event.type === 'message' && event.role === 'assistant' && typeof event.content === 'string') {
+        assistantParts.push(event.content);
+      }
+    }
+    const judgeText = assistantParts.join('').trim() || judgeRawOutput.response;
+
     try {
-      const jsonMatch = judgeRawOutput.response.match(/\[[\s\S]*\]/);
-      const rawResults = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(judgeRawOutput.response);
+      const jsonMatch = judgeText.match(/\[[\s\S]*\]/);
+      const rawResults = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(judgeText);
       
       return rawResults.map((r: any) => ({
         assertion: r.assertion || r.expectation,
