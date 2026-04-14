@@ -61,7 +61,7 @@ export class EvalEnvironment {
    */
   public removeWorktree(worktreePath: string): void {
     Logger.debug(`Removing worktree: ${worktreePath}`);
-    
+
     const child = executor.spawnSync('git', ['worktree', 'remove', '--force', worktreePath], {
       stdio: 'ignore',
       encoding: 'utf-8',
@@ -69,7 +69,16 @@ export class EvalEnvironment {
     });
 
     if (child.status !== 0) {
-      Logger.warn(`Failed to remove worktree at ${worktreePath}. Process exited with code ${child.status}. Manual cleanup may be required.`);
+      // git worktree remove failed (e.g. path already deregistered by a previous prune).
+      // Fall back to physical removal and prune stale references.
+      try {
+        if (fs.existsSync(worktreePath)) {
+          fs.rmSync(worktreePath, { recursive: true, force: true });
+        }
+        executor.spawnSync('git', ['worktree', 'prune'], { stdio: 'ignore', cwd: this.workspace });
+      } catch (err) {
+        Logger.warn(`Failed to remove worktree at ${worktreePath}. Process exited with code ${child.status}. Manual cleanup may be required.`);
+      }
     }
   }
 }

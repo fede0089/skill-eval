@@ -17,20 +17,34 @@ test('EvalEnvironment.createWorktree should return expected path', async (t) => 
   assert.ok(expectedPath.includes('.project-skill-evals/worktrees/test-task'));
 });
 
-test('EvalEnvironment.removeWorktree should warn when git worktree remove fails', (t) => {
+test('EvalEnvironment.removeWorktree should not warn when git fails but path is already gone', (t) => {
   const env = new EvalEnvironment({ workspace: process.cwd() });
 
-  mock.method(executor, 'spawnSync', mock.fn(() => ({ status: 1 })));
+  mock.method(executor, 'spawnSync', mock.fn(() => ({ status: 128 })));
   const warnMock = mock.fn();
   mock.method(Logger, 'warn', warnMock);
 
-  env.removeWorktree('/tmp/some-worktree');
+  // Non-existent path — fs.existsSync naturally returns false, no fs mocking needed
+  env.removeWorktree('/tmp/skill-eval-nonexistent-worktree-xyz-99999');
 
-  const warnCalls = warnMock.mock.calls.map(c => c.arguments[0] as string);
-  assert.ok(
-    warnCalls.some(msg => msg.includes('Failed to remove worktree')),
-    `Expected a warn about failed worktree removal, got: ${JSON.stringify(warnCalls)}`
-  );
+  assert.strictEqual(warnMock.mock.callCount(), 0, 'Expected no warning when path is already gone');
+
+  mock.reset();
+});
+
+test('EvalEnvironment.removeWorktree should silently clean up when git fails but dir still exists', (t) => {
+  // Use a real temp dir so existsSync returns true and rmSync actually removes it
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-worktree-test-'));
+  const env = new EvalEnvironment({ workspace: process.cwd() });
+
+  mock.method(executor, 'spawnSync', mock.fn(() => ({ status: 128 })));
+  const warnMock = mock.fn();
+  mock.method(Logger, 'warn', warnMock);
+
+  env.removeWorktree(tmpDir);
+
+  assert.strictEqual(warnMock.mock.callCount(), 0, 'Expected no warning when fallback cleanup succeeds');
+  assert.ok(!fs.existsSync(tmpDir), 'Expected directory to be removed by fallback');
 
   mock.reset();
 });
