@@ -87,12 +87,14 @@ export async function functionalCommand(
       withoutSkillUI.addTask({
         id: `without-skill-${task.id}`,
         title: `Without Skill: ${taskLabel}`,
-        task: async (uiCtx) => {
+        numTrials,
+        task: async (uiCtx, multi) => {
           let completed = 0;
           const trials = await Promise.all(
             Array.from({ length: numTrials }, (_, idx) => {
               const trialId = idx + 1;
-              return withoutSkillRunner.runFunctionalTask(task, i, trialId, uiCtx)
+              const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
+              return withoutSkillRunner.runFunctionalTask(task, i, trialId, trialCtx)
                 .catch((error): EvalTrial => ({
                   id: trialId,
                   transcript: { error: error instanceof Error ? error.message : String(error) },
@@ -100,8 +102,13 @@ export async function functionalCommand(
                   trialPassed: false
                 }))
                 .then(trial => {
-                  completed++;
-                  if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
+                  if (multi) {
+                    const reason = trial.assertionResults.find(r => !r.passed)?.reason;
+                    multi.markTrialComplete(trialId, trial.trialPassed, reason);
+                  } else {
+                    completed++;
+                    if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
+                  }
                   return trial;
                 });
             })
@@ -112,7 +119,7 @@ export async function functionalCommand(
           const passedCount = trials.filter(t => t.trialPassed).length;
           if (passedCount === trials.length) {
             withoutSkillTasksPassedCount++;
-          } else {
+          } else if (!multi) {
             const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'Without Skill failed';
             throw new Error(failureReason);
           }
@@ -135,12 +142,14 @@ export async function functionalCommand(
       withSkillUI.addTask({
         id: `with-skill-${task.id}`,
         title: `With Skill: ${taskLabel}`,
-        task: async (uiCtx) => {
+        numTrials,
+        task: async (uiCtx, multi) => {
           let completed = 0;
           const trials = await Promise.all(
             Array.from({ length: numTrials }, (_, idx) => {
               const trialId = idx + 1;
-              return withSkillRunner.runFunctionalTask(task, i, trialId, uiCtx)
+              const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
+              return withSkillRunner.runFunctionalTask(task, i, trialId, trialCtx)
                 .catch((error): EvalTrial => ({
                   id: trialId,
                   transcript: { error: error instanceof Error ? error.message : String(error) },
@@ -148,8 +157,13 @@ export async function functionalCommand(
                   trialPassed: false
                 }))
                 .then(trial => {
-                  completed++;
-                  if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
+                  if (multi) {
+                    const reason = trial.assertionResults.find(r => !r.passed)?.reason;
+                    multi.markTrialComplete(trialId, trial.trialPassed, reason);
+                  } else {
+                    completed++;
+                    if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
+                  }
                   return trial;
                 });
             })
@@ -170,7 +184,7 @@ export async function functionalCommand(
 
           if (passedCount === trials.length) {
             withSkillTasksPassedCount++;
-          } else {
+          } else if (!multi) {
             const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'With Skill failed';
             throw new Error(failureReason);
           }
