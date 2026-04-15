@@ -6,6 +6,7 @@ import { Logger } from './utils/logger.js';
 import { AppError } from './core/errors.js';
 import { createReporter } from './reporters/index.js';
 import { DEFAULT_AGENT } from './runners/registry.js';
+import { DEFAULT_TIMEOUT_MS } from './types/index.js';
 import type { ReportFormat } from './types/index.js';
 
 import * as path from 'path';
@@ -44,13 +45,13 @@ program
   .option('--concurrency <number>', 'Number of concurrent tasks')
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
   .option('--report <format>', 'Report format: html or json')
-  .option('--timeout <seconds>', 'Agent timeout in seconds', '600')
+  .option('--timeout <seconds>', 'Agent timeout in seconds', String(DEFAULT_TIMEOUT_MS / 1000))
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
     const concurrency = parseInt(options.concurrency, 10) || 5;
     const numTrials = parseInt(options.trials, 10) || 3;
-    const timeoutMs = (parseInt(options.timeout, 10) || 600) * 1000;
+    const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
     triggerCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs).catch(errorHandler);
   });
@@ -63,13 +64,13 @@ program
   .option('--concurrency <number>', 'Number of concurrent tasks')
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
   .option('--report <format>', 'Report format: html or json')
-  .option('--timeout <seconds>', 'Agent timeout in seconds', '600')
+  .option('--timeout <seconds>', 'Agent timeout in seconds', String(DEFAULT_TIMEOUT_MS / 1000))
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
     const concurrency = parseInt(options.concurrency, 10) || 5;
     const numTrials = parseInt(options.trials, 10) || 3;
-    const timeoutMs = (parseInt(options.timeout, 10) || 600) * 1000;
+    const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
     functionalCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs).catch(errorHandler);
   });

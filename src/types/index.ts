@@ -1,3 +1,5 @@
+export const DEFAULT_TIMEOUT_MS = 1_200_000;
+
 export type GraderType = 'programmatic' | 'model-based';
 
 export interface EvalTask {

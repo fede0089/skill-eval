@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import child_process from 'child_process';
-import { AgentOutput } from '../../types/index.js';
+import { AgentOutput, DEFAULT_TIMEOUT_MS } from '../../types/index.js';
 import { AgentRunner } from '../runner.interface.js';
 import { Logger } from '../../utils/logger.js';
 import { executor } from '../../utils/exec.js';
@@ -24,7 +24,7 @@ export class GeminiCliRunner implements AgentRunner {
     onLog?: (log: string) => void,
     logPath?: string,
     extraArgs: string[] = [],
-    timeoutMs: number = 600_000
+    timeoutMs: number = DEFAULT_TIMEOUT_MS
   ): Promise<AgentOutput | null> {
     return new Promise((resolve) => {
       let stdout = '';
