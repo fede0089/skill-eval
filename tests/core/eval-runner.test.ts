@@ -6,16 +6,7 @@ import { EvalEnvironment } from '../../src/core/environment.js';
 import { RunnerFactory } from '../../src/runners/index.js';
 import { Logger } from '../../src/utils/logger.js';
 
-test('EvalRunner.runFunctionalTask should disable skill in baseline', async (t) => {
-  const runnerOptions = {
-    agent: 'gemini-cli',
-    workspace: '/tmp',
-    skillPath: './mock-skill',
-    skillName: 'mock-skill',
-    runDir: './runs',
-    isBaseline: true
-  };
-
+test('EvalRunner.runFunctionalTask baseline should not call disableSkill', async (t) => {
   const disableSkillMock = mock.fn(async () => {});
   const agentRunnerMock = {
     skillDispatchToolName: 'activate_skill',
@@ -24,22 +15,22 @@ test('EvalRunner.runFunctionalTask should disable skill in baseline', async (t) 
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
-  const runner = new EvalRunner(runnerOptions);
+  const runner = new EvalRunner({
+    agent: 'gemini-cli',
+    workspace: '/tmp',
+    skillPath: './mock-skill',
+    skillName: 'mock-skill',
+    runDir: './runs',
+    isBaseline: true
+  });
 
-  // Mock dependencies
   mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
   mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
   mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
 
-  const task = { id: 1, prompt: 'test prompt', assertions: [] };
-  const uiCtx = { updateLog: () => {} } as any;
+  await runner.runFunctionalTask({ id: 1, prompt: 'test prompt', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
 
-  await runner.runFunctionalTask(task, 0, 1, uiCtx);
-
-  // Check if disableSkill was called with correct args
-  assert.strictEqual(disableSkillMock.mock.callCount(), 1, 'disableSkill should have been called once');
-  assert.strictEqual(disableSkillMock.mock.calls[0].arguments[0], 'mock-skill', 'disableSkill should receive the skill name');
-  assert.strictEqual(disableSkillMock.mock.calls[0].arguments[1], '/tmp/worktree', 'disableSkill should receive the worktree path');
+  assert.strictEqual(disableSkillMock.mock.callCount(), 0, 'disableSkill should not be called in baseline');
 });
 
 // ── Phase 2: System Prompt Restriction ──────────────────────────────────────
@@ -172,35 +163,3 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
   assert.strictEqual(result.trialPassed, true);
 });
 
-test('EvalRunner.runFunctionalTask baseline skill-disable failure should warn, not throw', async (t) => {
-  const agentRunnerMock = {
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
-    disableSkill: mock.fn(async () => { throw new Error('command not found: gemini'); })
-  };
-  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
-
-  const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
-    runDir: '/tmp', isBaseline: true
-  });
-
-  const warnMock = mock.fn();
-  mock.method(Logger, 'warn', warnMock);
-
-  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
-
-  // Should not throw — warning is surfaced, trial continues
-  const result = await runner.runFunctionalTask({ id: 6, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
-
-  assert.ok(result, 'Trial should still return a result when skill-disable fails');
-  const warnCalls = warnMock.mock.calls.map(c => c.arguments[0] as string);
-  assert.ok(
-    warnCalls.some(msg => msg.includes('baseline may be unreliable')),
-    `Expected a warn about baseline reliability, got: ${JSON.stringify(warnCalls)}`
-  );
-
-  mock.reset();
-});

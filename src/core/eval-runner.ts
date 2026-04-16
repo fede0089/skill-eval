@@ -129,13 +129,6 @@ export class EvalRunner {
       worktreePath = this.env.createWorktree(`task-${task.id}-${passName}-trial-${trialId}`);
       if (!isBaseline) {
         await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
-      } else {
-        // Strict isolation: disable the skill in the project scope of the temporary worktree
-        try {
-          await this.runner.disableSkill(this.options.skillName, worktreePath);
-        } catch (err) {
-          Logger.warn(`Could not disable skill '${this.options.skillName}' in worktree — baseline may be unreliable. Reason: ${err instanceof Error ? err.message : String(err)}`);
-        }
       }
 
       if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} AGENT RUN\n`);

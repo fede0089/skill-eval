@@ -53,6 +53,12 @@ export class EvalEnvironment {
       throw new ExecutionError(`Failed to create git worktree at ${worktreePath}. Process exited with code ${child.status}`);
     }
 
+    const geminiSrc = path.join(this.workspace, '.gemini');
+    if (fs.existsSync(geminiSrc)) {
+      fs.cpSync(geminiSrc, path.join(worktreePath, '.gemini'), { recursive: true, force: true });
+      Logger.debug(`Copied .gemini/ from workspace into worktree`);
+    }
+
     return worktreePath;
   }
 
