@@ -60,9 +60,7 @@ export class ListrEvalUI {
           try {
             await descriptor.task(evalCtx);
           } catch (error) {
-            if (error instanceof Error) {
-              error.message = `${descriptor.title} - ${error.message}`;
-            }
+            if (error instanceof Error) error.message = '';
             throw error;
           } finally {
             taskDone = true;
@@ -118,7 +116,7 @@ export class ListrEvalUI {
             if (passed) {
               deferreds[i].resolve();
             } else {
-              deferreds[i].reject(new Error(failureReason ?? 'Trial failed'));
+              deferreds[i].reject(new Error(''));
             }
           }
         };

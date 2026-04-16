@@ -145,12 +145,12 @@ export async function triggerCommand(
     };
 
     fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
-    reporter.generate(report, runDir);
 
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
     renderTriggerTable(report);
     Logger.write('\n\n');
+    reporter.generate(report, runDir);
 
   } finally {
     await env.teardown();

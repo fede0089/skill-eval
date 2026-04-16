@@ -222,7 +222,6 @@ export async function functionalCommand(
     };
 
     fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
-    reporter.generate(report, runDir);
 
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
@@ -231,6 +230,7 @@ export async function functionalCommand(
     const upliftSign = skillUplift > 0 ? '+' : '';
     Logger.write(`\n   Skill Uplift:            ${upliftSign}${skillUplift}%\n`);
     Logger.write('\n');
+    reporter.generate(report, runDir);
 
   } finally {
     await env.teardown();
