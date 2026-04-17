@@ -150,6 +150,48 @@ test('GeminiCliRunner.runPrompt should write to logPath if provided', async (t) 
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
 
+test('GeminiCliRunner.runPrompt should kill process and return error when stdout contains interactive Y/N prompt', async (t) => {
+  const mockChild = createMockChild();
+  const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
+
+  const runner = new GeminiCliRunner();
+  const promise = runner.runPrompt('test prompt');
+
+  setImmediate(() => {
+    mockChild.stdout.push('Opening authentication page in your browser. Do you want to continue? [Y/n]: ');
+    // do NOT push null — process is hanging
+  });
+
+  const result = await promise;
+
+  assert.ok(result, 'result should be defined');
+  assert.ok(result?.error, 'result should have an error');
+  assert.ok((mockChild.kill as ReturnType<typeof mock.fn>).mock.callCount() >= 1, 'child.kill should have been called');
+
+  spawnMock.mock.restore();
+});
+
+test('GeminiCliRunner.runPrompt should kill process and return error when stderr contains interactive Y/N prompt', async (t) => {
+  const mockChild = createMockChild();
+  const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
+
+  const runner = new GeminiCliRunner();
+  const promise = runner.runPrompt('test prompt');
+
+  setImmediate(() => {
+    mockChild.stderr.push('Some warning. Proceed? [y/N]: ');
+    // do NOT push null — process is hanging
+  });
+
+  const result = await promise;
+
+  assert.ok(result, 'result should be defined');
+  assert.ok(result?.error, 'result should have an error');
+  assert.ok((mockChild.kill as ReturnType<typeof mock.fn>).mock.callCount() >= 1, 'child.kill should have been called');
+
+  spawnMock.mock.restore();
+});
+
 test('GeminiCliRunner.runPrompt should warn (not throw) when log file creation fails', async (t) => {
   const { Logger } = await import('../../../src/utils/logger.js');
   const mockChild = createMockChild();

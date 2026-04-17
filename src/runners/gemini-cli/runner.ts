@@ -31,6 +31,25 @@ export class GeminiCliRunner implements AgentRunner {
       let stderr = '';
       let resolved = false;
 
+      // Matches interactive Y/N prompts (e.g. "[Y/n]:", "[y/N]:", "[Y/N]:") that indicate
+      // Gemini CLI is waiting for user input it will never receive (stdin is closed).
+      const INTERACTIVE_PROMPT_RE = /\[[yY]\/[nN]\]|\[[nN]\/[yY]\]/;
+
+      function killOnInteractivePrompt(chunk: string): boolean {
+        if (!resolved && INTERACTIVE_PROMPT_RE.test(chunk)) {
+          resolved = true;
+          clearTimeout(timeout);
+          child.kill('SIGKILL');
+          if (logStream) {
+            logStream.write('\n\n--- Gemini CLI blocked on interactive prompt — killed ---\n');
+            logStream.end();
+          }
+          resolve({ error: 'Gemini CLI blocked on interactive prompt', raw_output: stderr });
+          return true;
+        }
+        return false;
+      }
+
       // Use -p, --approval-mode auto_edit and --output-format stream-json for headless NDJSON mode.
       const args: string[] = ['-p', prompt, '--approval-mode', 'auto_edit', '--output-format', 'stream-json', ...extraArgs];
 
@@ -101,6 +120,7 @@ export class GeminiCliRunner implements AgentRunner {
       if (child.stdout) {
         child.stdout.on('data', (data) => {
           const chunk = data.toString();
+          if (killOnInteractivePrompt(chunk)) return;
           stdout += chunk;
           if (logStream) logStream.write(chunk);
         });
@@ -115,6 +135,7 @@ export class GeminiCliRunner implements AgentRunner {
       if (child.stderr) {
         child.stderr.on('data', (data) => {
           const chunk = data.toString();
+          if (killOnInteractivePrompt(chunk)) return;
           stderr += chunk;
           if (onLog) {
             const lines = chunk.split('\n').filter((l: string) => l.trim() !== '');
