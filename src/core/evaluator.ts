@@ -126,6 +126,21 @@ export class TriggerGrader {
 }
 
 /**
+ * Within each JSON string literal, replace literal control characters that JSON.parse
+ * rejects as "Bad control character in string literal" (common in LLM-generated JSON).
+ * Structural whitespace between JSON keys/values is left untouched.
+ */
+function sanitizeJsonControlChars(json: string): string {
+  return json.replace(/"(?:[^"\\]|\\.)*"/g, (match) => {
+    return match
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t')
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  });
+}
+
+/**
  * Model-based grader that uses an LLM Judge to verify functional assertions.
  * The judgeRunner is injected so the grader uses the same agent backend as the evaluation,
  * making it easy to swap the runner (e.g. gemini-cli → claude) without touching this class.
@@ -180,7 +195,8 @@ export class ModelBasedGrader {
 
     try {
       const jsonMatch = judgeText.match(/\[[\s\S]*\]/);
-      const rawResults = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(judgeText);
+      const rawJson = jsonMatch ? jsonMatch[0] : judgeText;
+      const rawResults = JSON.parse(sanitizeJsonControlChars(rawJson));
       
       return rawResults.map((r: any) => ({
         assertion: r.assertion || r.expectation,

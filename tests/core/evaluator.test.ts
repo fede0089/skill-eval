@@ -77,3 +77,28 @@ test('ModelBasedGrader.gradeModelBased returns empty array for empty assertions'
   const runPromptCalls = (judgeRunner.runPrompt as ReturnType<typeof mock.fn>).mock.callCount();
   assert.strictEqual(runPromptCalls, 0, 'Should not call judgeRunner when there are no assertions');
 });
+
+test('ModelBasedGrader.gradeModelBased handles judge JSON with literal newlines in reason field', async () => {
+  // Simulate an LLM judge that embeds literal newlines inside a JSON string value,
+  // which JSON.parse rejects as "Bad control character in string literal".
+  const judgeResponseWithNewlines = `[
+  {
+    "assertion": "Output contains LICENSE",
+    "passed": true,
+    "reason": "The file was created\nand its content is correct"
+  }
+]`;
+  const judgeRunner = makeJudgeRunner(judgeResponseWithNewlines);
+  const grader = new ModelBasedGrader('mock-skill', judgeRunner);
+  const results = await grader.gradeModelBased(
+    'Generate a license',
+    { response: 'I created LICENSE.md' },
+    ['Output contains LICENSE'],
+    'No workspace changes',
+    undefined, undefined, undefined
+  );
+
+  assert.strictEqual(results.length, 1);
+  assert.strictEqual(results[0].passed, true);
+  assert.strictEqual(results[0].assertion, 'Output contains LICENSE');
+});
