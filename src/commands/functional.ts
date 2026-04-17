@@ -9,6 +9,7 @@ import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
 import { aggregatePassAtK } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
+import { withRetry } from '../core/trial-utils.js';
 import { renderFunctionalTable } from '../utils/table-renderer.js';
 import type { Reporter } from '../reporters/index.js';
 import { JsonReporter } from '../reporters/index.js';
@@ -103,14 +104,16 @@ export async function functionalCommand(
             Array.from({ length: numTrials }, (_, idx) => {
               const trialId = idx + 1;
               const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
-              return withoutSkillRunner.runFunctionalTask(task, i, trialId, trialCtx)
-                .catch((error): EvalTrial => ({
-                  id: trialId,
-                  transcript: { error: error instanceof Error ? error.message : String(error) },
-                  assertionResults: [{ assertion: 'Without Skill Execution', passed: false, reason: String(error) }],
-                  trialPassed: false
-                }))
-                .then(trial => {
+              return withRetry(() =>
+                withoutSkillRunner.runFunctionalTask(task, i, trialId, trialCtx)
+                  .catch((error): EvalTrial => ({
+                    id: trialId,
+                    transcript: { error: error instanceof Error ? error.message : String(error) },
+                    assertionResults: [{ assertion: 'Without Skill Execution', passed: false, reason: String(error) }],
+                    trialPassed: false,
+                    isError: true
+                  }))
+              ).then(trial => {
                   if (multi) {
                     const reason = trial.assertionResults.find(r => !r.passed)?.reason;
                     multi.markTrialComplete(trialId, trial.trialPassed, reason);
@@ -158,14 +161,16 @@ export async function functionalCommand(
             Array.from({ length: numTrials }, (_, idx) => {
               const trialId = idx + 1;
               const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
-              return withSkillRunner.runFunctionalTask(task, i, trialId, trialCtx)
-                .catch((error): EvalTrial => ({
-                  id: trialId,
-                  transcript: { error: error instanceof Error ? error.message : String(error) },
-                  assertionResults: [{ assertion: 'With Skill Execution', passed: false, reason: String(error) }],
-                  trialPassed: false
-                }))
-                .then(trial => {
+              return withRetry(() =>
+                withSkillRunner.runFunctionalTask(task, i, trialId, trialCtx)
+                  .catch((error): EvalTrial => ({
+                    id: trialId,
+                    transcript: { error: error instanceof Error ? error.message : String(error) },
+                    assertionResults: [{ assertion: 'With Skill Execution', passed: false, reason: String(error) }],
+                    trialPassed: false,
+                    isError: true
+                  }))
+              ).then(trial => {
                   if (multi) {
                     const reason = trial.assertionResults.find(r => !r.passed)?.reason;
                     multi.markTrialComplete(trialId, trial.trialPassed, reason);

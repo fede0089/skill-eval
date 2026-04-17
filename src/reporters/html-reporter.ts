@@ -147,10 +147,12 @@ function renderAssertions(assertions: AssertionResult[]): string {
 }
 
 function renderTrial(trial: EvalTrial, prefix: string): string {
-  const cls = trial.trialPassed ? 'trial-pass' : 'trial-fail';
-  const badge = trial.trialPassed
-    ? '<span class="pill green">PASS</span>'
-    : '<span class="pill red">FAIL</span>';
+  const cls = trial.isError ? 'trial-error' : trial.trialPassed ? 'trial-pass' : 'trial-fail';
+  const badge = trial.isError
+    ? '<span class="pill amber">! ERROR</span>'
+    : trial.trialPassed
+      ? '<span class="pill green">✓ PASS</span>'
+      : '<span class="pill red">✗ FAIL</span>';
   return `<div class="trial ${cls}">
   <div class="trial-header">${escapeHtml(prefix)} Trial ${trial.id} ${badge}</div>
   <div class="trial-assertions">${renderAssertions(trial.assertionResults)}</div>
@@ -204,8 +206,13 @@ function renderTaskTable(report: EvalSuiteReport): string {
       const pn = trials.length > 0 ? Math.round((passed / trials.length) * 100) : 0;
       statCells = `<td class="${passColorClass(p1 / 100)}">${p1}%</td><td class="${passColorClass(pn / 100)}">${pn}%</td>`;
     } else {
-      const passed = trials[0]?.trialPassed ?? false;
-      statCells = `<td class="${passed ? 'green' : 'red'}">${passed ? 'PASS' : 'FAIL'}</td>`;
+      const trial = trials[0];
+      if (trial?.isError) {
+        statCells = `<td class="amber">(!) ERROR</td>`;
+      } else {
+        const passed = trial?.trialPassed ?? false;
+        statCells = `<td class="${passed ? 'green' : 'red'}">${passed ? '✓ PASS' : '✗ FAIL'}</td>`;
+      }
     }
 
     const detailsBtn = `<button class="details-btn" data-target="details-${result.taskId}">▶</button>`;
@@ -293,14 +300,16 @@ tr:last-child td { border-bottom: none; }
 /* Trials */
 .trial { border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
 .trial-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-weight: 500; font-size: 13px; background: #f8fafc; }
-.trial-pass .trial-header { border-left: 3px solid #22c55e; }
-.trial-fail .trial-header { border-left: 3px solid #ef4444; }
+.trial-pass  .trial-header { border-left: 3px solid #22c55e; }
+.trial-fail  .trial-header { border-left: 3px solid #ef4444; }
+.trial-error .trial-header { border-left: 3px solid #f59e0b; }
 .trial-assertions { padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
 
 /* Pills */
 .pill { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; letter-spacing: 0.05em; }
 .pill.green { background: #dcfce7; color: #15803d; }
 .pill.red   { background: #fee2e2; color: #b91c1c; }
+.pill.amber { background: #fef3c7; color: #92400e; }
 
 /* Badge */
 .badge { display: inline-block; font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: 4px; background: #e2e8f0; color: #475569; margin-left: 6px; vertical-align: middle; }

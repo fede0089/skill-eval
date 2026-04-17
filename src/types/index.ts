@@ -19,12 +19,15 @@ export interface AssertionResult {
 
 /**
  * Record of a single execution of a Task.
+ * isError=true means infrastructure failed (timeout, blocked prompt, runner crash, etc.)
+ * and the trial never reached a judge verdict. These trials are candidates for retry.
  */
 export interface EvalTrial {
   id: number;
   transcript: AgentTranscript;
   assertionResults: AssertionResult[];
   trialPassed: boolean;
+  isError?: boolean;
 }
 
 /**

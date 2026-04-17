@@ -100,6 +100,13 @@ export class EvalRunner {
         reason: errorMsg,
         graderType: 'programmatic'
       });
+      return {
+        id: trialId,
+        transcript: transcript || { error: 'No transcript produced' },
+        assertionResults,
+        trialPassed: false,
+        isError: true
+      };
     }
 
     return {
@@ -215,38 +222,55 @@ export class EvalRunner {
         };
       } else {
         const errorMsg = transcript?.error || 'Error: No transcript was produced';
-        trialPassed = false;
         if (task.assertions) {
           assertionResults = task.assertions.map(a => ({
             assertion: a,
             passed: false,
             reason: `Agent execution failed: ${errorMsg}`,
-            graderType: 'model-based'
+            graderType: 'model-based' as const
           }));
         }
+        // isError return — finally still runs cleanup
+        return {
+          id: trialId,
+          transcript: { error: transcript?.error || 'No transcript produced' },
+          assertionResults,
+          trialPassed: false,
+          isError: true
+        };
       }
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
-      trialPassed = false;
       if (task.assertions) {
         assertionResults = task.assertions.map(a => ({
           assertion: a,
           passed: false,
           reason: `Execution failed: ${errorMsg}`,
-          graderType: 'model-based'
+          graderType: 'model-based' as const
         }));
       }
+      // isError return — finally still runs cleanup
+      return {
+        id: trialId,
+        transcript: { error: errorMsg },
+        assertionResults,
+        trialPassed: false,
+        isError: true
+      };
     } finally {
       if (worktreePath) {
         this.env.removeWorktree(worktreePath);
       }
     }
 
+    // Unreachable: all paths above return explicitly.
+    // This satisfies TypeScript's control-flow analysis.
     return {
       id: trialId,
-      transcript: { error: transcript?.error || 'No transcript produced' },
-      assertionResults: assertionResults,
-      trialPassed
+      transcript: { error: 'No transcript produced' },
+      assertionResults,
+      trialPassed: false,
+      isError: true
     };
   }
 }

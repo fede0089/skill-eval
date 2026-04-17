@@ -139,6 +139,30 @@ test('EvalRunner.runFunctionalTask target with no skill activation → Invalid T
   assert.ok(result.assertionResults[0].reason.includes('Invalid With Skill'), `Expected 'Invalid With Skill', got: ${result.assertionResults[0].reason}`);
 });
 
+test('EvalRunner.runFunctionalTask with error transcript sets isError:true', async () => {
+  const agentRunnerMock = {
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ error: 'Process timeout exceeded (600 seconds)' })),
+    linkSkill: mock.fn(async () => {}),
+    disableSkill: mock.fn(async () => {})
+  };
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false
+  });
+
+  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
+  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+
+  const result = await runner.runFunctionalTask({ id: 99, prompt: 'test', assertions: ['check something'] }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.trialPassed, false);
+  assert.ok(result.isError, 'Should set isError:true when runner returns an error transcript');
+});
+
 test('EvalRunner.runFunctionalTask target with successful skill activation → validation passes', async () => {
   const agentRunnerMock = {
     skillDispatchToolName: 'activate_skill',

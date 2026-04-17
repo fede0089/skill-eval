@@ -69,8 +69,9 @@ test('triggerCommand should run all trials in parallel (no early abort on error)
   try {
     await triggerCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 3);
 
-    // All 3 trials must have been attempted (no early abort)
-    assert.strictEqual(runnerMock.runTriggerTask.mock.callCount(), 3);
+    // All 3 trials must have been attempted; trial 2 errors and is retried once → 4 total calls
+    assert.ok(runnerMock.runTriggerTask.mock.callCount() >= 3, 'All trials must be attempted (no early abort)');
+    assert.strictEqual(runnerMock.runTriggerTask.mock.callCount(), 4, 'Errored trial should be retried once');
   } finally {
     mock.reset();
   }

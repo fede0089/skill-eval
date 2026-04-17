@@ -34,6 +34,6 @@ test('triggerCommand should continue and report on task failure', async (t) => {
 
   await triggerCommand('gemini-cli', process.cwd(), 'mock-skill', 2, injectedSuite, 1);
 
-  // 2 tasks × 1 trial each = 2 calls (task 1 throws, task 2 succeeds)
-  assert.strictEqual(runnerMock.runTriggerTask.mock.callCount(), 2);
+  // task 1 always throws → 3 attempts (1 original + 2 retries); task 2 succeeds on first try → 4 total
+  assert.strictEqual(runnerMock.runTriggerTask.mock.callCount(), 4);
 });

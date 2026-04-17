@@ -68,8 +68,10 @@ test('functionalCommand should run all trials in parallel (no early abort on err
   try {
     await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 3);
 
-    // 1 task × 3 trials × 2 passes (without + with) = 6 calls, all attempted
-    assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 6);
+    // without-skill: 3 trials (one throws at callCount=2) → 4 calls (3 original + 1 retry)
+    // with-skill:    3 trials (none throws, callCount≠2)  → 3 calls
+    // total: 7
+    assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 7);
   } finally {
     mock.reset();
   }

@@ -9,6 +9,7 @@ import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
 import { aggregatePassAtK } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
+import { withRetry } from '../core/trial-utils.js';
 import { renderTriggerTable } from '../utils/table-renderer.js';
 import type { Reporter } from '../reporters/index.js';
 import { JsonReporter } from '../reporters/index.js';
@@ -87,18 +88,20 @@ export async function triggerCommand(
             Array.from({ length: numTrials }, (_, idx) => {
               const trialId = idx + 1;
               const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
-              return runner.runTriggerTask(task, i, trialId, trialCtx)
-                .catch((error): EvalTrial => ({
-                  id: trialId,
-                  transcript: { error: error instanceof Error ? error.message : String(error) },
-                  assertionResults: [{
-                    assertion: 'Runner Execution',
-                    passed: false,
-                    reason: error instanceof Error ? error.message : String(error)
-                  }],
-                  trialPassed: false
-                }))
-                .then(trial => {
+              return withRetry(() =>
+                runner.runTriggerTask(task, i, trialId, trialCtx)
+                  .catch((error): EvalTrial => ({
+                    id: trialId,
+                    transcript: { error: error instanceof Error ? error.message : String(error) },
+                    assertionResults: [{
+                      assertion: 'Runner Execution',
+                      passed: false,
+                      reason: error instanceof Error ? error.message : String(error)
+                    }],
+                    trialPassed: false,
+                    isError: true
+                  }))
+              ).then(trial => {
                   if (multi) {
                     const reason = trial.assertionResults.find(r => !r.passed)?.reason;
                     multi.markTrialComplete(trialId, trial.trialPassed, reason);

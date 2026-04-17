@@ -19,14 +19,21 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
   for (const result of results) {
     const promptSnippet = result.prompt.substring(0, 40) + (result.prompt.length > 40 ? '...' : '');
     if (numTrials > 1) {
-      const trialsStr = `${result.trials.filter(t => t.trialPassed).length}/${result.trials.length}`;
-      const trials = result.score === 1.0 ? chalk.green(trialsStr) : chalk.red(trialsStr);
+      const errorCount = result.trials.filter(t => t.isError).length;
+      const passedCount = result.trials.filter(t => t.trialPassed).length;
+      const trialsBase = `${passedCount}/${result.trials.length}`;
+      const trialsStr = errorCount > 0 ? `${trialsBase} (${errorCount}!)` : trialsBase;
+      const trials = result.score === 1.0 ? chalk.green(trialsStr) : errorCount > 0 ? chalk.yellow(trialsStr) : chalk.red(trialsStr);
       const p1 = `${Math.round(computePassAtK(result.trials, 1) * 100)}%`;
       const pn = `${Math.round(computePassAtK(result.trials, numTrials) * 100)}%`;
       tableData.push([result.taskId.toString(), promptSnippet, trials, p1, pn]);
     } else {
-      const statusStr = result.score === 1.0 ? 'PASS' : 'FAIL';
-      const status = result.score === 1.0 ? chalk.green(statusStr) : chalk.red(statusStr);
+      const trial = result.trials[0];
+      const status = trial?.isError
+        ? chalk.yellow('(!) ERROR')
+        : result.score === 1.0
+          ? chalk.green('✓ PASSED')
+          : chalk.red('✗ FAILED');
       tableData.push([result.taskId.toString(), promptSnippet, status]);
     }
   }
@@ -57,18 +64,24 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
     const withSkillTrials = result.trials;
 
     if (numTrials > 1) {
+      const bErrorCount = withoutSkillTrials.filter(t => t.isError).length;
+      const tErrorCount = withSkillTrials.filter(t => t.isError).length;
       const bp1 = `${Math.round(computePassAtK(withoutSkillTrials, 1) * 100)}%`;
       const bpn = `${Math.round(computePassAtK(withoutSkillTrials, numTrials) * 100)}%`;
       const tp1 = `${Math.round(computePassAtK(withSkillTrials, 1) * 100)}%`;
       const tpn = `${Math.round(computePassAtK(withSkillTrials, numTrials) * 100)}%`;
-      const bColor = withoutSkillTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
-      const tColor = withSkillTrials.every(t => t.trialPassed) ? chalk.green : chalk.red;
+      const bColor = withoutSkillTrials.every(t => t.trialPassed) ? chalk.green : bErrorCount > 0 ? chalk.yellow : chalk.red;
+      const tColor = withSkillTrials.every(t => t.trialPassed) ? chalk.green : tErrorCount > 0 ? chalk.yellow : chalk.red;
       tableData.push([result.taskId.toString(), promptSnippet, bColor(bp1), bColor(bpn), tColor(tp1), tColor(tpn)]);
     } else {
-      const withoutSkillStr = (withoutSkillTrials[0]?.trialPassed) ? 'PASS' : 'FAIL';
-      const withSkillStr = (withSkillTrials[0]?.trialPassed) ? 'PASS' : 'FAIL';
-      const withoutSkillStatus = withoutSkillTrials.every(t => t.trialPassed) ? chalk.green(withoutSkillStr) : chalk.red(withoutSkillStr);
-      const withSkillStatus = withSkillTrials.every(t => t.trialPassed) ? chalk.green(withSkillStr) : chalk.red(withSkillStr);
+      const withoutTrial = withoutSkillTrials[0];
+      const withTrial = withSkillTrials[0];
+      const withoutSkillStatus = withoutTrial?.isError
+        ? chalk.yellow('(!) ERROR')
+        : withoutTrial?.trialPassed ? chalk.green('✓ PASSED') : chalk.red('✗ FAILED');
+      const withSkillStatus = withTrial?.isError
+        ? chalk.yellow('(!) ERROR')
+        : withTrial?.trialPassed ? chalk.green('✓ PASSED') : chalk.red('✗ FAILED');
       tableData.push([result.taskId.toString(), promptSnippet, withoutSkillStatus, withSkillStatus]);
     }
   }
