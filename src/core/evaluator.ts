@@ -1,7 +1,7 @@
 import { AgentTranscript, ToolMetrics, AssertionResult, NdjsonToolUseEvent } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
 import { AgentRunner } from '../runners/runner.interface.js';
-import { parseNdjsonEvents } from '../utils/ndjson.js';
+import { parseNdjsonEvents, parseStreamResult } from '../utils/ndjson.js';
 
 /**
  * Programmatic grader that checks if a skill was triggered by analyzing tool calls.
@@ -153,25 +153,30 @@ export class ModelBasedGrader {
 
     const judgeRawOutput = await this.judgeRunner.runPrompt(judgePrompt, worktreePath, onLog, logPath);
     
-    if (!judgeRawOutput || !judgeRawOutput.response) {
-      const errorMsg = judgeRawOutput?.error ? ` (Error: ${judgeRawOutput.error})` : '';
+    if (!judgeRawOutput) {
       return assertions.map(a => ({
         assertion: a,
         passed: false,
-        reason: `Judge agent failed to provide a response.${errorMsg}`,
+        reason: 'Judge agent failed to produce any output.',
         graderType: 'model-based'
       }));
     }
 
-    // Extract only the assistant's text from the NDJSON stream so the regex
-    // doesn't accidentally match [DIFF] or other bracket content in the prompt.
-    const assistantParts: string[] = [];
-    for (const event of parseNdjsonEvents(judgeRawOutput.response)) {
-      if (event.type === 'message' && event.role === 'assistant' && typeof event.content === 'string') {
-        assistantParts.push(event.content);
-      }
+    // Extract clean assistant text from the stream-json NDJSON output,
+    // using the same parser as the agent run to ensure consistent handling.
+    const judgeStreamResult = parseStreamResult(judgeRawOutput.response || '');
+    if (!judgeStreamResult || 'error' in judgeStreamResult) {
+      const errorMsg = judgeStreamResult && 'error' in judgeStreamResult
+        ? judgeStreamResult.error
+        : (judgeRawOutput.error || 'No result event in judge output');
+      return assertions.map(a => ({
+        assertion: a,
+        passed: false,
+        reason: `Judge agent failed: ${errorMsg}`,
+        graderType: 'model-based'
+      }));
     }
-    const judgeText = assistantParts.join('').trim() || judgeRawOutput.response;
+    const judgeText = judgeStreamResult.response;
 
     try {
       const jsonMatch = judgeText.match(/\[[\s\S]*\]/);

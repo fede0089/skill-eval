@@ -17,7 +17,7 @@ export function isTrialError(trial: EvalTrial): boolean {
  * Delays: attempt 1 → baseDelayMs, attempt 2 → baseDelayMs * 2
  */
 export async function withRetry(
-  fn: () => Promise<EvalTrial>,
+  fn: (attempt: number) => Promise<EvalTrial>,
   maxRetries = 2,
   baseDelayMs = 1000
 ): Promise<EvalTrial> {
@@ -26,7 +26,7 @@ export async function withRetry(
     if (attempt > 0) {
       await new Promise(resolve => setTimeout(resolve, baseDelayMs * Math.pow(2, attempt - 1)));
     }
-    last = await fn();
+    last = await fn(attempt);
     if (!isTrialError(last)) return last;
   }
   return last!;

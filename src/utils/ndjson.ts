@@ -1,4 +1,4 @@
-import { NdjsonEvent } from '../types/index.js';
+import { NdjsonEvent, NdjsonResultEvent } from '../types/index.js';
 
 /**
  * Parses Newline-Delimited JSON (NDJSON) output into an array of events.
@@ -18,4 +18,31 @@ export function parseNdjsonEvents(output: string): NdjsonEvent[] {
     }
   }
   return events;
+}
+
+/**
+ * Parses a Gemini CLI stream-json stdout blob into a clean result.
+ * Returns { error } if the result event signals failure.
+ * Returns { response } with joined assistant text on success.
+ * Returns null if no result event is present (non-stream output).
+ */
+export function parseStreamResult(output: string): { error: string } | { response: string } | null {
+  const parts: string[] = [];
+  let resultEvent: NdjsonResultEvent | null = null;
+
+  for (const event of parseNdjsonEvents(output)) {
+    if (event.type === 'message' && event.role === 'assistant' && typeof event.content === 'string') {
+      parts.push(event.content);
+    } else if (event.type === 'result') {
+      resultEvent = event;
+    }
+  }
+
+  if (!resultEvent) return null;
+  if (resultEvent.status === 'error') {
+    const msg = resultEvent.error?.message || 'Agent run failed';
+    return { error: msg };
+  }
+  const text = parts.join('\n').trim() || (typeof resultEvent.response === 'string' ? resultEvent.response : '');
+  return { response: text };
 }

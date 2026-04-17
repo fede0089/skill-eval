@@ -88,8 +88,8 @@ export async function triggerCommand(
             Array.from({ length: numTrials }, (_, idx) => {
               const trialId = idx + 1;
               const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
-              return withRetry(() =>
-                runner.runTriggerTask(task, i, trialId, trialCtx)
+              return withRetry((attempt) =>
+                runner.runTriggerTask(task, i, trialId, trialCtx, attempt)
                   .catch((error): EvalTrial => ({
                     id: trialId,
                     transcript: { error: error instanceof Error ? error.message : String(error) },

@@ -3,12 +3,19 @@ import * as assert from 'node:assert';
 import { ModelBasedGrader } from '../../src/core/evaluator.js';
 import type { AgentRunner } from '../../src/runners/runner.interface.js';
 
-function makeJudgeRunner(response: string): AgentRunner {
+/** Wraps a plain-text response in Gemini CLI stream-json NDJSON format. */
+function makeNdjsonResponse(text: string): string {
+  const messageEvent = JSON.stringify({ type: 'message', role: 'assistant', content: text });
+  const resultEvent = JSON.stringify({ type: 'result', status: 'success' });
+  return `${messageEvent}\n${resultEvent}`;
+}
+
+function makeJudgeRunner(responseText: string): AgentRunner {
   return {
     skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response })),
+    runPrompt: mock.fn(async () => ({ response: makeNdjsonResponse(responseText) })),
     linkSkill: mock.fn(async () => {}),
-    disableSkill: mock.fn(async () => {})
+
   };
 }
 
@@ -40,7 +47,7 @@ test('ModelBasedGrader.gradeModelBased returns failed results when judge returns
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => null),
     linkSkill: mock.fn(async () => {}),
-    disableSkill: mock.fn(async () => {})
+
   };
 
   const grader = new ModelBasedGrader('mock-skill', judgeRunner);
@@ -54,7 +61,7 @@ test('ModelBasedGrader.gradeModelBased returns failed results when judge returns
 
   assert.strictEqual(results.length, 1);
   assert.strictEqual(results[0].passed, false);
-  assert.ok(results[0].reason.includes('failed to provide'), `Unexpected reason: ${results[0].reason}`);
+  assert.ok(results[0].reason.includes('failed to produce'), `Unexpected reason: ${results[0].reason}`);
 });
 
 test('ModelBasedGrader.gradeModelBased returns empty array for empty assertions', async () => {

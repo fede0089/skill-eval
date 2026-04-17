@@ -19,9 +19,4 @@ export interface AgentRunner {
    */
   linkSkill(absoluteSkillPath: string, worktreePath: string): Promise<void>;
 
-  /**
-   * Disables the named skill in the given working directory so baseline runs
-   * cannot invoke it. Each runner implements this using its own CLI mechanism.
-   */
-  disableSkill(skillName: string, worktreePath: string): Promise<void>;
 }

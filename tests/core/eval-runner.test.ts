@@ -5,33 +5,8 @@ import { EvalRunner } from '../../src/core/eval-runner.js';
 import { EvalEnvironment } from '../../src/core/environment.js';
 import { RunnerFactory } from '../../src/runners/index.js';
 import { Logger } from '../../src/utils/logger.js';
-
-test('EvalRunner.runFunctionalTask baseline should not call disableSkill', async (t) => {
-  const disableSkillMock = mock.fn(async () => {});
-  const agentRunnerMock = {
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: 'Mock response' })),
-    disableSkill: disableSkillMock
-  };
-  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
-
-  const runner = new EvalRunner({
-    agent: 'gemini-cli',
-    workspace: '/tmp',
-    skillPath: './mock-skill',
-    skillName: 'mock-skill',
-    runDir: './runs',
-    isBaseline: true
-  });
-
-  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
-
-  await runner.runFunctionalTask({ id: 1, prompt: 'test prompt', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
-
-  assert.strictEqual(disableSkillMock.mock.callCount(), 0, 'disableSkill should not be called in baseline');
-});
+import { withRetry } from '../../src/core/trial-utils.js';
+import type { EvalTrial } from '../../src/types/index.js';
 
 // ── Phase 2: System Prompt Restriction ──────────────────────────────────────
 
@@ -40,7 +15,7 @@ test('EvalRunner.runFunctionalTask baseline prompt should include negative instr
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
     linkSkill: mock.fn(async () => {}),
-    disableSkill: mock.fn(async () => {})
+
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -72,7 +47,7 @@ test('EvalRunner.runFunctionalTask baseline with skill activation → Invalid Ba
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: skillActivationLog() })),
     linkSkill: mock.fn(async () => {}),
-    disableSkill: mock.fn(async () => {})
+
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -96,7 +71,7 @@ test('EvalRunner.runFunctionalTask baseline with clean log → validation passes
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })),
     linkSkill: mock.fn(async () => {}),
-    disableSkill: mock.fn(async () => {})
+
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -120,7 +95,7 @@ test('EvalRunner.runFunctionalTask target with no skill activation → Invalid T
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })),
     linkSkill: mock.fn(async () => {}),
-    disableSkill: mock.fn(async () => {})
+
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -144,7 +119,7 @@ test('EvalRunner.runFunctionalTask with error transcript sets isError:true', asy
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ error: 'Process timeout exceeded (600 seconds)' })),
     linkSkill: mock.fn(async () => {}),
-    disableSkill: mock.fn(async () => {})
+
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -168,7 +143,7 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: skillActivationLog('t1', true) })),
     linkSkill: mock.fn(async () => {}),
-    disableSkill: mock.fn(async () => {})
+
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
@@ -185,5 +160,94 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
 
   assert.ok(!result.assertionResults.some(r => r.reason.includes('Invalid With Skill')), 'Should not flag valid with-skill as invalid');
   assert.strictEqual(result.trialPassed, true);
+});
+
+// ── Retry workspace isolation ────────────────────────────────────────────────
+
+test('EvalRunner.runTriggerTask with error transcript always calls removeWorktree', async () => {
+  mock.method(RunnerFactory, 'create', () => ({
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ error: 'Process timeout exceeded' })),
+    linkSkill: mock.fn(async () => {}),
+  }));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false
+  });
+
+  mock.method(EvalEnvironment.prototype, 'createWorktree', mock.fn(() => '/tmp/worktree'));
+  const removeWorktreeMock = mock.fn(() => {});
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', removeWorktreeMock);
+
+  const result = await runner.runTriggerTask({ id: 10, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.isError, true, 'Should return isError:true on timeout');
+  assert.strictEqual(removeWorktreeMock.mock.calls.length, 1, 'removeWorktree must be called for cleanup even on error path');
+});
+
+test('EvalRunner.runFunctionalTask with error transcript always calls removeWorktree', async () => {
+  mock.method(RunnerFactory, 'create', () => ({
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ error: 'Process timeout exceeded' })),
+    linkSkill: mock.fn(async () => {}),
+  }));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false
+  });
+
+  mock.method(EvalEnvironment.prototype, 'createWorktree', mock.fn(() => '/tmp/worktree'));
+  const removeWorktreeMock = mock.fn(() => {});
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', removeWorktreeMock);
+
+  const result = await runner.runFunctionalTask({ id: 11, prompt: 'test', assertions: ['x'] }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.isError, true, 'Should return isError:true on timeout');
+  assert.strictEqual(removeWorktreeMock.mock.calls.length, 1, 'removeWorktree must be called for cleanup even on error path');
+});
+
+test('EvalRunner.runTriggerTask uses unique worktree name per retry attempt', async () => {
+  mock.method(RunnerFactory, 'create', () => ({
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
+    linkSkill: mock.fn(async () => {}),
+  }));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false
+  });
+
+  const createWorktreeMock = mock.fn(() => '/tmp/worktree');
+  mock.method(EvalEnvironment.prototype, 'createWorktree', createWorktreeMock);
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', mock.fn(() => {}));
+
+  await runner.runTriggerTask({ id: 7, prompt: 'test' }, 0, 3, { updateLog: () => {} } as any, 0);
+  const attempt0Id = createWorktreeMock.mock.calls[0].arguments[0] as string;
+
+  await runner.runTriggerTask({ id: 7, prompt: 'test' }, 0, 3, { updateLog: () => {} } as any, 1);
+  const attempt1Id = createWorktreeMock.mock.calls[1].arguments[0] as string;
+
+  assert.strictEqual(attempt0Id, 'task-7-trial-3', 'First attempt uses base name');
+  assert.strictEqual(attempt1Id, 'task-7-trial-3-r1', 'First retry uses -r1 suffix');
+  assert.notStrictEqual(attempt0Id, attempt1Id, 'Retry must use a different worktree name');
+});
+
+test('withRetry passes attempt number 0, 1, 2 to fn and stops on success', async () => {
+  const attempts: number[] = [];
+  const fn = mock.fn(async (attempt: number): Promise<EvalTrial> => {
+    attempts.push(attempt);
+    if (attempt < 2) {
+      return { id: 1, transcript: { error: 'infra fail' }, assertionResults: [], trialPassed: false, isError: true };
+    }
+    return { id: 1, transcript: { response: 'ok' }, assertionResults: [], trialPassed: true };
+  });
+
+  const result = await withRetry(fn, 2, 0);
+
+  assert.deepStrictEqual(attempts, [0, 1, 2], 'Should call fn with attempt 0, 1, 2');
+  assert.strictEqual(result.trialPassed, true, 'Should return successful result');
 });
 

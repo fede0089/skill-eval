@@ -3,10 +3,10 @@ import * as path from 'path';
 import { executor } from '../utils/exec.js';
 import { EvalEnvironment } from './environment.js';
 import { RunnerFactory, AgentRunner } from '../runners/index.js';
-import { AgentTranscript, EvalTask, EvalTrial, AssertionResult, NdjsonResultEvent } from '../types/index.js';
+import { AgentTranscript, EvalTask, EvalTrial, AssertionResult } from '../types/index.js';
 import { TriggerGrader, ModelBasedGrader } from './evaluator.js';
 import { EvalTaskContext } from '../utils/ui.js';
-import { parseNdjsonEvents } from '../utils/ndjson.js';
+import { parseNdjsonEvents, parseStreamResult } from '../utils/ndjson.js';
 import { Logger } from '../utils/logger.js';
 
 export interface EvalRunOptions {
@@ -20,32 +20,6 @@ export interface EvalRunOptions {
   timeoutMs?: number;
 }
 
-/**
- * Parses the Gemini CLI stream-json result event from stdout.
- * Returns { error } if the run failed, or { response } with the clean text on success.
- * Returns null if no result event is found (non-stream output).
- */
-function parseStreamResult(output: string): { error: string } | { response: string } | null {
-  const parts: string[] = [];
-  let resultEvent: NdjsonResultEvent | null = null;
-
-  for (const event of parseNdjsonEvents(output)) {
-    if (event.type === 'message' && event.role === 'assistant' && typeof event.content === 'string') {
-      parts.push(event.content);
-    } else if (event.type === 'result') {
-      resultEvent = event;
-    }
-  }
-
-  if (!resultEvent) return null;
-  if (resultEvent.status === 'error') {
-    const msg = resultEvent.error?.message || 'Agent run failed';
-    return { error: msg };
-  }
-  // Success: prefer collected assistant messages, fall back to result.response
-  const text = parts.join('\n').trim() || (typeof resultEvent.response === 'string' ? resultEvent.response : '');
-  return { response: text };
-}
 
 export class EvalRunner {
   private env: EvalEnvironment;
@@ -61,15 +35,16 @@ export class EvalRunner {
     this.functionalGrader = new ModelBasedGrader(options.skillName, this.runner);
   }
 
-  async runTriggerTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
+  async runTriggerTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext, attempt = 0): Promise<EvalTrial> {
     const logFileName = `task_${task.id}_trial_${trialId}.log`;
     const logPath = this.options.debug ? path.join(this.options.runDir, logFileName) : undefined;
 
     let worktreePath: string | undefined;
     let transcript: AgentTranscript | null = null;
 
+    const worktreeId = attempt > 0 ? `task-${task.id}-trial-${trialId}-r${attempt}` : `task-${task.id}-trial-${trialId}`;
     try {
-      worktreePath = this.env.createWorktree(`task-${task.id}-trial-${trialId}`);
+      worktreePath = this.env.createWorktree(worktreeId);
       await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
 
       transcript = await this.runner.runPrompt(task.prompt, worktreePath, (log: string) => {
@@ -117,7 +92,7 @@ export class EvalRunner {
     };
   }
 
-  async runFunctionalTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext): Promise<EvalTrial> {
+  async runFunctionalTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext, attempt = 0): Promise<EvalTrial> {
     const isBaseline = this.options.isBaseline;
     const passName = isBaseline ? 'without-skill' : 'with-skill';
     const promptToUse = isBaseline
@@ -132,8 +107,9 @@ export class EvalRunner {
     let trialPassed = false;
     let transcript: AgentTranscript | null = null;
 
+    const worktreeId = attempt > 0 ? `task-${task.id}-${passName}-trial-${trialId}-r${attempt}` : `task-${task.id}-${passName}-trial-${trialId}`;
     try {
-      worktreePath = this.env.createWorktree(`task-${task.id}-${passName}-trial-${trialId}`);
+      worktreePath = this.env.createWorktree(worktreeId);
       if (!isBaseline) {
         await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
       }

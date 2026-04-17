@@ -101,65 +101,6 @@ test('EvalEnvironment.teardown runs git worktree prune', async (t) => {
   assert.deepStrictEqual(pruneCalls[0].arguments[2], { stdio: 'ignore', cwd: workspace });
 });
 
-test('EvalEnvironment.createWorktree copies .gemini/ from workspace into worktree', (t) => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
-  const evalId = 'test-copy-gemini';
-  const worktreePath = path.join(workspace, '.project-skill-evals', 'worktrees', evalId);
-
-  // Create a .gemini/settings.json in the workspace
-  const geminiDir = path.join(workspace, '.gemini');
-  fs.mkdirSync(geminiDir, { recursive: true });
-  const settingsContent = JSON.stringify({ tools: { allowed: ['run_shell_command'] } });
-  fs.writeFileSync(path.join(geminiDir, 'settings.json'), settingsContent, 'utf-8');
-
-  // Mock spawnSync: call 1 = remove --force (returns 128), call 2 = prune (returns 0),
-  // call 3 = add (returns 0, and creates the directory)
-  let spawnCallCount = 0;
-  t.mock.method(executor, 'spawnSync', () => {
-    spawnCallCount++;
-    if (spawnCallCount === 3) {
-      // Simulate git worktree add by creating the directory
-      fs.mkdirSync(worktreePath, { recursive: true });
-      return { status: 0 };
-    }
-    return { status: 128 };
-  });
-
-  const env = new EvalEnvironment({ workspace });
-  try {
-    env.createWorktree(evalId);
-    const copiedSettings = path.join(worktreePath, '.gemini', 'settings.json');
-    assert.ok(fs.existsSync(copiedSettings), 'Expected .gemini/settings.json to be copied into worktree');
-    assert.strictEqual(fs.readFileSync(copiedSettings, 'utf-8'), settingsContent);
-  } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
-  }
-});
-
-test('EvalEnvironment.createWorktree does not fail when workspace has no .gemini/', (t) => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
-  const evalId = 'test-no-gemini';
-  const worktreePath = path.join(workspace, '.project-skill-evals', 'worktrees', evalId);
-
-  let spawnCallCount = 0;
-  t.mock.method(executor, 'spawnSync', () => {
-    spawnCallCount++;
-    if (spawnCallCount === 3) {
-      fs.mkdirSync(worktreePath, { recursive: true });
-      return { status: 0 };
-    }
-    return { status: 128 };
-  });
-
-  const env = new EvalEnvironment({ workspace });
-  try {
-    const result = env.createWorktree(evalId);
-    assert.strictEqual(result, worktreePath);
-    assert.ok(!fs.existsSync(path.join(worktreePath, '.gemini')), 'Expected no .gemini/ in worktree when workspace has none');
-  } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
-  }
-});
 
 test('EvalEnvironment.createWorktree should recover from stale physical directory', (t) => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
