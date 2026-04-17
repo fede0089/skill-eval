@@ -31,9 +31,12 @@ export class GeminiCliRunner implements AgentRunner {
       let stderr = '';
       let resolved = false;
 
-      // Matches interactive Y/N prompts (e.g. "[Y/n]:", "[y/N]:", "[Y/N]:") that indicate
-      // Gemini CLI is waiting for user input it will never receive (stdin is closed).
-      const INTERACTIVE_PROMPT_RE = /\[[yY]\/[nN]\]|\[[nN]\/[yY]\]/;
+      // Matches interactive Y/N prompts only when they appear at the end of a chunk
+      // (optionally followed by ": " or whitespace), indicating the process is waiting
+      // for user input it will never receive (stdin is closed).
+      // Anchoring to end-of-chunk avoids false positives from generated content that
+      // happens to contain "[Y/n]" in the middle of a line.
+      const INTERACTIVE_PROMPT_RE = /\[[yYnN]\/[yYnN]\]\s*:?\s*$/;
 
       function killOnInteractivePrompt(chunk: string): boolean {
         if (!resolved && INTERACTIVE_PROMPT_RE.test(chunk)) {
@@ -42,9 +45,16 @@ export class GeminiCliRunner implements AgentRunner {
           child.kill('SIGKILL');
           if (logStream) {
             logStream.write('\n\n--- Gemini CLI blocked on interactive prompt — killed ---\n');
-            logStream.end();
+            logStream.write(`--- Triggering text: ${JSON.stringify(chunk)} ---\n`);
+            if (stderr) {
+              logStream.write(`--- Stderr at time of kill ---\n${stderr}\n--- End stderr ---\n`);
+            }
+            logStream.end(() => {
+              resolve({ error: 'Gemini CLI blocked on interactive prompt', raw_output: stderr });
+            });
+          } else {
+            resolve({ error: 'Gemini CLI blocked on interactive prompt', raw_output: stderr });
           }
-          resolve({ error: 'Gemini CLI blocked on interactive prompt', raw_output: stderr });
           return true;
         }
         return false;

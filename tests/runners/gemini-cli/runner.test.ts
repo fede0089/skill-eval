@@ -192,6 +192,55 @@ test('GeminiCliRunner.runPrompt should kill process and return error when stderr
   spawnMock.mock.restore();
 });
 
+test('GeminiCliRunner.runPrompt should log triggering text and stderr when killing on interactive prompt', async (t) => {
+  const mockChild = createMockChild();
+  const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
+
+  const runner = new GeminiCliRunner();
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-'));
+  const logPath = path.join(tempDir, 'test.log');
+  const triggerText = 'Some warning. Proceed? [y/N]: ';
+
+  const promise = runner.runPrompt('test prompt', undefined, undefined, logPath);
+
+  setImmediate(() => {
+    mockChild.stderr.push(triggerText);
+  });
+
+  await promise;
+
+  const content = fs.readFileSync(logPath, 'utf-8');
+  assert.ok(content.includes('Triggering text:'), 'Log should include "Triggering text:" label');
+  assert.ok(content.includes(triggerText), 'Log should contain the actual triggering chunk');
+
+  spawnMock.mock.restore();
+  fs.rmSync(tempDir, { recursive: true, force: true });
+});
+
+test('GeminiCliRunner.runPrompt should NOT kill process when [Y/n] appears in the middle of generated content', async (t) => {
+  const mockChild = createMockChild();
+  const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
+
+  const runner = new GeminiCliRunner();
+  const promise = runner.runPrompt('test prompt');
+
+  setImmediate(() => {
+    // [Y/n] embedded in JSON content — not at end of chunk
+    mockChild.stdout.push('{"type":"content","text":"Use [Y/n] to confirm each step"}');
+    mockChild.stdout.push(null);
+    mockChild.stderr.push(null);
+    mockChild.emit('close', 0);
+  });
+
+  const result = await promise;
+
+  assert.ok(result, 'result should be defined');
+  assert.ok(!result?.error, 'result should NOT have an error');
+  assert.strictEqual((mockChild.kill as ReturnType<typeof mock.fn>).mock.callCount(), 0, 'child.kill should NOT have been called');
+
+  spawnMock.mock.restore();
+});
+
 test('GeminiCliRunner.runPrompt should warn (not throw) when log file creation fails', async (t) => {
   const { Logger } = await import('../../../src/utils/logger.js');
   const mockChild = createMockChild();
