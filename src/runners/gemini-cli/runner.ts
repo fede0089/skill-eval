@@ -36,7 +36,8 @@ export class GeminiCliRunner implements AgentRunner {
 
       const spawnOptions: any = {
         cwd: cwd,
-        env: { ...process.env, FORCE_COLOR: '1' }
+        env: { ...process.env, FORCE_COLOR: '1' },
+        stdio: ['ignore', 'pipe', 'pipe']  // stdin closed → interactive reads get EOF immediately
       };
 
       const child = child_process.spawn('gemini', args, spawnOptions);
