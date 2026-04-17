@@ -46,6 +46,7 @@ program
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
   .option('--report <format>', 'Report format: html or json')
   .option('--timeout <seconds>', 'Agent timeout in seconds', String(DEFAULT_TIMEOUT_MS / 1000))
+  .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
@@ -53,7 +54,8 @@ program
     const numTrials = parseInt(options.trials, 10) || 3;
     const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
-    triggerCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs).catch(errorHandler);
+    const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
+    triggerCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs, evalId).catch(errorHandler);
   });
 
 program
@@ -65,6 +67,7 @@ program
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
   .option('--report <format>', 'Report format: html or json')
   .option('--timeout <seconds>', 'Agent timeout in seconds', String(DEFAULT_TIMEOUT_MS / 1000))
+  .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
@@ -72,7 +75,8 @@ program
     const numTrials = parseInt(options.trials, 10) || 3;
     const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
-    functionalCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs).catch(errorHandler);
+    const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
+    functionalCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs, evalId).catch(errorHandler);
   });
 
 

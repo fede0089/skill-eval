@@ -21,10 +21,19 @@ export async function functionalCommand(
   injectedSuite?: EvalSuite,
   numTrials: number = 3,
   reporter: Reporter = new JsonReporter(),
-  timeoutMs?: number
+  timeoutMs?: number,
+  evalId?: number
 ): Promise<void> {
   if (!injectedSuite) preflight(agent, workspace, skillPath);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
+
+  if (evalId !== undefined) {
+    suite.tasks = suite.tasks.filter(t => t.id === evalId);
+    if (suite.tasks.length === 0) {
+      console.error(`No eval found with id ${evalId}`);
+      process.exit(1);
+    }
+  }
 
   const { skill_name, tasks } = suite;
 
