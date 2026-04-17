@@ -112,12 +112,12 @@ test('EvalEnvironment.createWorktree copies .gemini/ from workspace into worktre
   const settingsContent = JSON.stringify({ tools: { allowed: ['run_shell_command'] } });
   fs.writeFileSync(path.join(geminiDir, 'settings.json'), settingsContent, 'utf-8');
 
-  // Mock spawnSync: first call (remove --force) returns 128 (not found), second (add) returns 0
-  // Also create the worktree directory so cpSync has a target
+  // Mock spawnSync: call 1 = remove --force (returns 128), call 2 = prune (returns 0),
+  // call 3 = add (returns 0, and creates the directory)
   let spawnCallCount = 0;
   t.mock.method(executor, 'spawnSync', () => {
     spawnCallCount++;
-    if (spawnCallCount === 2) {
+    if (spawnCallCount === 3) {
       // Simulate git worktree add by creating the directory
       fs.mkdirSync(worktreePath, { recursive: true });
       return { status: 0 };
@@ -144,7 +144,7 @@ test('EvalEnvironment.createWorktree does not fail when workspace has no .gemini
   let spawnCallCount = 0;
   t.mock.method(executor, 'spawnSync', () => {
     spawnCallCount++;
-    if (spawnCallCount === 2) {
+    if (spawnCallCount === 3) {
       fs.mkdirSync(worktreePath, { recursive: true });
       return { status: 0 };
     }
@@ -156,6 +156,44 @@ test('EvalEnvironment.createWorktree does not fail when workspace has no .gemini
     const result = env.createWorktree(evalId);
     assert.strictEqual(result, worktreePath);
     assert.ok(!fs.existsSync(path.join(worktreePath, '.gemini')), 'Expected no .gemini/ in worktree when workspace has none');
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test('EvalEnvironment.createWorktree should recover from stale physical directory', (t) => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
+  const evalId = 'test-stale-recovery';
+  const worktreePath = path.join(workspace, '.project-skill-evals', 'worktrees', evalId);
+
+  // Simulate a previous crashed run: directory already exists with leftover content
+  fs.mkdirSync(worktreePath, { recursive: true });
+  fs.writeFileSync(path.join(worktreePath, 'leftover.txt'), 'stale', 'utf-8');
+
+  let spawnCallCount = 0;
+  const spawnArgs: string[][] = [];
+  t.mock.method(executor, 'spawnSync', (_cmd: string, args: string[]) => {
+    spawnCallCount++;
+    spawnArgs.push(args);
+    if (spawnCallCount === 3) {
+      // Simulate git worktree add: physical rm already happened, create fresh dir
+      fs.mkdirSync(worktreePath, { recursive: true });
+      return { status: 0 };
+    }
+    return { status: spawnCallCount === 2 ? 0 : 128 };
+  });
+
+  const env = new EvalEnvironment({ workspace });
+  try {
+    const result = env.createWorktree(evalId);
+
+    assert.strictEqual(result, worktreePath);
+    assert.strictEqual(spawnCallCount, 3, 'Expected remove → prune → add (3 spawnSync calls)');
+    assert.ok(spawnArgs[0].includes('remove'), 'First call should be git worktree remove');
+    assert.ok(spawnArgs[1].includes('prune'),  'Second call should be git worktree prune');
+    assert.ok(spawnArgs[2].includes('add'),    'Third call should be git worktree add');
+    assert.ok(!fs.existsSync(path.join(worktreePath, 'leftover.txt')), 'Stale leftover.txt should have been removed before add');
+    assert.ok(fs.existsSync(worktreePath), 'Worktree directory should exist after add');
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
   }

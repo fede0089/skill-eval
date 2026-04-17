@@ -39,9 +39,17 @@ export class EvalEnvironment {
 
     Logger.debug(`Creating worktree at: ${worktreePath}`);
 
-    // Ensure the path is clean before adding a worktree
-    // We try to remove it first in case a previous run crashed
+    // Ensure the path is clean before adding a worktree.
+    // We try to remove it first in case a previous run crashed.
     executor.spawnSync('git', ['worktree', 'remove', '--force', worktreePath], { stdio: 'ignore', cwd: this.workspace });
+
+    // If git worktree remove failed (e.g. path was never registered, or git
+    // metadata is stale), fall back to a physical wipe and a metadata prune so
+    // that 'git worktree add' does not exit 128 on a pre-existing path.
+    if (fs.existsSync(worktreePath)) {
+      fs.rmSync(worktreePath, { recursive: true, force: true });
+    }
+    executor.spawnSync('git', ['worktree', 'prune'], { stdio: 'ignore', cwd: this.workspace });
 
     const child = executor.spawnSync('git', ['worktree', 'add', worktreePath, '-f'], {
       stdio: 'ignore',
