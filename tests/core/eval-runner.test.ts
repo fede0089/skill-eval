@@ -1,5 +1,8 @@
 import { test, mock } from 'node:test';
 import * as assert from 'node:assert';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import { executor } from '../../src/utils/exec.js';
 import { EvalRunner } from '../../src/core/eval-runner.js';
 import { EvalEnvironment } from '../../src/core/environment.js';
@@ -15,6 +18,7 @@ test('EvalRunner.runFunctionalTask baseline prompt should include negative instr
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
     linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
 
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
@@ -47,6 +51,7 @@ test('EvalRunner.runFunctionalTask baseline with skill activation → Invalid Ba
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: skillActivationLog() })),
     linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
 
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
@@ -71,6 +76,7 @@ test('EvalRunner.runFunctionalTask baseline with clean log → validation passes
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })),
     linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
 
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
@@ -95,6 +101,7 @@ test('EvalRunner.runFunctionalTask target with no skill activation → Invalid T
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })),
     linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
 
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
@@ -119,6 +126,7 @@ test('EvalRunner.runFunctionalTask with error transcript sets isError:true', asy
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ error: 'Process timeout exceeded (600 seconds)' })),
     linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
 
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
@@ -143,6 +151,7 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: skillActivationLog('t1', true) })),
     linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
 
   };
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
@@ -169,6 +178,7 @@ test('EvalRunner.runTriggerTask with error transcript always calls removeWorktre
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ error: 'Process timeout exceeded' })),
     linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
   }));
 
   const runner = new EvalRunner({
@@ -191,6 +201,7 @@ test('EvalRunner.runFunctionalTask with error transcript always calls removeWork
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ error: 'Process timeout exceeded' })),
     linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
   }));
 
   const runner = new EvalRunner({
@@ -213,6 +224,7 @@ test('EvalRunner.runTriggerTask uses unique worktree name per retry attempt', as
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
     linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
   }));
 
   const runner = new EvalRunner({
@@ -249,5 +261,78 @@ test('withRetry passes attempt number 0, 1, 2 to fn and stops on success', async
 
   assert.deepStrictEqual(attempts, [0, 1, 2], 'Should call fn with attempt 0, 1, 2');
   assert.strictEqual(result.trialPassed, true, 'Should return successful result');
+});
+
+// ── Runner config (evals/config/<agent>/) ───────────────────────────────────
+
+test('EvalRunner.runTriggerTask copies evals/config/gemini-cli/ into worktree .gemini/', async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
+  const skillDir = path.join(workspace, 'test-skill');
+  const configDir = path.join(skillDir, 'evals', 'config', 'gemini-cli');
+  fs.mkdirSync(configDir, { recursive: true });
+  const settingsContent = JSON.stringify({ telemetry: { enabled: false } });
+  fs.writeFileSync(path.join(configDir, 'settings.json'), settingsContent);
+
+  const worktreePath = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-worktree-'));
+
+  try {
+    mock.method(RunnerFactory, 'create', () => ({
+      skillDispatchToolName: 'activate_skill',
+      runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
+      linkSkill: mock.fn(async () => {}),
+      applyRunnerConfig: mock.fn((src: string, dst: string) => {
+        const geminiSrc = path.join(src, 'gemini-cli');
+        if (!fs.existsSync(geminiSrc)) return;
+        const geminiDst = path.join(dst, '.gemini');
+        fs.mkdirSync(geminiDst, { recursive: true });
+        fs.cpSync(geminiSrc, geminiDst, { recursive: true, force: true });
+      }),
+    }));
+    mock.method(EvalEnvironment.prototype, 'createWorktree', () => worktreePath);
+    mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+
+    const runner = new EvalRunner({
+      agent: 'gemini-cli', workspace, skillPath: './test-skill', skillName: 'test-skill',
+      runDir: '/tmp',
+    });
+
+    await runner.runTriggerTask({ id: 1, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
+
+    const copiedSettings = path.join(worktreePath, '.gemini', 'settings.json');
+    assert.ok(fs.existsSync(copiedSettings), 'settings.json should be copied to worktree .gemini/');
+    assert.strictEqual(fs.readFileSync(copiedSettings, 'utf-8'), settingsContent);
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(worktreePath, { recursive: true, force: true });
+  }
+});
+
+test('EvalRunner.runTriggerTask does not fail when evals/config/gemini-cli/ does not exist', async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
+  const worktreePath = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-worktree-'));
+
+  try {
+    mock.method(RunnerFactory, 'create', () => ({
+      skillDispatchToolName: 'activate_skill',
+      runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
+      linkSkill: mock.fn(async () => {}),
+      applyRunnerConfig: mock.fn(() => {}),
+    }));
+    mock.method(EvalEnvironment.prototype, 'createWorktree', () => worktreePath);
+    mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+
+    const runner = new EvalRunner({
+      agent: 'gemini-cli', workspace, skillPath: './test-skill', skillName: 'test-skill',
+      runDir: '/tmp',
+    });
+
+    await assert.doesNotReject(
+      () => runner.runTriggerTask({ id: 1, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any),
+      'Should not throw when runner config dir does not exist'
+    );
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(worktreePath, { recursive: true, force: true });
+  }
 });
 

@@ -35,6 +35,9 @@ Evaluations are defined via an `evals/evals.json` file inside your target skill 
      SKILL.md
      evals/
        evals.json
+       config/               # optional: runner-specific configuration
+         gemini-cli/         # copied into <worktree>/.gemini/ before each run
+           settings.json
    ```
 
 2. Run evaluations by specifying the workspace (the repo the agent will run in) and the skill path:
@@ -50,6 +53,8 @@ Evaluations are defined via an `evals/evals.json` file inside your target skill 
    ```
 
    Both commands support `--trials <number>` (default: 3) to run multiple trials per task and compute **pass@k** metrics, and `--concurrency <number>` (default: 5) to control parallel execution.
+
+   > **Runner config (`evals/config/<agent>/`):** Each skill can include runner-specific configuration files under `evals/config/`. Before every trial, skill-eval copies the matching subdirectory into the worktree's agent config directory (e.g., `evals/config/gemini-cli/` → `<worktree>/.gemini/`). Use this to pin `settings.json`, policies, or any other runner config needed for the eval to work correctly — without touching your workspace's own config.
 
 3. `skill-eval` will automatically:
    - Validate the agent binary and skill directory structure before starting (pre-flight check).
@@ -101,7 +106,8 @@ For functional evaluations, include `expectations`:
    ├── runner.ts    # implements AgentRunner interface
    └── index.ts     # export { YourRunner } from './runner.js'
    ```
-2. Open `src/runners/registry.ts` and add one entry:
+2. Implement all methods of `AgentRunner`, including `applyRunnerConfig(evalConfigBaseDir, worktreePath)`. This method should copy `evalConfigBaseDir/<your-agent>/` into the appropriate config directory inside the worktree (e.g., `.gemini/` for Gemini CLI, `.claude/` for a hypothetical Claude runner). No-op silently if the directory doesn't exist.
+3. Open `src/runners/registry.ts` and add one entry:
    ```ts
    import { YourRunner } from './<your-agent>/index.js';
 
@@ -110,7 +116,7 @@ For functional evaluations, include `expectations`:
      '<your-agent>': { Runner: YourRunner, binary: '<cli-binary-name>' },
    };
    ```
-3. Done — the factory, preflight check, and CLI all pick it up automatically.
+4. Done — the factory, preflight check, and CLI all pick it up automatically.
 
 ### Adding a new report format
 

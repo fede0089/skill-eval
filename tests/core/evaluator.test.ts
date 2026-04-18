@@ -15,7 +15,7 @@ function makeJudgeRunner(responseText: string): AgentRunner {
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => ({ response: makeNdjsonResponse(responseText) })),
     linkSkill: mock.fn(async () => {}),
-
+    applyRunnerConfig: mock.fn(() => {}),
   };
 }
 
@@ -47,7 +47,7 @@ test('ModelBasedGrader.gradeModelBased returns failed results when judge returns
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => null),
     linkSkill: mock.fn(async () => {}),
-
+    applyRunnerConfig: mock.fn(() => {}),
   };
 
   const grader = new ModelBasedGrader('mock-skill', judgeRunner);

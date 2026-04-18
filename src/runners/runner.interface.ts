@@ -19,4 +19,11 @@ export interface AgentRunner {
    */
   linkSkill(absoluteSkillPath: string, worktreePath: string): Promise<void>;
 
+  /**
+   * Copies runner-specific config from the skill's evals/config/ directory
+   * into the worktree. Each runner knows its own subdirectory name and target
+   * location (e.g. GeminiCliRunner copies 'gemini-cli/' → '.gemini/').
+   * No-ops silently if the config directory doesn't exist.
+   */
+  applyRunnerConfig(evalConfigBaseDir: string, worktreePath: string): void;
 }

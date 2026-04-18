@@ -194,6 +194,15 @@ export class GeminiCliRunner implements AgentRunner {
     });
   }
 
+  applyRunnerConfig(evalConfigBaseDir: string, worktreePath: string): void {
+    const src = path.join(evalConfigBaseDir, 'gemini-cli');
+    if (!fs.existsSync(src)) return;
+    const dst = path.join(worktreePath, '.gemini');
+    fs.mkdirSync(dst, { recursive: true });
+    fs.cpSync(src, dst, { recursive: true, force: true });
+    Logger.debug(`Applied gemini-cli runner config to worktree`);
+  }
+
   async linkSkill(absoluteSkillPath: string, worktreePath: string): Promise<void> {
     const skillName = path.basename(absoluteSkillPath);
     const localSkillsDir = path.join(worktreePath, '.agents', 'skills');

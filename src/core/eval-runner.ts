@@ -46,6 +46,7 @@ export class EvalRunner {
     try {
       worktreePath = this.env.createWorktree(worktreeId);
       await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
+      this.runner.applyRunnerConfig(path.resolve(this.options.workspace, this.options.skillPath, 'evals', 'config'), worktreePath);
 
       transcript = await this.runner.runPrompt(task.prompt, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
@@ -113,6 +114,7 @@ export class EvalRunner {
       if (!isBaseline) {
         await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
       }
+      this.runner.applyRunnerConfig(path.resolve(this.options.workspace, this.options.skillPath, 'evals', 'config'), worktreePath);
 
       if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} AGENT RUN\n`);
       transcript = await this.runner.runPrompt(promptToUse, worktreePath, (log: string) => {
