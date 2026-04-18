@@ -43,6 +43,12 @@ export class EvalRunner {
     let transcript: AgentTranscript | null = null;
 
     const worktreeId = attempt > 0 ? `task-${task.id}-trial-${trialId}-r${attempt}` : `task-${task.id}-trial-${trialId}`;
+    if (attempt > 0) {
+      const prevId = attempt === 1
+        ? `task-${task.id}-trial-${trialId}`
+        : `task-${task.id}-trial-${trialId}-r${attempt - 1}`;
+      this.env.removeWorktree(path.resolve(this.options.workspace, '.project-skill-evals', 'worktrees', prevId));
+    }
     try {
       worktreePath = this.env.createWorktree(worktreeId);
       await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
@@ -119,6 +125,12 @@ export class EvalRunner {
     let transcript: AgentTranscript | null = null;
 
     const worktreeId = attempt > 0 ? `task-${task.id}-${passName}-trial-${trialId}-r${attempt}` : `task-${task.id}-${passName}-trial-${trialId}`;
+    if (attempt > 0) {
+      const prevId = attempt === 1
+        ? `task-${task.id}-${passName}-trial-${trialId}`
+        : `task-${task.id}-${passName}-trial-${trialId}-r${attempt - 1}`;
+      this.env.removeWorktree(path.resolve(this.options.workspace, '.project-skill-evals', 'worktrees', prevId));
+    }
     try {
       worktreePath = this.env.createWorktree(worktreeId);
       if (!isBaseline) {
