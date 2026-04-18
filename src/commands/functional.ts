@@ -45,6 +45,11 @@ export async function functionalCommand(
   const env = new EvalEnvironment({ workspace });
   await env.setup();
 
+  // Ensure worktrees are cleaned up even when the process is interrupted (Ctrl+C).
+  const cleanup = () => { env.teardown().finally(() => process.exit(1)); };
+  process.once('SIGINT', cleanup);
+  process.once('SIGTERM', cleanup);
+
   // Setup Artifacts Directory (Always create, even if not in debug mode, for 'show' command)
   const debug = !!process.env.DEBUG;
   const startTime = new Date();
@@ -116,7 +121,7 @@ export async function functionalCommand(
               ).then(trial => {
                   if (multi) {
                     const reason = trial.assertionResults.find(r => !r.passed)?.reason;
-                    multi.markTrialComplete(trialId, trial.trialPassed, reason);
+                    multi.markTrialComplete(trialId, trial.trialPassed, reason, trial.isError);
                   } else {
                     completed++;
                     if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
@@ -173,7 +178,7 @@ export async function functionalCommand(
               ).then(trial => {
                   if (multi) {
                     const reason = trial.assertionResults.find(r => !r.passed)?.reason;
-                    multi.markTrialComplete(trialId, trial.trialPassed, reason);
+                    multi.markTrialComplete(trialId, trial.trialPassed, reason, trial.isError);
                   } else {
                     completed++;
                     if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
@@ -247,6 +252,8 @@ export async function functionalCommand(
     reporter.generate(report, runDir);
 
   } finally {
+    process.off('SIGINT', cleanup);
+    process.off('SIGTERM', cleanup);
     await env.teardown();
   }
 }

@@ -15,7 +15,7 @@ export interface MultiTrialContext {
   /** Returns an EvalTaskContext whose updateLog writes to the given trial's subtask output */
   getTrialCtx(trialId: number): EvalTaskContext;
   /** Resolves or rejects the deferred promise for the given trial's subtask */
-  markTrialComplete(trialId: number, passed: boolean, failureReason?: string): void;
+  markTrialComplete(trialId: number, passed: boolean, failureReason?: string, isError?: boolean): void;
 }
 
 export type EvalTaskFn = (ctx: EvalTaskContext, multi?: MultiTrialContext) => Promise<void>;
@@ -109,13 +109,14 @@ export class ListrEvalUI {
               outputSetters[i](sanitizeLog(log));
             }
           }),
-          markTrialComplete: (trialId: number, passed: boolean, failureReason?: string) => {
+          markTrialComplete: (trialId: number, passed: boolean, failureReason?: string, isError?: boolean) => {
             const i = trialId - 1;
             if (trialDone[i]) return;
             trialDone[i] = true;
             if (passed) {
               deferreds[i].resolve();
             } else {
+              if (isError) outputSetters[i]('(!) ERROR');
               deferreds[i].reject(new Error(''));
             }
           }

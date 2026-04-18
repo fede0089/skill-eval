@@ -173,6 +173,52 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
 
 // ── Retry workspace isolation ────────────────────────────────────────────────
 
+test('EvalRunner.runTriggerTask with stream-json error result sets isError:true', async () => {
+  const ndjsonError = JSON.stringify({ type: 'result', status: 'error', error: { message: 'Gemini CLI blocked on interactive prompt' } });
+  mock.method(RunnerFactory, 'create', () => ({
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: ndjsonError, raw_output: '' })),
+    linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
+  }));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false
+  });
+
+  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+
+  const result = await runner.runTriggerTask({ id: 20, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.isError, true, 'Should set isError:true when NDJSON result has status:error');
+  assert.strictEqual(result.trialPassed, false);
+});
+
+test('EvalRunner.runFunctionalTask with stream-json error result sets isError:true', async () => {
+  const ndjsonError = JSON.stringify({ type: 'result', status: 'error', error: { message: 'Gemini CLI blocked on interactive prompt' } });
+  mock.method(RunnerFactory, 'create', () => ({
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: ndjsonError, raw_output: '' })),
+    linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
+  }));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false
+  });
+
+  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+
+  const result = await runner.runFunctionalTask({ id: 21, prompt: 'test', assertions: ['check something'] }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.isError, true, 'Should set isError:true when NDJSON result has status:error');
+  assert.strictEqual(result.trialPassed, false);
+});
+
 test('EvalRunner.runTriggerTask with error transcript always calls removeWorktree', async () => {
   mock.method(RunnerFactory, 'create', () => ({
     skillDispatchToolName: 'activate_skill',

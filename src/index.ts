@@ -51,10 +51,11 @@ program
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
     const concurrency = parseInt(options.concurrency, 10) || 5;
-    const numTrials = parseInt(options.trials, 10) || 3;
+    const numTrials = options.trials !== undefined ? (parseInt(options.trials, 10) || 3) : 3;
     const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
+    Logger.debug(`[CLI] numTrials=${numTrials} (--trials raw value: ${JSON.stringify(options.trials)})`);
     triggerCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs, evalId).catch(errorHandler);
   });
 
@@ -72,10 +73,11 @@ program
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
     const concurrency = parseInt(options.concurrency, 10) || 5;
-    const numTrials = parseInt(options.trials, 10) || 3;
+    const numTrials = options.trials !== undefined ? (parseInt(options.trials, 10) || 3) : 3;
     const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
+    Logger.debug(`[CLI] numTrials=${numTrials} (--trials raw value: ${JSON.stringify(options.trials)})`);
     functionalCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs, evalId).catch(errorHandler);
   });
 

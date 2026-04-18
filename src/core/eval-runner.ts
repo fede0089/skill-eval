@@ -57,6 +57,16 @@ export class EvalRunner {
       }
     }
 
+    // Propagate stream-json errors: when the agent fails, Gemini CLI still
+    // writes a {"type":"result","status":"error",...} event to stdout so transcript.error
+    // is never set by the runner. Parse it here so the grading path is skipped correctly.
+    if (transcript && !transcript.error) {
+      const streamResult = parseStreamResult(transcript.response || '');
+      if (streamResult && 'error' in streamResult) {
+        transcript.error = streamResult.error;
+      }
+    }
+
     let triggered = false;
     const assertionResults: AssertionResult[] = [];
 
