@@ -1,8 +1,0 @@
-{
-  "track_id": "eval_improvements_20260410",
-  "type": "feature",
-  "status": "complete",
-  "created_at": "2026-04-10T00:00:00.000Z",
-  "updated_at": "2026-04-10T00:00:00.000Z",
-  "description": "Fix fragile NDJSON regex parsing and implement pass@k multi-trial metric."
-}

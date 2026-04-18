@@ -1,8 +1,0 @@
-{
-  "track_id": "parallel_prompts_20260410",
-  "type": "feature",
-  "status": "new",
-  "created_at": "2026-04-10T12:00:00Z",
-  "updated_at": "2026-04-10T12:00:00Z",
-  "description": "quiero que se corran los prompts en paralelo para ganar tiempo, pero hay que manejar bien la concurrencia y el otuput en pantalla! cada prompt debería tener su linea y cada linea ir actualizandose...cuando todos finalizan ahi recien se finaliza y muestra el summary"
-}

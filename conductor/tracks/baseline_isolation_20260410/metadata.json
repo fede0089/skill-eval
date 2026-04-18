@@ -1,8 +1,0 @@
-{
-  "track_id": "baseline_isolation_20260410",
-  "type": "feature",
-  "status": "new",
-  "created_at": "2026-04-10T00:00:00Z",
-  "updated_at": "2026-04-10T00:00:00Z",
-  "description": "Implement strict isolation for the Baseline pass in skill evaluations to ensure the agent under test cannot access the skill being evaluated."
-}
