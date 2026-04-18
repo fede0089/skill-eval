@@ -16,7 +16,6 @@ export class EvalEnvironment {
   }
 
   public async setup(): Promise<void> {
-    Logger.debug(`Setting up evaluation environment...`);
   }
 
   public async teardown(): Promise<void> {

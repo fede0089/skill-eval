@@ -38,10 +38,6 @@ export async function triggerCommand(
 
   const { skill_name, tasks } = suite;
 
-  Logger.debug(`\nStarting trigger evaluation for skill: ${skill_name}`);
-  Logger.debug(`Agent: ${agent}`);
-  Logger.debug(`Found ${tasks.length} tasks.\n`);
-
   // Setup Environment (global setup)
   const env = new EvalEnvironment({ workspace });
   await env.setup();
@@ -57,7 +53,6 @@ export async function triggerCommand(
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
   const runDir = path.resolve(workspace, '.project-skill-evals', 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
-  Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
 
   const taskResults: TaskResult[] = [];
   let tasksPassedCount = 0;

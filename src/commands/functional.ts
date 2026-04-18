@@ -38,10 +38,6 @@ export async function functionalCommand(
 
   const { skill_name, tasks } = suite;
 
-  Logger.debug(`\nStarting functional evaluation for skill: ${skill_name}`);
-  Logger.debug(`Agent: ${agent}`);
-  Logger.debug(`Found ${tasks.length} tasks.\n`);
-
   const env = new EvalEnvironment({ workspace });
   await env.setup();
 
@@ -56,7 +52,6 @@ export async function functionalCommand(
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
   const runDir = path.resolve(workspace, '.project-skill-evals', 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
-  Logger.debug(`[Artifacts] Saving to: ${runDir}\n`);
 
   const taskResults: TaskResult[] = [];
   let withSkillTasksPassedCount = 0;

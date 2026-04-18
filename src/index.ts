@@ -55,7 +55,6 @@ program
     const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
-    Logger.debug(`[CLI] numTrials=${numTrials} (--trials raw value: ${JSON.stringify(options.trials)})`);
     triggerCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs, evalId).catch(errorHandler);
   });
 
@@ -77,7 +76,6 @@ program
     const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
     const reporter = createReporter((options.report || 'html') as ReportFormat);
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
-    Logger.debug(`[CLI] numTrials=${numTrials} (--trials raw value: ${JSON.stringify(options.trials)})`);
     functionalCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs, evalId).catch(errorHandler);
   });
 
