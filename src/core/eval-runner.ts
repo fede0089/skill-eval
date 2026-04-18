@@ -50,10 +50,12 @@ export class EvalRunner {
       this.env.removeWorktree(path.resolve(this.options.workspace, '.project-skill-evals', 'worktrees', prevId));
     }
     try {
+      uiCtx.updateLog('Setting up…');
       worktreePath = this.env.createWorktree(worktreeId);
       await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
       this.runner.applyRunnerConfig(path.resolve(this.options.workspace, this.options.skillPath, 'evals', 'config'), worktreePath);
 
+      uiCtx.updateLog('Executing prompt…');
       transcript = await this.runner.runPrompt(task.prompt, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
       }, logPath, undefined, this.options.timeoutMs);
@@ -77,6 +79,7 @@ export class EvalRunner {
     const assertionResults: AssertionResult[] = [];
 
     if (transcript && !transcript.error) {
+      uiCtx.updateLog('Grading…');
       triggered = this.triggerGrader.gradeTrigger(transcript);
       assertionResults.push({
         assertion: 'Skill was triggered',
@@ -132,12 +135,14 @@ export class EvalRunner {
       this.env.removeWorktree(path.resolve(this.options.workspace, '.project-skill-evals', 'worktrees', prevId));
     }
     try {
+      uiCtx.updateLog('Setting up…');
       worktreePath = this.env.createWorktree(worktreeId);
       if (!isBaseline) {
         await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
       }
       this.runner.applyRunnerConfig(path.resolve(this.options.workspace, this.options.skillPath, 'evals', 'config'), worktreePath);
 
+      uiCtx.updateLog('Executing prompt…');
       if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} AGENT RUN\n`);
       transcript = await this.runner.runPrompt(promptToUse, worktreePath, (log: string) => {
         uiCtx.updateLog(log);
@@ -195,6 +200,7 @@ export class EvalRunner {
         } catch (e) { }
 
         if (task.assertions && task.assertions.length > 0) {
+          uiCtx.updateLog('Grading…');
           if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} JUDGE RUN\n`);
           // Use the already-parsed stream result to get clean text for the judge.
           const streamResult = parseStreamResult(transcript.response || '');

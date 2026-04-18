@@ -148,7 +148,9 @@ export class GeminiCliRunner implements AgentRunner {
           if (killOnInteractivePrompt(chunk)) return;
           stderr += chunk;
           if (onLog) {
-            const lines = chunk.split('\n').filter((l: string) => l.trim() !== '');
+            const lines = chunk.split('\n').filter(
+              (l: string) => l.trim() !== '' && !l.startsWith('[DEBUG]')
+            );
             if (lines.length > 0) {
               onLog(lines[lines.length - 1]);
             }
@@ -178,14 +180,14 @@ export class GeminiCliRunner implements AgentRunner {
       child.on('close', (code) => {
         if (logStream) {
           logStream.write(`\n\n--- Gemini CLI exited with status ${code} ---\n`);
+          if (code !== 0 && stderr) {
+            logStream.write(`--- Stderr ---\n${stderr}\n--- End Stderr ---\n`);
+          }
           logStream.end();
         }
 
         if (code !== 0 && !resolved) {
-          Logger.error(`Gemini CLI exited with status ${code}`);
-          if (stderr) {
-            Logger.debug(`Gemini CLI Stderr: ${stderr.trim()}`);
-          }
+          if (onLog) onLog(`Exited with status ${code}`);
         }
 
         processDone = true;
@@ -200,7 +202,6 @@ export class GeminiCliRunner implements AgentRunner {
     const dst = path.join(worktreePath, '.gemini');
     fs.mkdirSync(dst, { recursive: true });
     fs.cpSync(src, dst, { recursive: true, force: true });
-    Logger.debug(`Applied gemini-cli runner config to worktree`);
   }
 
   async linkSkill(absoluteSkillPath: string, worktreePath: string): Promise<void> {
