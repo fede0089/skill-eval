@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import chalk from 'chalk';
 import { EvalEnvironment } from '../core/environment.js';
 import { EvalSuiteReport, TaskResult, EvalTrial, EvalSuite } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
@@ -10,7 +9,7 @@ import { EvalRunner } from '../core/eval-runner.js';
 import { aggregatePassAtK } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
-import { renderTriggerTable } from '../utils/table-renderer.js';
+import { renderTriggerTable, renderRunHeader } from '../utils/table-renderer.js';
 import type { Reporter } from '../reporters/index.js';
 import { JsonReporter } from '../reporters/index.js';
 
@@ -70,8 +69,8 @@ export async function triggerCommand(
   const ui = new ListrEvalUI();
 
   try {
-    Logger.write(`\n${chalk.bold(`TRIGGER EVALUATION: ${skillPath}`)}\n`);
-    Logger.write(`\n--- Trigger Pass ---\n`);
+    renderRunHeader({ command: 'trigger', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, concurrency, timeoutMs: timeoutMs ?? 600000, runDir, evalId });
+    Logger.write(`--- Trigger Pass ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
 
     for (let i = 0; i < tasks.length; i++) {

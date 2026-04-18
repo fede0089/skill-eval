@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import chalk from 'chalk';
 import { EvalEnvironment } from '../core/environment.js';
 import { EvalSuiteReport, TaskResult, EvalTrial, EvalSuite } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
@@ -10,7 +9,7 @@ import { EvalRunner } from '../core/eval-runner.js';
 import { aggregatePassAtK } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
-import { renderFunctionalTable } from '../utils/table-renderer.js';
+import { renderFunctionalTable, renderRunHeader } from '../utils/table-renderer.js';
 import type { Reporter } from '../reporters/index.js';
 import { JsonReporter } from '../reporters/index.js';
 
@@ -83,10 +82,10 @@ export async function functionalCommand(
   });
 
   try {
-    Logger.write(`\n${chalk.bold(`FUNCTIONAL EVALUATION: ${skillPath}`)}\n`);
+    renderRunHeader({ command: 'functional', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, concurrency, timeoutMs: timeoutMs ?? 600000, runDir, evalId });
 
     // ==== WITHOUT SKILL RUN ====
-    Logger.write(`\n--- Without Skill ---\n`);
+    Logger.write(`--- Without Skill ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
     const withoutSkillUI = new ListrEvalUI();
 

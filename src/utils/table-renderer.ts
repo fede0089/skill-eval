@@ -1,7 +1,72 @@
 import chalk from 'chalk';
+import * as path from 'path';
 import { EvalSuiteReport } from '../types/index.js';
 import { Logger } from './logger.js';
 import { computePassAtK } from '../core/statistics.js';
+
+export interface RunHeaderConfig {
+  command: 'trigger' | 'functional';
+  skillName: string;
+  agent: string;
+  workspace: string;
+  tasks: number;
+  trials: number;
+  concurrency: number;
+  timeoutMs: number;
+  runDir: string;
+  evalId?: number;
+}
+
+const BOX_INNER = 56; // visible chars between │ and │ (one space padding each side)
+
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+function boxLine(content = ''): string {
+  const visible = stripAnsi(content).length;
+  const pad = Math.max(0, BOX_INNER - visible);
+  return chalk.gray('│') + ' ' + content + ' '.repeat(pad) + ' ' + chalk.gray('│');
+}
+
+function boxLabel(key: string, value: string): string {
+  const keyPart = chalk.gray(key.padEnd(11));
+  return boxLine(keyPart + ' ' + chalk.white(value));
+}
+
+/**
+ * Renders a styled run-config header before the evaluation UI starts.
+ * Always shown regardless of debug mode.
+ */
+export function renderRunHeader(config: RunHeaderConfig): void {
+  const { command, skillName, agent, workspace, tasks, trials, concurrency, timeoutMs, runDir, evalId } = config;
+
+  const timeoutSec = timeoutMs / 1000;
+  const timeoutStr = timeoutSec % 60 === 0 ? `${timeoutSec / 60}m` : `${timeoutSec}s`;
+
+  const relRunDir = path.relative(workspace, runDir);
+  const maxOutputLen = BOX_INNER - 13; // 11 label + 2 spaces
+  const outputStr = relRunDir.length > maxOutputLen ? relRunDir.slice(0, maxOutputLen - 1) + '…' : relRunDir;
+
+  const titleLabel = 'skill-eval';
+  const dashes = '─'.repeat(BOX_INNER - titleLabel.length);
+  const top = chalk.gray('┌─ ') + chalk.bold(titleLabel) + ' ' + chalk.gray(dashes + '┐');
+  const bottom = chalk.gray('└' + '─'.repeat(BOX_INNER + 2) + '┘');
+
+  const commandPart = evalId !== undefined ? `${command}  ·  eval #${evalId}` : command;
+  const title = chalk.bold.cyan(skillName) + chalk.gray(`  ·  ${commandPart}`);
+  const runLine = `${tasks} task${tasks !== 1 ? 's' : ''}  ·  ${trials} trial${trials !== 1 ? 's' : ''}  ·  concurrency ${concurrency}`;
+
+  process.stdout.write('\n');
+  process.stdout.write(top + '\n');
+  process.stdout.write(boxLine(title) + '\n');
+  process.stdout.write(boxLine() + '\n');
+  process.stdout.write(boxLabel('agent', agent) + '\n');
+  process.stdout.write(boxLabel('run', runLine) + '\n');
+  process.stdout.write(boxLabel('timeout', timeoutStr) + '\n');
+  process.stdout.write(boxLabel('output', outputStr) + '\n');
+  process.stdout.write(bottom + '\n\n');
+}
 
 /**
  * Renders a trigger evaluation summary table and rate line to the terminal.
