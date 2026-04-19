@@ -1,8 +1,23 @@
 import chalk from 'chalk';
 import * as path from 'path';
-import { EvalSuiteReport } from '../types/index.js';
+import { EvalSuiteReport, EvalTrial } from '../types/index.js';
 import { Logger } from './logger.js';
 import { computePassAtK } from '../core/statistics.js';
+
+/**
+ * Returns a color-coded pass@1 string for a set of trials:
+ * - All errored  → yellow "Error"
+ * - Some errored → yellow "X%*"  (unreliable, partial measurement)
+ * - None errored → green  "X%"   (reliable measurement)
+ */
+function formatPassAt1(trials: EvalTrial[]): string {
+  const allError = trials.length > 0 && trials.every(t => t.isError);
+  const someError = trials.some(t => t.isError);
+  const p1 = Math.round(computePassAtK(trials, 1) * 100);
+  if (allError) return chalk.yellow('Error');
+  if (someError) return chalk.yellow(`${p1}%*`);
+  return chalk.green(`${p1}%`);
+}
 
 export interface RunHeaderConfig {
   command: 'trigger' | 'functional';
@@ -79,30 +94,34 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
 
   const tableData = numTrials > 1
     ? [['ID', 'Prompt', 'Trials', 'pass@1']]
-    : [['ID', 'Prompt', 'Status']];
+    : [['ID', 'Prompt', 'pass@1']];
+
+  let hasPartialErrors = false;
 
   for (const result of results) {
     const promptSnippet = result.prompt.substring(0, 40) + (result.prompt.length > 40 ? '...' : '');
+    const p1Cell = formatPassAt1(result.trials);
+    const someError = result.trials.some(t => t.isError);
+    const allError = result.trials.length > 0 && result.trials.every(t => t.isError);
+    if (someError && !allError) hasPartialErrors = true;
+
     if (numTrials > 1) {
       const errorCount = result.trials.filter(t => t.isError).length;
       const passedCount = result.trials.filter(t => t.trialPassed).length;
       const trialsBase = `${passedCount}/${result.trials.length}`;
       const trialsStr = errorCount > 0 ? `${trialsBase} (${errorCount}!)` : trialsBase;
       const trials = result.score === 1.0 ? chalk.green(trialsStr) : errorCount > 0 ? chalk.yellow(trialsStr) : chalk.red(trialsStr);
-      const p1 = `${Math.round(computePassAtK(result.trials, 1) * 100)}%`;
-      tableData.push([result.taskId.toString(), promptSnippet, trials, p1]);
+      tableData.push([result.taskId.toString(), promptSnippet, trials, p1Cell]);
     } else {
-      const trial = result.trials[0];
-      const status = trial?.isError
-        ? chalk.yellow('(!) ERROR')
-        : result.score === 1.0
-          ? chalk.green('✓ PASSED')
-          : chalk.red('✗ FAILED');
-      tableData.push([result.taskId.toString(), promptSnippet, status]);
+      tableData.push([result.taskId.toString(), promptSnippet, p1Cell]);
     }
   }
 
   Logger.table(tableData);
+
+  if (hasPartialErrors) {
+    Logger.write(chalk.yellow('\n   * Some trials did not complete due to infrastructure errors. pass@1 is computed over the trials that ran.'));
+  }
 
   const percentage = Math.round((metrics.passAtK || 0) * 100);
   Logger.write(`\n   Trigger Success Rate:   ${percentage}%`);
@@ -113,39 +132,35 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
  */
 export function renderFunctionalTable(report: EvalSuiteReport): void {
   const { results, metrics } = report;
-  const numTrials = metrics.numTrials || 1;
 
-  const tableData = numTrials > 1
-    ? [['ID', 'Prompt', 'W/o p@1', 'W/ p@1']]
-    : [['ID', 'Prompt', 'W/o Skill', 'W/ Skill']];
+  const tableData: string[][] = [['ID', 'Prompt', 'W/o p@1', 'W/ p@1']];
+
+  let hasPartialErrors = false;
 
   for (const result of results) {
     const promptSnippet = result.prompt.substring(0, 40) + (result.prompt.length > 40 ? '...' : '');
     const withoutSkillTrials = result.withoutSkillTrials || [];
     const withSkillTrials = result.trials;
 
-    if (numTrials > 1) {
-      const bErrorCount = withoutSkillTrials.filter(t => t.isError).length;
-      const tErrorCount = withSkillTrials.filter(t => t.isError).length;
-      const bp1 = `${Math.round(computePassAtK(withoutSkillTrials, 1) * 100)}%`;
-      const tp1 = `${Math.round(computePassAtK(withSkillTrials, 1) * 100)}%`;
-      const bColor = withoutSkillTrials.every(t => t.trialPassed) ? chalk.green : bErrorCount > 0 ? chalk.yellow : chalk.red;
-      const tColor = withSkillTrials.every(t => t.trialPassed) ? chalk.green : tErrorCount > 0 ? chalk.yellow : chalk.red;
-      tableData.push([result.taskId.toString(), promptSnippet, bColor(bp1), tColor(tp1)]);
-    } else {
-      const withoutTrial = withoutSkillTrials[0];
-      const withTrial = withSkillTrials[0];
-      const withoutSkillStatus = withoutTrial?.isError
-        ? chalk.yellow('(!) ERROR')
-        : withoutTrial?.trialPassed ? chalk.green('✓ PASSED') : chalk.red('✗ FAILED');
-      const withSkillStatus = withTrial?.isError
-        ? chalk.yellow('(!) ERROR')
-        : withTrial?.trialPassed ? chalk.green('✓ PASSED') : chalk.red('✗ FAILED');
-      tableData.push([result.taskId.toString(), promptSnippet, withoutSkillStatus, withSkillStatus]);
-    }
+    const bSomeError = withoutSkillTrials.some(t => t.isError);
+    const bAllError = withoutSkillTrials.length > 0 && withoutSkillTrials.every(t => t.isError);
+    const tSomeError = withSkillTrials.some(t => t.isError);
+    const tAllError = withSkillTrials.length > 0 && withSkillTrials.every(t => t.isError);
+    if ((bSomeError && !bAllError) || (tSomeError && !tAllError)) hasPartialErrors = true;
+
+    tableData.push([
+      result.taskId.toString(),
+      promptSnippet,
+      formatPassAt1(withoutSkillTrials),
+      formatPassAt1(withSkillTrials),
+    ]);
   }
 
   Logger.table(tableData);
+
+  if (hasPartialErrors) {
+    Logger.write(chalk.yellow('\n   * Some trials did not complete due to infrastructure errors. pass@1 is computed over the trials that ran.'));
+  }
 
   const withoutSkillPercentage = Math.round((metrics.withoutSkillPassAtK || 0) * 100);
   const withSkillPercentage = Math.round((metrics.passAtK || 0) * 100);
