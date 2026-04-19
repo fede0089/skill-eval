@@ -198,8 +198,8 @@ export class ModelBasedGrader {
       const rawJson = jsonMatch ? jsonMatch[0] : judgeText;
       const rawResults = JSON.parse(sanitizeJsonControlChars(rawJson));
       
-      return rawResults.map((r: any) => ({
-        assertion: r.assertion || r.expectation,
+      return rawResults.map((r: any, i: number) => ({
+        assertion: r.assertion || r.expectation || assertions[i] || '',
         passed: !!r.passed,
         reason: r.reason || '',
         graderType: 'model-based'

@@ -145,6 +145,8 @@ export interface NdjsonMessageEvent {
   type: 'message';
   role?: string;
   content?: string;
+  /** Present in stream-json mode (Gemini CLI). true = fragment of ongoing output. */
+  delta?: boolean;
 }
 
 export interface NdjsonResultEvent {

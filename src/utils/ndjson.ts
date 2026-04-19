@@ -27,15 +27,31 @@ export function parseNdjsonEvents(output: string): NdjsonEvent[] {
  * Returns null if no result event is present (non-stream output).
  */
 export function parseStreamResult(output: string): { error: string } | { response: string } | null {
-  const parts: string[] = [];
+  let deltaBuffer = '';
+  const completedParts: string[] = [];
   let resultEvent: NdjsonResultEvent | null = null;
 
   for (const event of parseNdjsonEvents(output)) {
     if (event.type === 'message' && event.role === 'assistant' && typeof event.content === 'string') {
-      parts.push(event.content);
+      if (event.delta) {
+        // Streaming fragment — concatenate directly, no separator
+        deltaBuffer += event.content;
+      } else {
+        // Complete message turn — flush delta buffer first, then add as a separate turn
+        if (deltaBuffer) {
+          completedParts.push(deltaBuffer);
+          deltaBuffer = '';
+        }
+        completedParts.push(event.content);
+      }
     } else if (event.type === 'result') {
       resultEvent = event;
     }
+  }
+
+  // Flush any trailing delta fragments
+  if (deltaBuffer) {
+    completedParts.push(deltaBuffer);
   }
 
   if (!resultEvent) return null;
@@ -43,6 +59,7 @@ export function parseStreamResult(output: string): { error: string } | { respons
     const msg = resultEvent.error?.message || 'Agent run failed';
     return { error: msg };
   }
-  const text = parts.join('\n').trim() || (typeof resultEvent.response === 'string' ? resultEvent.response : '');
+  const text = completedParts.join('\n').trim() ||
+    (typeof resultEvent.response === 'string' ? resultEvent.response : '');
   return { response: text };
 }

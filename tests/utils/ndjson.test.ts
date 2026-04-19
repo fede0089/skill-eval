@@ -1,6 +1,6 @@
-import { test } from 'node:test';
+import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { parseNdjsonEvents } from '../../src/utils/ndjson.js';
+import { parseNdjsonEvents, parseStreamResult } from '../../src/utils/ndjson.js';
 
 test('parseNdjsonEvents: parses a single JSON object', () => {
   const output = JSON.stringify({ type: 'result', status: 'success' });
@@ -62,4 +62,99 @@ test('parseNdjsonEvents: trims whitespace from lines', () => {
   const output = '  ' + JSON.stringify({ type: 'result' }) + '  ';
   const events = parseNdjsonEvents(output);
   assert.strictEqual(events.length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// parseStreamResult
+// ---------------------------------------------------------------------------
+
+function makeNdjson(...events: object[]): string {
+  return events.map(e => JSON.stringify(e)).join('\n');
+}
+
+describe('parseStreamResult', () => {
+  test('returns null when no result event is present', () => {
+    const input = makeNdjson({ type: 'message', role: 'assistant', content: 'hi', delta: true });
+    assert.strictEqual(parseStreamResult(input), null);
+  });
+
+  test('returns error when result status is error', () => {
+    const input = makeNdjson(
+      { type: 'message', role: 'assistant', content: 'partial', delta: true },
+      { type: 'result', status: 'error', error: { message: 'quota exceeded' } }
+    );
+    const result = parseStreamResult(input);
+    assert.deepStrictEqual(result, { error: 'quota exceeded' });
+  });
+
+  test('returns generic error message when error object lacks message', () => {
+    const input = makeNdjson({ type: 'result', status: 'error' });
+    const result = parseStreamResult(input);
+    assert.deepStrictEqual(result, { error: 'Agent run failed' });
+  });
+
+  test('single delta fragment is returned as-is', () => {
+    const input = makeNdjson(
+      { type: 'message', role: 'assistant', content: 'Hello world', delta: true },
+      { type: 'result', status: 'success' }
+    );
+    const result = parseStreamResult(input);
+    assert.deepStrictEqual(result, { response: 'Hello world' });
+  });
+
+  test('multiple delta fragments are concatenated WITHOUT separator', () => {
+    // Simulates the bug: a JSON key split across two delta events
+    const input = makeNdjson(
+      { type: 'message', role: 'assistant', content: '{"passed"', delta: true },
+      { type: 'message', role: 'assistant', content: ': true}', delta: true },
+      { type: 'result', status: 'success' }
+    );
+    const result = parseStreamResult(input);
+    assert.deepStrictEqual(result, { response: '{"passed": true}' });
+  });
+
+  test('multiple non-delta messages are joined with newline', () => {
+    const input = makeNdjson(
+      { type: 'message', role: 'assistant', content: 'first' },
+      { type: 'message', role: 'assistant', content: 'second' },
+      { type: 'result', status: 'success' }
+    );
+    const result = parseStreamResult(input);
+    assert.deepStrictEqual(result, { response: 'first\nsecond' });
+  });
+
+  test('delta sequence followed by non-delta flushes buffer then adds newline', () => {
+    const input = makeNdjson(
+      { type: 'message', role: 'assistant', content: 'part1', delta: true },
+      { type: 'message', role: 'assistant', content: 'part2', delta: true },
+      { type: 'message', role: 'assistant', content: 'complete turn' },
+      { type: 'result', status: 'success' }
+    );
+    const result = parseStreamResult(input);
+    assert.deepStrictEqual(result, { response: 'part1part2\ncomplete turn' });
+  });
+
+  test('falls back to result.response when no message events present', () => {
+    const input = makeNdjson({ type: 'result', status: 'success', response: 'fallback text' });
+    const result = parseStreamResult(input);
+    assert.deepStrictEqual(result, { response: 'fallback text' });
+  });
+
+  test('ignores messages with role other than assistant', () => {
+    const input = makeNdjson(
+      { type: 'message', role: 'user', content: 'user message', delta: false },
+      { type: 'result', status: 'success', response: 'fallback' }
+    );
+    const result = parseStreamResult(input);
+    assert.deepStrictEqual(result, { response: 'fallback' });
+  });
+
+  test('trims leading/trailing whitespace from assembled response', () => {
+    const input = makeNdjson(
+      { type: 'message', role: 'assistant', content: '  trimmed  ', delta: true },
+      { type: 'result', status: 'success' }
+    );
+    const result = parseStreamResult(input);
+    assert.deepStrictEqual(result, { response: 'trimmed' });
+  });
 });
