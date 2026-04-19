@@ -80,6 +80,12 @@ export class ListrEvalUI {
           { length: numTrials },
           () => () => {}
         );
+        const titleSetters: Array<(s: string) => void> = Array.from(
+          { length: numTrials },
+          () => () => {}
+        );
+        const titleSetterReady: boolean[] = new Array(numTrials).fill(false);
+        const pendingTitle: Array<string | undefined> = new Array(numTrials).fill(undefined);
         const trialDone: boolean[] = new Array(numTrials).fill(false);
 
         const subtasks = Array.from({ length: numTrials }, (_, idx) => {
@@ -96,6 +102,14 @@ export class ListrEvalUI {
               outputSetters[idx] = (s: string) => {
                 subtask.output = s;
               };
+              titleSetters[idx] = (s: string) => {
+                subtask.title = s;
+              };
+              titleSetterReady[idx] = true;
+              if (pendingTitle[idx] !== undefined) {
+                subtask.title = pendingTitle[idx]!;
+                pendingTitle[idx] = undefined;
+              }
               await promise;
             }
           };
@@ -106,7 +120,12 @@ export class ListrEvalUI {
             updateLog: (log: string) => {
               const i = trialId - 1;
               if (trialDone[i]) return;
-              outputSetters[i](sanitizeLog(log));
+              const title = `Trial ${trialId} — ${sanitizeLog(log)}`;
+              if (titleSetterReady[i]) {
+                titleSetters[i](title);
+              } else {
+                pendingTitle[i] = title;
+              }
             }
           }),
           markTrialComplete: (trialId: number, passed: boolean, failureReason?: string, isError?: boolean) => {
@@ -114,9 +133,15 @@ export class ListrEvalUI {
             if (trialDone[i]) return;
             trialDone[i] = true;
             if (passed) {
+              titleSetters[i](`Trial ${trialId} — passed`);
               deferreds[i].resolve();
             } else {
-              if (isError) outputSetters[i]('(!) ERROR');
+              if (isError) {
+                titleSetters[i](`Trial ${trialId} — error`);
+                outputSetters[i]('(!) ERROR');
+              } else {
+                titleSetters[i](`Trial ${trialId} — failed`);
+              }
               deferreds[i].reject(new Error(''));
             }
           }
