@@ -30,6 +30,10 @@ export class GeminiCliRunner implements AgentRunner {
       let stdout = '';
       let stderr = '';
       let resolved = false;
+      let logStreamEnded = false;
+
+      type TerminationReason = 'timeout' | 'interactive-prompt' | 'error' | 'normal';
+      let terminationReason: TerminationReason = 'normal';
 
       // Matches interactive Y/N prompts only when they appear at the end of a chunk
       // (optionally followed by ": " or whitespace), indicating the process is waiting
@@ -43,12 +47,16 @@ export class GeminiCliRunner implements AgentRunner {
           resolved = true;
           clearTimeout(timeout);
           child.kill('SIGKILL');
+          terminationReason = 'interactive-prompt';
           if (logStream) {
             logStream.write('\n\n--- Gemini CLI blocked on interactive prompt — killed ---\n');
             logStream.write(`--- Triggering text: ${JSON.stringify(chunk)} ---\n`);
             if (stderr) {
               logStream.write(`--- Stderr at time of kill ---\n${stderr}\n--- End stderr ---\n`);
             }
+            // End the stream here so the log is fully flushed before resolving.
+            // logStreamEnded prevents child.on('close') from double-ending it.
+            logStreamEnded = true;
             logStream.end(() => {
               resolve({ error: 'Gemini CLI blocked on interactive prompt', raw_output: stderr });
             });
@@ -96,10 +104,8 @@ export class GeminiCliRunner implements AgentRunner {
         if (!resolved) {
           resolved = true;
           child.kill('SIGKILL');
-          if (logStream) {
-            logStream.write('\n\n--- Gemini CLI process timed out ---\n');
-            logStream.end();
-          }
+          terminationReason = 'timeout';
+          // logStream is finalized (marker + stderr + end) in child.on('close')
           const timeoutSec = timeoutMs / 1000;
           Logger.error(`\nGemini CLI process timed out after ${timeoutSec} seconds.`);
           resolve({ error: `Process timeout exceeded (${timeoutSec} seconds)`, raw_output: stderr });
@@ -132,7 +138,9 @@ export class GeminiCliRunner implements AgentRunner {
           const chunk = data.toString();
           if (killOnInteractivePrompt(chunk)) return;
           stdout += chunk;
-          if (logStream) logStream.write(chunk);
+          // Guard against write-after-end: if an interactive prompt on stderr killed the
+          // process, logStreamEnded is already true while buffered stdout chunks drain.
+          if (logStream && !logStreamEnded) logStream.write(chunk);
         });
         child.stdout.on('end', () => {
           stdoutDone = true;
@@ -168,20 +176,28 @@ export class GeminiCliRunner implements AgentRunner {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeout);
-          if (logStream) {
-            logStream.write(`\n\n--- Error starting Gemini CLI: ${err.message} ---\n`);
-            logStream.end();
-          }
+          terminationReason = 'error';
+          // logStream is finalized (marker + stderr + end) in child.on('close')
           Logger.error(`Failed to start gemini CLI. Error: ${err.message}`);
           resolve(null);
         }
       });
 
       child.on('close', (code) => {
-        if (logStream) {
-          logStream.write(`\n\n--- Gemini CLI exited with status ${code} ---\n`);
-          if (code !== 0 && stderr) {
-            logStream.write(`--- Stderr ---\n${stderr}\n--- End Stderr ---\n`);
+        if (logStream && !logStreamEnded) {
+          logStreamEnded = true;
+          if (terminationReason === 'timeout') {
+            logStream.write('\n\n--- Gemini CLI process timed out ---\n');
+            if (stderr) logStream.write(`--- Stderr ---\n${stderr}\n--- End Stderr ---\n`);
+          } else if (terminationReason === 'error') {
+            logStream.write('\n\n--- Error starting Gemini CLI ---\n');
+            if (stderr) logStream.write(`--- Stderr ---\n${stderr}\n--- End Stderr ---\n`);
+          } else {
+            // 'normal' exit (interactive-prompt is excluded by the !logStreamEnded guard above)
+            logStream.write(`\n\n--- Gemini CLI exited with status ${code} ---\n`);
+            if (code !== 0 && stderr) {
+              logStream.write(`--- Stderr ---\n${stderr}\n--- End Stderr ---\n`);
+            }
           }
           logStream.end();
         }
