@@ -42,7 +42,7 @@ test('ModelBasedGrader.gradeModelBased uses the injected judgeRunner', async () 
   assert.strictEqual(runPromptCalls, 1, 'Should call judgeRunner.runPrompt exactly once');
 });
 
-test('ModelBasedGrader.gradeModelBased returns failed results when judge returns no response', async () => {
+test('ModelBasedGrader.gradeModelBased throws when judge returns no response (null)', async () => {
   const judgeRunner: AgentRunner = {
     skillDispatchToolName: 'activate_skill',
     runPrompt: mock.fn(async () => null),
@@ -51,17 +51,69 @@ test('ModelBasedGrader.gradeModelBased returns failed results when judge returns
   };
 
   const grader = new ModelBasedGrader('mock-skill', judgeRunner);
-  const results = await grader.gradeModelBased(
-    'Generate a license',
-    { response: 'done' },
-    ['Output contains LICENSE'],
-    'No changes',
-    undefined, undefined, undefined
+  await assert.rejects(
+    () => grader.gradeModelBased(
+      'Generate a license',
+      { response: 'done' },
+      ['Output contains LICENSE'],
+      'No changes',
+      undefined, undefined, undefined
+    ),
+    (err: Error) => {
+      assert.ok(err.message.includes('Judge agent failed'), `Unexpected message: ${err.message}`);
+      return true;
+    }
   );
+});
 
-  assert.strictEqual(results.length, 1);
-  assert.strictEqual(results[0].passed, false);
-  assert.ok(results[0].reason.includes('failed to produce'), `Unexpected reason: ${results[0].reason}`);
+test('ModelBasedGrader.gradeModelBased throws when judge runner returns an error', async () => {
+  const judgeRunner: AgentRunner = {
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ error: 'Gemini CLI blocked on interactive prompt', raw_output: '' })),
+    linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
+  };
+
+  const grader = new ModelBasedGrader('mock-skill', judgeRunner);
+  await assert.rejects(
+    () => grader.gradeModelBased(
+      'Generate a license',
+      { response: 'done' },
+      ['Output contains LICENSE'],
+      'No changes',
+      undefined, undefined, undefined
+    ),
+    (err: Error) => {
+      assert.ok(err.message.includes('Judge agent failed'), `Unexpected message: ${err.message}`);
+      assert.ok(err.message.includes('interactive prompt'), `Should include original error: ${err.message}`);
+      return true;
+    }
+  );
+});
+
+test('ModelBasedGrader.gradeModelBased throws when judge stream result has an error', async () => {
+  const ndjsonError = JSON.stringify({ type: 'result', status: 'error', error: { message: 'quota exceeded' } });
+  const judgeRunner: AgentRunner = {
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: ndjsonError, raw_output: '' })),
+    linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
+  };
+
+  const grader = new ModelBasedGrader('mock-skill', judgeRunner);
+  await assert.rejects(
+    () => grader.gradeModelBased(
+      'Generate a license',
+      { response: 'done' },
+      ['Output contains LICENSE'],
+      'No changes',
+      undefined, undefined, undefined
+    ),
+    (err: Error) => {
+      assert.ok(err.message.includes('Judge agent failed'), `Unexpected message: ${err.message}`);
+      return true;
+    }
+  );
 });
 
 test('ModelBasedGrader.gradeModelBased returns empty array for empty assertions', async () => {

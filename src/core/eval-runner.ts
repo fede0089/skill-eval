@@ -18,6 +18,7 @@ export interface EvalRunOptions {
   isBaseline?: boolean;
   debug?: boolean;
   timeoutMs?: number;
+  judgeRetryDelayMs?: number;
 }
 
 
@@ -202,15 +203,49 @@ export class EvalRunner {
           const streamResult = parseStreamResult(transcript.response || '');
           const streamText = streamResult && 'response' in streamResult ? streamResult.response : '';
           const gradingTranscript = streamText ? { ...transcript, response: streamText } : transcript;
-          assertionResults = await this.functionalGrader.gradeModelBased(
-            task.prompt,
-            gradingTranscript,
-            task.assertions,
-            context,
-            (log) => { uiCtx.updateLog(`Grading: ${log}`); },
-            logPath,
-            worktreePath
-          );
+
+          // Retry only the judge on infrastructure failures (timeout, interactive prompt, etc.).
+          // The agent has already run successfully — no need to re-run it.
+          const MAX_JUDGE_RETRIES = 2;
+          const judgeDelayMs = this.options.judgeRetryDelayMs ?? 1000;
+          let lastJudgeError: Error | null = null;
+          for (let judgeAttempt = 0; judgeAttempt <= MAX_JUDGE_RETRIES; judgeAttempt++) {
+            if (judgeAttempt > 0) {
+              uiCtx.updateLog(`Judge error, retrying (${judgeAttempt}/${MAX_JUDGE_RETRIES})…`);
+              await new Promise(r => setTimeout(r, judgeDelayMs * Math.pow(2, judgeAttempt - 1)));
+            }
+            try {
+              assertionResults = await this.functionalGrader.gradeModelBased(
+                task.prompt,
+                gradingTranscript,
+                task.assertions,
+                context,
+                (log) => { uiCtx.updateLog(`Grading: ${log}`); },
+                logPath,
+                worktreePath
+              );
+              lastJudgeError = null;
+              break;
+            } catch (e) {
+              lastJudgeError = e instanceof Error ? e : new Error(String(e));
+            }
+          }
+
+          if (lastJudgeError) {
+            // Judge exhausted all retries — return an inconclusive failure.
+            // isError is intentionally NOT set so the outer withRetry does not
+            // re-run the expensive agent for a judge infrastructure issue.
+            const reason = lastJudgeError.message;
+            return {
+              id: trialId,
+              transcript: transcript || { error: 'No transcript produced' },
+              assertionResults: task.assertions.map(a => ({
+                assertion: a, passed: false, reason, graderType: 'model-based' as const
+              })),
+              trialPassed: false
+            };
+          }
+
           trialPassed = assertionResults.every(r => r.passed);
         } else {
           trialPassed = true;

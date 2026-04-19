@@ -167,14 +167,13 @@ export class ModelBasedGrader {
     const judgePrompt = this.buildJudgePrompt(prompt, transcript.response || '', assertions, workspaceContext);
 
     const judgeRawOutput = await this.judgeRunner.runPrompt(judgePrompt, worktreePath, onLog, logPath);
-    
+
     if (!judgeRawOutput) {
-      return assertions.map(a => ({
-        assertion: a,
-        passed: false,
-        reason: 'Judge agent failed to produce any output.',
-        graderType: 'model-based'
-      }));
+      throw new Error('Judge agent failed: no output produced');
+    }
+
+    if (judgeRawOutput.error) {
+      throw new Error(`Judge agent failed: ${judgeRawOutput.error}`);
     }
 
     // Extract clean assistant text from the stream-json NDJSON output,
@@ -183,13 +182,8 @@ export class ModelBasedGrader {
     if (!judgeStreamResult || 'error' in judgeStreamResult) {
       const errorMsg = judgeStreamResult && 'error' in judgeStreamResult
         ? judgeStreamResult.error
-        : (judgeRawOutput.error || 'No result event in judge output');
-      return assertions.map(a => ({
-        assertion: a,
-        passed: false,
-        reason: `Judge agent failed: ${errorMsg}`,
-        graderType: 'model-based'
-      }));
+        : 'No result event in judge output';
+      throw new Error(`Judge agent failed: ${errorMsg}`);
     }
     const judgeText = judgeStreamResult.response;
 

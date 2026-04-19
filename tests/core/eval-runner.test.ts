@@ -309,6 +309,86 @@ test('withRetry passes attempt number 0, 1, 2 to fn and stops on success', async
   assert.strictEqual(result.trialPassed, true, 'Should return successful result');
 });
 
+// ── Judge retry ──────────────────────────────────────────────────────────────
+
+test('EvalRunner.runFunctionalTask retries only the judge when gradeModelBased throws, succeeds on second attempt', async () => {
+  let runPromptCallCount = 0;
+  const skillLog = skillActivationLog('t1', true);
+  const judgeResponse = JSON.stringify([{ assertion: 'test', passed: true, reason: 'ok' }]);
+  const ndjsonJudgeResponse = `${JSON.stringify({ type: 'message', role: 'assistant', content: judgeResponse })}\n${JSON.stringify({ type: 'result', status: 'success' })}`;
+
+  mock.method(RunnerFactory, 'create', () => ({
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => {
+      runPromptCallCount++;
+      if (runPromptCallCount === 1) {
+        // Agent call — success with skill activation
+        return { response: 'ok', raw_output: skillLog };
+      } else if (runPromptCallCount === 2) {
+        // Judge call attempt 0 — infrastructure failure
+        return { error: 'Gemini CLI blocked on interactive prompt', raw_output: '' };
+      } else {
+        // Judge call attempt 1 — success
+        return { response: ndjsonJudgeResponse, raw_output: '' };
+      }
+    }),
+    linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
+  }));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false, judgeRetryDelayMs: 0
+  });
+
+  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
+  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+
+  const result = await runner.runFunctionalTask({ id: 30, prompt: 'test', assertions: ['test'] }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.trialPassed, true, 'Trial should pass after judge retry succeeds');
+  assert.strictEqual(result.isError, undefined, 'isError should not be set when judge eventually succeeds');
+  assert.strictEqual(runPromptCallCount, 3, 'Agent called once, judge called twice (1 fail + 1 success)');
+});
+
+test('EvalRunner.runFunctionalTask returns inconclusive failure (isError unset) when judge exhausts all retries', async () => {
+  let runPromptCallCount = 0;
+  const skillLog = skillActivationLog('t1', true);
+
+  mock.method(RunnerFactory, 'create', () => ({
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => {
+      runPromptCallCount++;
+      if (runPromptCallCount === 1) {
+        // Agent call — success
+        return { response: 'ok', raw_output: skillLog };
+      }
+      // All judge calls — infrastructure failure
+      return { error: 'Gemini CLI blocked on interactive prompt', raw_output: '' };
+    }),
+    linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
+  }));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false, judgeRetryDelayMs: 0
+  });
+
+  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
+  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+
+  const result = await runner.runFunctionalTask({ id: 31, prompt: 'test', assertions: ['test'] }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.trialPassed, false, 'Trial should fail when judge is exhausted');
+  assert.ok(!result.isError, 'isError should NOT be set — outer withRetry must not re-run the agent for a judge failure');
+  assert.ok(result.assertionResults[0].reason.includes('Judge agent failed'), `Expected judge error reason, got: ${result.assertionResults[0].reason}`);
+  // Agent called once, judge called 3 times (MAX_JUDGE_RETRIES=2 → attempts 0,1,2)
+  assert.strictEqual(runPromptCallCount, 4, 'Agent called once, judge called 3 times (initial + 2 retries)');
+});
+
 // ── Runner config (evals/config/<agent>/) ───────────────────────────────────
 
 test('EvalRunner.runTriggerTask copies evals/config/gemini-cli/ into worktree .gemini/', async () => {
