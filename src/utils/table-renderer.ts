@@ -78,7 +78,7 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
   const numTrials = metrics.numTrials || 1;
 
   const tableData = numTrials > 1
-    ? [['ID', 'Prompt', 'Trials', 'pass@1', `pass@${numTrials}`]]
+    ? [['ID', 'Prompt', 'Trials', 'pass@1']]
     : [['ID', 'Prompt', 'Status']];
 
   for (const result of results) {
@@ -90,8 +90,7 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
       const trialsStr = errorCount > 0 ? `${trialsBase} (${errorCount}!)` : trialsBase;
       const trials = result.score === 1.0 ? chalk.green(trialsStr) : errorCount > 0 ? chalk.yellow(trialsStr) : chalk.red(trialsStr);
       const p1 = `${Math.round(computePassAtK(result.trials, 1) * 100)}%`;
-      const pn = `${Math.round(computePassAtK(result.trials, numTrials) * 100)}%`;
-      tableData.push([result.taskId.toString(), promptSnippet, trials, p1, pn]);
+      tableData.push([result.taskId.toString(), promptSnippet, trials, p1]);
     } else {
       const trial = result.trials[0];
       const status = trial?.isError
@@ -106,10 +105,7 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
   Logger.table(tableData);
 
   const percentage = Math.round((metrics.passAtK || 0) * 100);
-  const triggerRateLine = numTrials > 1
-    ? `\n   Trigger Success Rate:   pass@1: ${percentage}%   pass@${numTrials}: ${Math.round((metrics.passAtN || 0) * 100)}%`
-    : `\n   Trigger Success Rate:   ${percentage}%`;
-  Logger.write(triggerRateLine);
+  Logger.write(`\n   Trigger Success Rate:   ${percentage}%`);
 }
 
 /**
@@ -120,7 +116,7 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
   const numTrials = metrics.numTrials || 1;
 
   const tableData = numTrials > 1
-    ? [['ID', 'Prompt', 'W/o p@1', `W/o p@${numTrials}`, 'W/ p@1', `W/ p@${numTrials}`]]
+    ? [['ID', 'Prompt', 'W/o p@1', 'W/ p@1']]
     : [['ID', 'Prompt', 'W/o Skill', 'W/ Skill']];
 
   for (const result of results) {
@@ -132,12 +128,10 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
       const bErrorCount = withoutSkillTrials.filter(t => t.isError).length;
       const tErrorCount = withSkillTrials.filter(t => t.isError).length;
       const bp1 = `${Math.round(computePassAtK(withoutSkillTrials, 1) * 100)}%`;
-      const bpn = `${Math.round(computePassAtK(withoutSkillTrials, numTrials) * 100)}%`;
       const tp1 = `${Math.round(computePassAtK(withSkillTrials, 1) * 100)}%`;
-      const tpn = `${Math.round(computePassAtK(withSkillTrials, numTrials) * 100)}%`;
       const bColor = withoutSkillTrials.every(t => t.trialPassed) ? chalk.green : bErrorCount > 0 ? chalk.yellow : chalk.red;
       const tColor = withSkillTrials.every(t => t.trialPassed) ? chalk.green : tErrorCount > 0 ? chalk.yellow : chalk.red;
-      tableData.push([result.taskId.toString(), promptSnippet, bColor(bp1), bColor(bpn), tColor(tp1), tColor(tpn)]);
+      tableData.push([result.taskId.toString(), promptSnippet, bColor(bp1), tColor(tp1)]);
     } else {
       const withoutTrial = withoutSkillTrials[0];
       const withTrial = withSkillTrials[0];
@@ -156,13 +150,6 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
   const withoutSkillPercentage = Math.round((metrics.withoutSkillPassAtK || 0) * 100);
   const withSkillPercentage = Math.round((metrics.passAtK || 0) * 100);
 
-  const withoutSkillRateLine = numTrials > 1
-    ? `\n   Without Skill Rate:   pass@1: ${withoutSkillPercentage}%   pass@${numTrials}: ${Math.round((metrics.withoutSkillPassAtN || 0) * 100)}%`
-    : `\n   Without Skill Rate:   ${withoutSkillPercentage}%`;
-  const withSkillRateLine = numTrials > 1
-    ? `   With Skill Rate:      pass@1: ${withSkillPercentage}%   pass@${numTrials}: ${Math.round((metrics.passAtN || 0) * 100)}%`
-    : `   With Skill Rate:      ${withSkillPercentage}%`;
-
-  Logger.write(withoutSkillRateLine);
-  Logger.write(`\n${withSkillRateLine}`);
+  Logger.write(`\n   Without Skill Rate:   ${withoutSkillPercentage}%`);
+  Logger.write(`\n   With Skill Rate:      ${withSkillPercentage}%`);
 }

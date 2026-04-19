@@ -94,6 +94,28 @@ test('withRetry stops retrying as soon as a non-error result is returned', async
   assert.strictEqual(result.trialPassed, false);
 });
 
+test('withRetry calls onRetry before each retry with next attempt number and last trial', async () => {
+  const retryLog: Array<{ attempt: number; trialId: number }> = [];
+  let callCount = 0;
+  const fn = async () => {
+    callCount++;
+    return makeTrial({ isError: true, id: callCount });
+  };
+  await withRetry(fn, 2, 0, (attempt, lastTrial) => {
+    retryLog.push({ attempt, trialId: lastTrial.id });
+  });
+  assert.deepStrictEqual(retryLog, [
+    { attempt: 1, trialId: 1 },
+    { attempt: 2, trialId: 2 }
+  ], 'onRetry should be called twice, with attempt 1 and 2, carrying the last failed trial');
+});
+
+test('withRetry does not call onRetry on the last exhausted attempt', async () => {
+  let retryCalls = 0;
+  await withRetry(async () => makeTrial({ isError: true }), 2, 0, () => { retryCalls++; });
+  assert.strictEqual(retryCalls, 2, 'onRetry fires before attempt 1 and 2, but not after the last failure');
+});
+
 // ── padAbortedTrials ─────────────────────────────────────────────────────────
 
 test('padAbortedTrials pads up to targetCount with isError:true trials', () => {

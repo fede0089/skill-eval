@@ -59,23 +59,11 @@ function renderMetricsCards(report: EvalSuiteReport): string {
     const upliftRaw = parseInt(metrics.skillUplift ?? '0', 10);
     const upliftClass = upliftRaw > 0 ? 'green' : upliftRaw < 0 ? 'red' : 'amber';
     cards.push(renderCard('Without Skill p@1', formatPercent(bk), passColorClass(bk)));
-    if (numTrials > 1) {
-      const bn = metrics.withoutSkillPassAtN ?? 0;
-      cards.push(renderCard(`Without Skill p@${numTrials}`, formatPercent(bn), passColorClass(bn)));
-    }
     cards.push(renderCard('With Skill p@1', formatPercent(tk), passColorClass(tk)));
-    if (numTrials > 1) {
-      const tn = metrics.passAtN ?? 0;
-      cards.push(renderCard(`With Skill p@${numTrials}`, formatPercent(tn), passColorClass(tn)));
-    }
     cards.push(renderCard('Skill Uplift', escapeHtml(metrics.skillUplift ?? '0%'), upliftClass));
   } else {
     const k = metrics.passAtK ?? 0;
     cards.push(renderCard('pass@1', formatPercent(k), passColorClass(k)));
-    if (numTrials > 1) {
-      const n = metrics.passAtN ?? 0;
-      cards.push(renderCard(`pass@${numTrials}`, formatPercent(n), passColorClass(n)));
-    }
     cards.push(renderCard('Tasks passed', `${metrics.passedCount}/${metrics.totalCount}`, passColorClass(metrics.passedCount / Math.max(metrics.totalCount, 1))));
   }
 
@@ -185,7 +173,7 @@ function renderTaskTable(report: EvalSuiteReport): string {
   const headerCells = functional
     ? ['#', 'Prompt', 'W/o p@1', 'W/ p@1', 'Details']
     : numTrials > 1
-      ? ['#', 'Prompt', 'pass@1', `pass@${numTrials}`, 'Details']
+      ? ['#', 'Prompt', 'pass@1', 'Details']
       : ['#', 'Prompt', 'Status', 'Details'];
 
   const headerRow = `<tr>${headerCells.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>`;
@@ -202,9 +190,7 @@ function renderTaskTable(report: EvalSuiteReport): string {
       statCells = `<td class="${passColorClass(bp1 / 100)}">${bp1}%</td><td class="${passColorClass(tp1 / 100)}">${tp1}%</td>`;
     } else if (numTrials > 1) {
       const p1 = Math.round((trials.filter(t => t.trialPassed).length / Math.max(trials.length, 1)) * 100);
-      const passed = trials.filter(t => t.trialPassed).length;
-      const pn = trials.length > 0 ? Math.round((passed / trials.length) * 100) : 0;
-      statCells = `<td class="${passColorClass(p1 / 100)}">${p1}%</td><td class="${passColorClass(pn / 100)}">${pn}%</td>`;
+      statCells = `<td class="${passColorClass(p1 / 100)}">${p1}%</td>`;
     } else {
       const trial = trials[0];
       if (trial?.isError) {

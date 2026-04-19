@@ -72,7 +72,7 @@ test('renderTriggerTable: uses pass@k columns for multi-trial reports', () => {
   renderTriggerTable(makeTriggerReport(3));
 
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
-  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'Trials', 'pass@1', 'pass@3'], 'Header should have pass@k columns');
+  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'Trials', 'pass@1'], 'Header should have pass@1 column');
 
   mock.reset();
 });

@@ -15,11 +15,16 @@ export function isTrialError(trial: EvalTrial): boolean {
  * A successful judge verdict (pass OR fail) stops retrying immediately.
  *
  * Delays: attempt 1 → baseDelayMs, attempt 2 → baseDelayMs * 2
+ *
+ * @param onRetry Optional callback fired after an error result, before the next attempt.
+ *                Receives the upcoming attempt number (1-based) and the failed trial.
+ *                Use it to surface retry progress in the UI.
  */
 export async function withRetry(
   fn: (attempt: number) => Promise<EvalTrial>,
   maxRetries = 2,
-  baseDelayMs = 1000
+  baseDelayMs = 1000,
+  onRetry?: (attempt: number, lastTrial: EvalTrial) => void
 ): Promise<EvalTrial> {
   let last: EvalTrial | undefined;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -28,6 +33,7 @@ export async function withRetry(
     }
     last = await fn(attempt);
     if (!isTrialError(last)) return last;
+    if (attempt < maxRetries) onRetry?.(attempt + 1, last);
   }
   return last!;
 }

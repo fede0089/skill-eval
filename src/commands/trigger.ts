@@ -87,19 +87,26 @@ export async function triggerCommand(
             Array.from({ length: numTrials }, (_, idx) => {
               const trialId = idx + 1;
               const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
-              return withRetry((attempt) =>
-                runner.runTriggerTask(task, i, trialId, trialCtx, attempt)
-                  .catch((error): EvalTrial => ({
-                    id: trialId,
-                    transcript: { error: error instanceof Error ? error.message : String(error) },
-                    assertionResults: [{
-                      assertion: 'Runner Execution',
-                      passed: false,
-                      reason: error instanceof Error ? error.message : String(error)
-                    }],
-                    trialPassed: false,
-                    isError: true
-                  }))
+              return withRetry(
+                (attempt) =>
+                  runner.runTriggerTask(task, i, trialId, trialCtx, attempt)
+                    .catch((error): EvalTrial => ({
+                      id: trialId,
+                      transcript: { error: error instanceof Error ? error.message : String(error) },
+                      assertionResults: [{
+                        assertion: 'Runner Execution',
+                        passed: false,
+                        reason: error instanceof Error ? error.message : String(error)
+                      }],
+                      trialPassed: false,
+                      isError: true
+                    })),
+                2,
+                1000,
+                (nextAttempt, lastTrial) => {
+                  const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
+                  trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
+                }
               ).then(trial => {
                   if (multi) {
                     const reason = trial.assertionResults.find(r => !r.passed)?.reason;
@@ -137,7 +144,7 @@ export async function triggerCommand(
     await ui.run(concurrency);
 
     // Compute aggregate metrics and build report
-    const { passAtK, passAtN } = aggregatePassAtK(taskResults, numTrials, r => r.trials);
+    const { passAtK } = aggregatePassAtK(taskResults, numTrials, r => r.trials);
     const percentage = Math.round(passAtK * 100);
 
     const report: EvalSuiteReport = {
@@ -149,8 +156,7 @@ export async function triggerCommand(
         passedCount: tasksPassedCount,
         totalCount: tasks.length,
         numTrials,
-        passAtK: Math.round(passAtK * 1000) / 1000,
-        passAtN: Math.round(passAtN * 1000) / 1000
+        passAtK: Math.round(passAtK * 1000) / 1000
       },
       results: taskResults
     };
