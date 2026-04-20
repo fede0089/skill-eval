@@ -6,7 +6,7 @@ import { RunnerFactory, AgentRunner } from '../runners/index.js';
 import { AgentTranscript, EvalTask, EvalTrial, AssertionResult } from '../types/index.js';
 import { TriggerGrader, ModelBasedGrader } from './evaluator.js';
 import { EvalTaskContext } from '../utils/ui.js';
-import { parseNdjsonEvents, parseStreamResult } from '../utils/ndjson.js';
+import { parseNdjsonEvents, parseStreamResult, parseTokenStats } from '../utils/ndjson.js';
 import { Logger } from '../utils/logger.js';
 
 export interface EvalRunOptions {
@@ -74,6 +74,11 @@ export class EvalRunner {
       }
     }
 
+    // Extract token stats from the agent's NDJSON stream (never from the judge).
+    const tokenStats = transcript
+      ? parseTokenStats(transcript.response || '') ?? undefined
+      : undefined;
+
     let triggered = false;
     const assertionResults: AssertionResult[] = [];
 
@@ -99,7 +104,8 @@ export class EvalRunner {
         transcript: transcript || { error: 'No transcript produced' },
         assertionResults,
         trialPassed: false,
-        isError: true
+        isError: true,
+        tokenStats
       };
     }
 
@@ -107,7 +113,8 @@ export class EvalRunner {
       id: trialId,
       transcript: transcript || { error: 'No transcript produced' },
       assertionResults: assertionResults,
-      trialPassed: triggered
+      trialPassed: triggered,
+      tokenStats
     };
   }
 
@@ -155,6 +162,11 @@ export class EvalRunner {
         }
       }
 
+      // Extract token stats from the agent's NDJSON stream (never from the judge).
+      const tokenStats = transcript
+        ? parseTokenStats(transcript.response || '') ?? undefined
+        : undefined;
+
       if (transcript && !transcript.error) {
         if (isBaseline && this.triggerGrader.detectSkillAttempt(transcript)) {
           return {
@@ -166,7 +178,8 @@ export class EvalRunner {
               reason: `Invalid Without Skill: '${this.options.skillName}' activation detected during without-skill run`,
               graderType: 'programmatic'
             }],
-            trialPassed: false
+            trialPassed: false,
+            tokenStats
           };
         }
         if (!isBaseline && !this.triggerGrader.gradeTrigger(transcript)) {
@@ -179,7 +192,8 @@ export class EvalRunner {
               reason: `Invalid With Skill: '${this.options.skillName}' was not successfully activated`,
               graderType: 'programmatic'
             }],
-            trialPassed: false
+            trialPassed: false,
+            tokenStats
           };
         }
 
@@ -242,7 +256,8 @@ export class EvalRunner {
               assertionResults: task.assertions.map(a => ({
                 assertion: a, passed: false, reason, graderType: 'model-based' as const
               })),
-              trialPassed: false
+              trialPassed: false,
+              tokenStats
             };
           }
 
@@ -255,7 +270,8 @@ export class EvalRunner {
           id: trialId,
           transcript: transcript || { error: 'No transcript produced' },
           assertionResults: assertionResults,
-          trialPassed
+          trialPassed,
+          tokenStats
         };
       } else {
         const errorMsg = transcript?.error || 'Error: No transcript was produced';
@@ -273,7 +289,8 @@ export class EvalRunner {
           transcript: { error: transcript?.error || 'No transcript produced' },
           assertionResults,
           trialPassed: false,
-          isError: true
+          isError: true,
+          tokenStats
         };
       }
     } catch (e) {

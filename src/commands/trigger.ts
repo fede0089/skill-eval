@@ -7,7 +7,7 @@ import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
 import { AgentPool } from '../core/agent-pool.js';
-import { aggregatePassAtK } from '../core/statistics.js';
+import { aggregatePassAtK, aggregateTokenStats } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderTriggerTable, renderRunHeader } from '../utils/table-renderer.js';
@@ -161,6 +161,8 @@ export async function triggerCommand(
     const { passAtK } = aggregatePassAtK(taskResults, numTrials, r => r.trials);
     const percentage = Math.round(passAtK * 100);
 
+    const withSkillTokenStats = aggregateTokenStats(taskResults.flatMap(r => r.trials)) ?? undefined;
+
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
       skill_name,
@@ -170,7 +172,8 @@ export async function triggerCommand(
         passedCount: tasksPassedCount,
         totalCount: tasks.length,
         numTrials,
-        passAtK: Math.round(passAtK * 1000) / 1000
+        passAtK: Math.round(passAtK * 1000) / 1000,
+        tokenStats: withSkillTokenStats ? { withSkill: withSkillTokenStats } : undefined
       },
       results: taskResults
     };

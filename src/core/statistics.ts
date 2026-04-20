@@ -1,4 +1,4 @@
-import { EvalTrial, TaskResult } from '../types/index.js';
+import { AggregatedTokenStats, EvalTrial, TaskResult } from '../types/index.js';
 
 /**
  * Computes the pass rate (pass@1) for a set of trials.
@@ -26,5 +26,23 @@ export function aggregatePassAtK(
   if (results.length === 0) return { passAtK: 0 };
   return {
     passAtK: results.reduce((sum, r) => sum + computePassAtK(trialSelector(r)), 0) / results.length
+  };
+}
+
+/**
+ * Computes average token consumption across trials that have token stats.
+ * Trials without tokenStats are excluded from the average.
+ * Returns null if no trial has token stats.
+ */
+export function aggregateTokenStats(trials: EvalTrial[]): AggregatedTokenStats | null {
+  const withStats = trials.filter(t => t.tokenStats);
+  if (withStats.length === 0) return null;
+  const n = withStats.length;
+  return {
+    avgTotal:  Math.round(withStats.reduce((s, t) => s + t.tokenStats!.total_tokens,  0) / n),
+    avgInput:  Math.round(withStats.reduce((s, t) => s + t.tokenStats!.input_tokens,  0) / n),
+    avgOutput: Math.round(withStats.reduce((s, t) => s + t.tokenStats!.output_tokens, 0) / n),
+    avgCached: Math.round(withStats.reduce((s, t) => s + t.tokenStats!.cached_tokens, 0) / n),
+    trialCount: n,
   };
 }

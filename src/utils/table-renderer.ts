@@ -1,8 +1,26 @@
 import chalk from 'chalk';
 import * as path from 'path';
-import { EvalSuiteReport, EvalTrial } from '../types/index.js';
+import { AggregatedTokenStats, EvalSuiteReport, EvalTrial } from '../types/index.js';
 import { Logger } from './logger.js';
 import { computePassAtK } from '../core/statistics.js';
+
+/**
+ * Formats a token count for human-readable display.
+ * Numbers >= 1M are shown as "1.2M", >= 1K as "119K", else as-is.
+ */
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return `${n}`;
+}
+
+function formatTokenStatsLine(stats: AggregatedTokenStats): string {
+  const total  = formatTokens(stats.avgTotal);
+  const input  = formatTokens(stats.avgInput);
+  const output = formatTokens(stats.avgOutput);
+  const cached = formatTokens(stats.avgCached);
+  return `${total} total  (${input} input + ${output} output,  ${cached} cached)`;
+}
 
 /**
  * Returns a color-coded pass@1 string for a set of trials:
@@ -125,6 +143,11 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
 
   const percentage = Math.round((metrics.passAtK || 0) * 100);
   Logger.write(`\n   Trigger Success Rate:   ${percentage}%`);
+
+  const wi = metrics.tokenStats?.withSkill;
+  if (wi) {
+    Logger.write(`\n   Avg Tokens:             ${formatTokenStatsLine(wi)}`);
+  }
 }
 
 /**
@@ -167,4 +190,18 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
 
   Logger.write(`\n   Without Skill Rate:   ${withoutSkillPercentage}%`);
   Logger.write(`\n   With Skill Rate:      ${withSkillPercentage}%`);
+
+  const wo = metrics.tokenStats?.withoutSkill;
+  const wi = metrics.tokenStats?.withSkill;
+  if (wo || wi) {
+    if (wo) Logger.write(`\n   Tokens (w/o skill):   ${formatTokenStatsLine(wo)}`);
+    if (wi) Logger.write(`\n   Tokens (w/ skill):    ${formatTokenStatsLine(wi)}`);
+    if (wo && wi && wo.avgTotal > 0) {
+      const delta = wi.avgTotal - wo.avgTotal;
+      const deltaSign = delta >= 0 ? '+' : '';
+      const deltaPct = Math.round((delta / wo.avgTotal) * 100);
+      const deltaStr = `${deltaSign}${formatTokens(Math.abs(delta))} (${deltaSign}${deltaPct}%)`;
+      Logger.write(`\n   Token Delta:          ${delta >= 0 ? chalk.yellow(deltaStr) : chalk.green(deltaStr)}`);
+    }
+  }
 }

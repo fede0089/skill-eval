@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { parseNdjsonEvents, parseStreamResult } from '../../src/utils/ndjson.js';
+import { parseNdjsonEvents, parseStreamResult, parseTokenStats } from '../../src/utils/ndjson.js';
 
 test('parseNdjsonEvents: parses a single JSON object', () => {
   const output = JSON.stringify({ type: 'result', status: 'success' });
@@ -156,5 +156,69 @@ describe('parseStreamResult', () => {
     );
     const result = parseStreamResult(input);
     assert.deepStrictEqual(result, { response: 'trimmed' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseTokenStats
+// ---------------------------------------------------------------------------
+
+describe('parseTokenStats', () => {
+  test('returns TrialTokenStats from a result event with stats', () => {
+    const input = makeNdjson({
+      type: 'result',
+      status: 'success',
+      stats: { total_tokens: 119002, input_tokens: 113266, output_tokens: 571, cached: 73501 }
+    });
+    const result = parseTokenStats(input);
+    assert.deepStrictEqual(result, {
+      total_tokens: 119002,
+      input_tokens: 113266,
+      output_tokens: 571,
+      cached_tokens: 73501
+    });
+  });
+
+  test('returns null when result event has no stats field', () => {
+    const input = makeNdjson({ type: 'result', status: 'success' });
+    assert.strictEqual(parseTokenStats(input), null);
+  });
+
+  test('returns null when result event stats lacks total_tokens', () => {
+    const input = makeNdjson({
+      type: 'result', status: 'success',
+      stats: { input_tokens: 100 }
+    });
+    assert.strictEqual(parseTokenStats(input), null);
+  });
+
+  test('returns null for non-NDJSON output', () => {
+    assert.strictEqual(parseTokenStats('plain text output'), null);
+  });
+
+  test('returns null for empty string', () => {
+    assert.strictEqual(parseTokenStats(''), null);
+  });
+
+  test('defaults missing sub-fields to 0', () => {
+    const input = makeNdjson({
+      type: 'result', status: 'success',
+      stats: { total_tokens: 500 }
+    });
+    const result = parseTokenStats(input);
+    assert.deepStrictEqual(result, {
+      total_tokens: 500,
+      input_tokens: 0,
+      output_tokens: 0,
+      cached_tokens: 0
+    });
+  });
+
+  test('ignores token stats from non-result events', () => {
+    const input = makeNdjson(
+      { type: 'message', role: 'assistant', content: 'hi', stats: { total_tokens: 999 } },
+      { type: 'result', status: 'success' }
+    );
+    assert.strictEqual(parseTokenStats(input), null);
   });
 });

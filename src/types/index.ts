@@ -22,12 +22,28 @@ export interface AssertionResult {
  * isError=true means infrastructure failed (timeout, blocked prompt, runner crash, etc.)
  * and the trial never reached a judge verdict. These trials are candidates for retry.
  */
+export interface TrialTokenStats {
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+  cached_tokens: number;
+}
+
+export interface AggregatedTokenStats {
+  avgTotal: number;
+  avgInput: number;
+  avgOutput: number;
+  avgCached: number;
+  trialCount: number;
+}
+
 export interface EvalTrial {
   id: number;
   transcript: AgentTranscript;
   assertionResults: AssertionResult[];
   trialPassed: boolean;
   isError?: boolean;
+  tokenStats?: TrialTokenStats;
 }
 
 /**
@@ -115,6 +131,10 @@ export interface EvalSuiteReport {
     numTrials?: number; // Number of trials per task
     passAtK?: number;              // Average pass@1 across tasks (pass rate)
     withoutSkillPassAtK?: number;  // Average without-skill pass@1 (functional only)
+    tokenStats?: {
+      withSkill?: AggregatedTokenStats;
+      withoutSkill?: AggregatedTokenStats;  // functional only
+    };
     [key: string]: any;
   };
   results: TaskResult[];
@@ -150,6 +170,13 @@ export interface NdjsonResultEvent {
   status: string;
   response?: string;
   error?: { message?: string };
+  stats?: {
+    total_tokens?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+    cached?: number;
+    [key: string]: unknown;
+  };
 }
 
 export type NdjsonEvent =

@@ -1,4 +1,4 @@
-import { NdjsonEvent, NdjsonResultEvent } from '../types/index.js';
+import { NdjsonEvent, NdjsonResultEvent, TrialTokenStats } from '../types/index.js';
 
 /**
  * Parses Newline-Delimited JSON (NDJSON) output into an array of events.
@@ -62,4 +62,26 @@ export function parseStreamResult(output: string): { error: string } | { respons
   const text = completedParts.join('\n').trim() ||
     (typeof resultEvent.response === 'string' ? resultEvent.response : '');
   return { response: text };
+}
+
+/**
+ * Extracts token consumption stats from a Gemini CLI stream-json stdout blob.
+ * Looks for a result event with a stats.total_tokens field.
+ * Returns null if no such event is found or stats are absent.
+ */
+export function parseTokenStats(output: string): TrialTokenStats | null {
+  for (const event of parseNdjsonEvents(output)) {
+    if (event.type === 'result' && event.stats) {
+      const s = event.stats;
+      if (typeof s.total_tokens === 'number') {
+        return {
+          total_tokens: s.total_tokens,
+          input_tokens:  typeof s.input_tokens  === 'number' ? s.input_tokens  : 0,
+          output_tokens: typeof s.output_tokens === 'number' ? s.output_tokens : 0,
+          cached_tokens: typeof s.cached        === 'number' ? s.cached        : 0,
+        };
+      }
+    }
+  }
+  return null;
 }

@@ -55,7 +55,7 @@ test('renderTriggerTable: calls Logger.table and Logger.write with rate line (1 
 
   assert.strictEqual(tableMock.mock.callCount(), 1, 'Logger.table should be called once');
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
-  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'pass@1'], 'Header should have pass@1 column for 1 trial');
+  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'success rate'], 'Header should have success rate column for 1 trial');
   assert.ok(rows.length > 1, 'Table should have at least one data row');
 
   const written = writeMock.mock.calls.map(c => c.arguments[0] as string).join('');
@@ -72,7 +72,7 @@ test('renderTriggerTable: uses pass@k columns for multi-trial reports', () => {
   renderTriggerTable(makeTriggerReport(3));
 
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
-  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'Trials', 'pass@1'], 'Header should have pass@1 column');
+  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'Trials', 'success rate'], 'Header should have success rate column');
 
   mock.reset();
 });

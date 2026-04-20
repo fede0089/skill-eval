@@ -29,6 +29,12 @@ function formatPercent(val: number): string {
   return `${Math.round(val * 100)}%`;
 }
 
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return `${n}`;
+}
+
 function passColorClass(val: number): string {
   if (val >= 0.8) return 'green';
   if (val >= 0.5) return 'amber';
@@ -60,10 +66,25 @@ function renderMetricsCards(report: EvalSuiteReport): string {
     cards.push(renderCard('Without Skill Success Rate', formatPercent(bk), passColorClass(bk)));
     cards.push(renderCard('With Skill Success Rate', formatPercent(tk), passColorClass(tk)));
     cards.push(renderCard('Skill Uplift', escapeHtml(metrics.skillUplift ?? '0%'), upliftClass));
+
+    const wo = metrics.tokenStats?.withoutSkill;
+    const wi = metrics.tokenStats?.withSkill;
+    if (wo) cards.push(renderCard('Tokens (w/o skill)', formatTokens(wo.avgTotal) + ' avg', ''));
+    if (wi) cards.push(renderCard('Tokens (w/ skill)', formatTokens(wi.avgTotal) + ' avg', ''));
+    if (wo && wi && wo.avgTotal > 0) {
+      const delta = wi.avgTotal - wo.avgTotal;
+      const deltaSign = delta >= 0 ? '+' : '';
+      const deltaPct = Math.round((delta / wo.avgTotal) * 100);
+      const deltaClass = delta > 0 ? 'amber' : delta < 0 ? 'green' : '';
+      cards.push(renderCard('Token Delta', `${deltaSign}${deltaPct}%`, deltaClass));
+    }
   } else {
     const k = metrics.passAtK ?? 0;
     cards.push(renderCard('Success Rate', formatPercent(k), passColorClass(k)));
     cards.push(renderCard('Tasks passed', `${metrics.passedCount}/${metrics.totalCount}`, passColorClass(metrics.passedCount / Math.max(metrics.totalCount, 1))));
+
+    const wi = metrics.tokenStats?.withSkill;
+    if (wi) cards.push(renderCard('Avg Tokens', formatTokens(wi.avgTotal), ''));
   }
 
   return `<div class="cards">${cards.join('')}</div>`;
