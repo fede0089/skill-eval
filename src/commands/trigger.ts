@@ -11,8 +11,8 @@ import { aggregatePassAtK } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderTriggerTable, renderRunHeader } from '../utils/table-renderer.js';
-import type { Reporter } from '../reporters/index.js';
 import { JsonReporter } from '../reporters/index.js';
+import type { Reporter } from '../reporters/index.js';
 
 export async function triggerCommand(
   agent: string,
@@ -175,12 +175,11 @@ export async function triggerCommand(
       results: taskResults
     };
 
-    fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
-
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
     renderTriggerTable(report);
     Logger.write('\n\n');
+    new JsonReporter().generate(report, runDir);
     reporter.generate(report, runDir);
 
   } finally {

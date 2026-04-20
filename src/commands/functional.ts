@@ -242,8 +242,6 @@ export async function functionalCommand(
       results: taskResults
     };
 
-    fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(report, null, 2), 'utf-8');
-
     Logger.write(`\nEVALUATION SUMMARY\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
     renderFunctionalTable(report);
@@ -251,6 +249,7 @@ export async function functionalCommand(
     const upliftSign = skillUplift > 0 ? '+' : '';
     Logger.write(`\n   Skill Uplift:            ${upliftSign}${skillUplift}%\n`);
     Logger.write('\n');
+    new JsonReporter().generate(report, runDir);
     reporter.generate(report, runDir);
 
   } finally {

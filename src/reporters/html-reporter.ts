@@ -6,9 +6,8 @@ import type { Reporter } from './reporter.js';
 
 export class HtmlReporter implements Reporter {
   generate(report: EvalSuiteReport, runDir: string): void {
-    const html = generateHtml(report);
     const htmlPath = path.join(runDir, 'report.html');
-    fs.writeFileSync(htmlPath, html, 'utf-8');
+    fs.writeFileSync(htmlPath, generateHtml(report), 'utf-8');
     Logger.write(`\n   Report: file://${htmlPath}\n`);
   }
 }
