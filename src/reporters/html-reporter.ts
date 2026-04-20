@@ -57,12 +57,12 @@ function renderMetricsCards(report: EvalSuiteReport): string {
     const tk = metrics.passAtK ?? 0;
     const upliftRaw = parseInt(metrics.skillUplift ?? '0', 10);
     const upliftClass = upliftRaw > 0 ? 'green' : upliftRaw < 0 ? 'red' : 'amber';
-    cards.push(renderCard('Without Skill p@1', formatPercent(bk), passColorClass(bk)));
-    cards.push(renderCard('With Skill p@1', formatPercent(tk), passColorClass(tk)));
+    cards.push(renderCard('Without Skill Success Rate', formatPercent(bk), passColorClass(bk)));
+    cards.push(renderCard('With Skill Success Rate', formatPercent(tk), passColorClass(tk)));
     cards.push(renderCard('Skill Uplift', escapeHtml(metrics.skillUplift ?? '0%'), upliftClass));
   } else {
     const k = metrics.passAtK ?? 0;
-    cards.push(renderCard('pass@1', formatPercent(k), passColorClass(k)));
+    cards.push(renderCard('Success Rate', formatPercent(k), passColorClass(k)));
     cards.push(renderCard('Tasks passed', `${metrics.passedCount}/${metrics.totalCount}`, passColorClass(metrics.passedCount / Math.max(metrics.totalCount, 1))));
   }
 
@@ -89,15 +89,15 @@ function renderChart(report: EvalSuiteReport): string {
       Math.round((r.trials.filter(t => t.trialPassed).length / Math.max(r.trials.length, 1)) * 100)
     );
     datasets = [
-      { label: 'Without Skill p@1', data: withoutSkillData, backgroundColor: '#94a3b8', borderRadius: 4 },
-      { label: 'With Skill p@1', data: withSkillData, backgroundColor: '#3b82f6', borderRadius: 4 },
+      { label: 'Without Skill Success Rate', data: withoutSkillData, backgroundColor: '#94a3b8', borderRadius: 4 },
+      { label: 'With Skill Success Rate', data: withSkillData, backgroundColor: '#3b82f6', borderRadius: 4 },
     ];
   } else {
     const passData = results.map(r =>
       Math.round((r.trials.filter(t => t.trialPassed).length / Math.max(r.trials.length, 1)) * 100)
     );
     datasets = [{
-      label: numTrials > 1 ? 'pass@1' : 'Score',
+      label: numTrials > 1 ? 'Success Rate' : 'Score',
       data: passData,
       backgroundColor: passData.map(v => v >= 80 ? '#22c55e' : v >= 50 ? '#f59e0b' : '#ef4444'),
       borderRadius: 4,
@@ -172,7 +172,7 @@ function renderTaskTable(report: EvalSuiteReport): string {
   const headerCells = functional
     ? ['#', 'Prompt', 'Without Skill', 'With Skill', 'Details']
     : numTrials > 1
-      ? ['#', 'Prompt', 'pass@1', 'Details']
+      ? ['#', 'Prompt', 'Success Rate', 'Details']
       : ['#', 'Prompt', 'Status', 'Details'];
 
   const headerRow = `<tr>${headerCells.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>`;

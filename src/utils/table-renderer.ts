@@ -93,8 +93,8 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
   const numTrials = metrics.numTrials || 1;
 
   const tableData = numTrials > 1
-    ? [['ID', 'Prompt', 'Trials', 'pass@1']]
-    : [['ID', 'Prompt', 'pass@1']];
+    ? [['ID', 'Prompt', 'Trials', 'success rate']]
+    : [['ID', 'Prompt', 'success rate']];
 
   let hasPartialErrors = false;
 
@@ -120,7 +120,7 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
   Logger.table(tableData);
 
   if (hasPartialErrors) {
-    Logger.write(chalk.yellow('\n   * Some trials did not complete due to infrastructure errors. pass@1 is computed over the trials that ran.'));
+    Logger.write(chalk.yellow('\n   * Some trials did not complete due to infrastructure errors. success rate is computed over the trials that ran.'));
   }
 
   const percentage = Math.round((metrics.passAtK || 0) * 100);
@@ -159,7 +159,7 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
   Logger.table(tableData);
 
   if (hasPartialErrors) {
-    Logger.write(chalk.yellow('\n   * Some trials did not complete due to infrastructure errors. pass@1 is computed over the trials that ran.'));
+    Logger.write(chalk.yellow('\n   * Some trials did not complete due to infrastructure errors. success rate is computed over the trials that ran.'));
   }
 
   const withoutSkillPercentage = Math.round((metrics.withoutSkillPassAtK || 0) * 100);
