@@ -4,10 +4,9 @@ import { triggerCommand } from './commands/trigger.js';
 import { functionalCommand } from './commands/functional.js';
 import { Logger } from './utils/logger.js';
 import { AppError } from './core/errors.js';
-import { createReporter } from './reporters/index.js';
+import { HtmlReporter } from './reporters/index.js';
 import { DEFAULT_AGENT } from './runners/registry.js';
 import { DEFAULT_TIMEOUT_MS } from './types/index.js';
-import type { ReportFormat } from './types/index.js';
 
 import * as path from 'path';
 import * as fs from 'fs';
@@ -42,20 +41,18 @@ program
   .description('Evaluate triggering of an agent skill')
   .requiredOption('--workspace <path>', 'Path to the workspace/repo to evaluate against')
   .requiredOption('--skill <path>', 'Path to the skill directory')
-  .option('--concurrency <number>', 'Number of concurrent tasks')
+  .option('--agents <number>', 'Number of parallel agents')
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
-  .option('--report <format>', 'Report format: html or json')
   .option('--timeout <seconds>', 'Agent timeout in seconds', String(DEFAULT_TIMEOUT_MS / 1000))
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
-    const concurrency = parseInt(options.concurrency, 10) || 5;
+    const maxAgents = parseInt(options.agents, 10) || 4;
     const numTrials = options.trials !== undefined ? (parseInt(options.trials, 10) || 3) : 3;
     const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
-    const reporter = createReporter((options.report || 'html') as ReportFormat);
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
-    triggerCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs, evalId).catch(errorHandler);
+    triggerCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId).catch(errorHandler);
   });
 
 program
@@ -63,20 +60,18 @@ program
   .description('Evaluate functional correctness of an agent skill based on assertions')
   .requiredOption('--workspace <path>', 'Path to the workspace/repo to evaluate against')
   .requiredOption('--skill <path>', 'Path to the skill directory')
-  .option('--concurrency <number>', 'Number of concurrent tasks')
+  .option('--agents <number>', 'Number of parallel agents')
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
-  .option('--report <format>', 'Report format: html or json')
   .option('--timeout <seconds>', 'Agent timeout in seconds', String(DEFAULT_TIMEOUT_MS / 1000))
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
-    const concurrency = parseInt(options.concurrency, 10) || 5;
+    const maxAgents = parseInt(options.agents, 10) || 4;
     const numTrials = options.trials !== undefined ? (parseInt(options.trials, 10) || 3) : 3;
     const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
-    const reporter = createReporter((options.report || 'html') as ReportFormat);
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
-    functionalCommand(selectedAgent, workspace, options.skill, concurrency, undefined, numTrials, reporter, timeoutMs, evalId).catch(errorHandler);
+    functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId).catch(errorHandler);
   });
 
 

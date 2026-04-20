@@ -87,7 +87,7 @@ test('renderFunctionalTable: calls Logger.table and Logger.write with rate lines
 
   assert.strictEqual(tableMock.mock.callCount(), 1, 'Logger.table should be called once');
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
-  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'W/o p@1', 'W/ p@1'], 'Header should have p@1 columns');
+  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'Without Skill', 'With Skill'], 'Header should have skill columns');
 
   const written = writeMock.mock.calls.map(c => c.arguments[0] as string).join('');
   assert.ok(written.includes('Without Skill Rate'), 'Should include without-skill rate line');
@@ -104,8 +104,8 @@ test('renderFunctionalTable: uses pass@k columns for multi-trial reports', () =>
   renderFunctionalTable(makeFunctionalReport(3));
 
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
-  assert.ok(rows[0].includes('W/o p@1'), 'Header should include W/o p@1 for multi-trial');
-  assert.ok(rows[0].includes('W/ p@1'), 'Header should include W/ p@1 for multi-trial');
+  assert.ok(rows[0].includes('Without Skill'), 'Header should include Without Skill for multi-trial');
+  assert.ok(rows[0].includes('With Skill'), 'Header should include With Skill for multi-trial');
 
   mock.reset();
 });

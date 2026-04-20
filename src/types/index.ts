@@ -120,8 +120,6 @@ export interface EvalSuiteReport {
   results: TaskResult[];
 }
 
-export type ReportFormat = 'html' | 'json';
-
 /**
  * Typed representations of Gemini CLI stream-json events.
  * parseNdjsonEvents returns NdjsonEvent[]; callers narrow with event.type checks.

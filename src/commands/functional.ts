@@ -6,6 +6,7 @@ import { Logger } from '../utils/logger.js';
 import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
+import { AgentPool } from '../core/agent-pool.js';
 import { aggregatePassAtK } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
@@ -17,7 +18,7 @@ export async function functionalCommand(
   agent: string,
   workspace: string,
   skillPath: string,
-  concurrency: number = 5,
+  maxAgents: number = 4,
   injectedSuite?: EvalSuite,
   numTrials: number = 3,
   reporter: Reporter = new JsonReporter(),
@@ -81,145 +82,140 @@ export async function functionalCommand(
     timeoutMs
   });
 
+  const pool = new AgentPool(maxAgents);
+  const ui = new ListrEvalUI();
+
+  // Barrier chain: each prompt waits until the previous prompt's trials have all acquired slots.
+  let barrier = Promise.resolve();
+
+  // Subtask labels: Without Skill 1..N then With Skill 1..N for each prompt
+  const subtaskLabels = [
+    ...Array.from({ length: numTrials }, (_, i) => `Without Skill ${i + 1}`),
+    ...Array.from({ length: numTrials }, (_, i) => `With Skill ${i + 1}`)
+  ];
+
   try {
-    renderRunHeader({ command: 'functional', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, concurrency, timeoutMs: timeoutMs ?? 600000, runDir, evalId });
-
-    // ==== WITHOUT SKILL RUN ====
-    Logger.write(`--- Without Skill ---\n`);
+    renderRunHeader({ command: 'functional', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs: timeoutMs ?? 600000, runDir, evalId });
     Logger.write(`──────────────────────────────────────────────────\n`);
-    const withoutSkillUI = new ListrEvalUI();
 
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
       const taskLabel = `${promptSnippet} (#${task.id})`;
-      withoutSkillUI.addTask({
-        id: `without-skill-${task.id}`,
-        title: `Without Skill: ${taskLabel}`,
-        numTrials,
+
+      const thisBarrier = barrier;
+      let resolveBarrier!: () => void;
+      barrier = new Promise<void>(r => { resolveBarrier = r; });
+
+      ui.addTask({
+        id: task.id,
+        title: taskLabel,
+        subtaskLabels,
         task: async (uiCtx, multi) => {
-          let completed = 0;
-          const trials = await Promise.all(
-            Array.from({ length: numTrials }, (_, idx) => {
-              const trialId = idx + 1;
-              const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
-              return withRetry(
-                (attempt) =>
-                  withoutSkillRunner.runFunctionalTask(task, i, trialId, trialCtx, attempt)
-                    .catch((error): EvalTrial => ({
-                      id: trialId,
-                      transcript: { error: error instanceof Error ? error.message : String(error) },
-                      assertionResults: [{ assertion: 'Without Skill Execution', passed: false, reason: String(error) }],
-                      trialPassed: false,
-                      isError: true
-                    })),
-                2,
-                1000,
-                (nextAttempt, lastTrial) => {
-                  const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
-                  trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
-                }
-              ).then(trial => {
-                  if (multi) {
-                    const reason = trial.assertionResults.find(r => !r.passed)?.reason;
-                    multi.markTrialComplete(trialId, trial.trialPassed, reason, trial.isError);
-                  } else {
-                    completed++;
-                    if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
-                  }
-                  return trial;
-                });
-            })
-          );
+          await thisBarrier;
 
-          withoutSkillTrialsByTask.set(task.id, trials);
-
-          const passedCount = trials.filter(t => t.trialPassed).length;
-          if (passedCount === trials.length) {
-            withoutSkillTasksPassedCount++;
-          } else if (!multi) {
-            const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'Without Skill failed';
-            throw new Error(failureReason);
+          // ── Without Skill trials (subtask IDs 1..numTrials) ──────────────
+          const woPromises: Promise<EvalTrial>[] = [];
+          for (let idx = 0; idx < numTrials; idx++) {
+            const trialId = idx + 1;
+            const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
+            const release = await pool.acquire();
+            const p = withRetry(
+              (attempt) =>
+                withoutSkillRunner.runFunctionalTask(task, i, trialId, trialCtx, attempt)
+                  .catch((error): EvalTrial => ({
+                    id: trialId,
+                    transcript: { error: error instanceof Error ? error.message : String(error) },
+                    assertionResults: [{ assertion: 'Without Skill Execution', passed: false, reason: String(error) }],
+                    trialPassed: false,
+                    isError: true
+                  })),
+              2,
+              1000,
+              (nextAttempt, lastTrial) => {
+                const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
+                trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
+              }
+            ).then(trial => {
+              if (multi) {
+                const reason = trial.assertionResults.find(r => !r.passed)?.reason;
+                multi.markTrialComplete(trialId, trial.trialPassed, reason, trial.isError);
+              }
+              return trial;
+            }).finally(release);
+            woPromises.push(p);
           }
-        }
-      });
-    }
 
-    await withoutSkillUI.run(concurrency);
+          // ── With Skill trials (subtask IDs numTrials+1..2*numTrials) ─────
+          const wiPromises: Promise<EvalTrial>[] = [];
+          for (let idx = 0; idx < numTrials; idx++) {
+            const subtaskId = numTrials + idx + 1;   // Listr subtask position
+            const runnerTrialId = idx + 1;            // 1-based trial number within WI pass
+            const trialCtx = multi?.getTrialCtx(subtaskId) ?? uiCtx;
+            const release = await pool.acquire();
+            const p = withRetry(
+              (attempt) =>
+                withSkillRunner.runFunctionalTask(task, i, runnerTrialId, trialCtx, attempt)
+                  .catch((error): EvalTrial => ({
+                    id: runnerTrialId,
+                    transcript: { error: error instanceof Error ? error.message : String(error) },
+                    assertionResults: [{ assertion: 'With Skill Execution', passed: false, reason: String(error) }],
+                    trialPassed: false,
+                    isError: true
+                  })),
+              2,
+              1000,
+              (nextAttempt, lastTrial) => {
+                const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
+                trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
+              }
+            ).then(trial => {
+              if (multi) {
+                const reason = trial.assertionResults.find(r => !r.passed)?.reason;
+                multi.markTrialComplete(subtaskId, trial.trialPassed, reason, trial.isError);
+              }
+              return trial;
+            }).finally(release);
+            wiPromises.push(p);
+          }
 
-    // ==== WITH SKILL RUN ====
-    Logger.write(`\n--- With Skill ---\n`);
-    Logger.write(`──────────────────────────────────────────────────\n`);
+          // All WO + WI slots for this prompt have been acquired — signal the next prompt.
+          resolveBarrier();
 
-    const withSkillUI = new ListrEvalUI();
+          const [woTrials, wiTrials] = await Promise.all([
+            Promise.all(woPromises),
+            Promise.all(wiPromises)
+          ]);
 
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i];
-      const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
-      const taskLabel = `${promptSnippet} (#${task.id})`;
-      withSkillUI.addTask({
-        id: `with-skill-${task.id}`,
-        title: `With Skill: ${taskLabel}`,
-        numTrials,
-        task: async (uiCtx, multi) => {
-          let completed = 0;
-          const trials = await Promise.all(
-            Array.from({ length: numTrials }, (_, idx) => {
-              const trialId = idx + 1;
-              const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
-              return withRetry(
-                (attempt) =>
-                  withSkillRunner.runFunctionalTask(task, i, trialId, trialCtx, attempt)
-                    .catch((error): EvalTrial => ({
-                      id: trialId,
-                      transcript: { error: error instanceof Error ? error.message : String(error) },
-                      assertionResults: [{ assertion: 'With Skill Execution', passed: false, reason: String(error) }],
-                      trialPassed: false,
-                      isError: true
-                    })),
-                2,
-                1000,
-                (nextAttempt, lastTrial) => {
-                  const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
-                  trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
-                }
-              ).then(trial => {
-                  if (multi) {
-                    const reason = trial.assertionResults.find(r => !r.passed)?.reason;
-                    multi.markTrialComplete(trialId, trial.trialPassed, reason, trial.isError);
-                  } else {
-                    completed++;
-                    if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
-                  }
-                  return trial;
-                });
-            })
-          );
+          withoutSkillTrialsByTask.set(task.id, woTrials);
 
-          const passedCount = trials.filter(t => t.trialPassed).length;
-          const score = trials.length > 0 ? passedCount / trials.length : 0;
+          const woPassedCount = woTrials.filter(t => t.trialPassed).length;
+          if (woPassedCount === woTrials.length) withoutSkillTasksPassedCount++;
+
+          const wiPassedCount = wiTrials.filter(t => t.trialPassed).length;
+          const score = wiTrials.length > 0 ? wiPassedCount / wiTrials.length : 0;
           const withoutSkillTrials = withoutSkillTrialsByTask.get(task.id) ?? [];
 
           const taskResult: TaskResult = {
             taskId: task.id,
             prompt: task.prompt,
             score,
-            trials: trials.map(t => ({ ...t, transcript: undefined as any })),
+            trials: wiTrials.map(t => ({ ...t, transcript: undefined as any })),
             withoutSkillTrials: withoutSkillTrials.map(t => ({ ...t, transcript: undefined as any }))
           };
           taskResults.push(taskResult);
 
-          if (passedCount === trials.length) {
+          if (wiPassedCount === wiTrials.length) {
             withSkillTasksPassedCount++;
           } else if (!multi) {
-            const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'With Skill failed';
+            const failureReason = wiTrials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'With Skill failed';
             throw new Error(failureReason);
           }
         }
       });
     }
 
-    await withSkillUI.run(concurrency);
+    await ui.run(tasks.length);
 
     // ==== REPORTING ====
     const { passAtK } = aggregatePassAtK(taskResults, numTrials, r => r.trials);

@@ -66,6 +66,32 @@ describe('ListrEvalUI', () => {
     assert.strictEqual(results[0], 'success');
   });
 
+  describe('subtaskLabels', () => {
+    it('uses provided labels for subtask titles and drives trial count', async () => {
+      const ui = new ListrEvalUI();
+      let capturedMulti: MultiTrialContext | undefined;
+
+      ui.addTask({
+        id: 1,
+        title: 'Labeled Task',
+        subtaskLabels: ['Without Skill 1', 'Without Skill 2', 'With Skill 1', 'With Skill 2'],
+        task: async (_ctx, multi) => {
+          capturedMulti = multi;
+          multi!.markTrialComplete(1, true);
+          multi!.markTrialComplete(2, true);
+          multi!.markTrialComplete(3, true);
+          multi!.markTrialComplete(4, true);
+        }
+      });
+
+      await ui.run(1);
+
+      assert.ok(capturedMulti !== undefined, 'multi context should be provided');
+      assert.ok(typeof capturedMulti!.getTrialCtx === 'function');
+      assert.ok(typeof capturedMulti!.markTrialComplete === 'function');
+    });
+  });
+
   describe('multi-trial subtasks (numTrials > 1)', () => {
     it('provides MultiTrialContext to task callback when numTrials > 1', async () => {
       const ui = new ListrEvalUI();

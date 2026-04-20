@@ -26,7 +26,7 @@ export interface RunHeaderConfig {
   workspace: string;
   tasks: number;
   trials: number;
-  concurrency: number;
+  maxAgents: number;
   timeoutMs: number;
   runDir: string;
   evalId?: number;
@@ -54,7 +54,7 @@ function boxLabel(key: string, value: string): string {
  * Always shown regardless of debug mode.
  */
 export function renderRunHeader(config: RunHeaderConfig): void {
-  const { command, skillName, agent, workspace, tasks, trials, concurrency, timeoutMs, runDir, evalId } = config;
+  const { command, skillName, agent, workspace, tasks, trials, maxAgents, timeoutMs, runDir, evalId } = config;
 
   const timeoutSec = timeoutMs / 1000;
   const timeoutStr = timeoutSec % 60 === 0 ? `${timeoutSec / 60}m` : `${timeoutSec}s`;
@@ -70,7 +70,7 @@ export function renderRunHeader(config: RunHeaderConfig): void {
 
   const commandPart = evalId !== undefined ? `${command}  ·  eval #${evalId}` : command;
   const title = chalk.bold.cyan(skillName) + chalk.gray(`  ·  ${commandPart}`);
-  const runLine = `${tasks} task${tasks !== 1 ? 's' : ''}  ·  ${trials} trial${trials !== 1 ? 's' : ''}  ·  concurrency ${concurrency}`;
+  const runLine = `${tasks} task${tasks !== 1 ? 's' : ''}  ·  ${trials} trial${trials !== 1 ? 's' : ''}  ·  agents ${maxAgents}`;
 
   process.stdout.write('\n');
   process.stdout.write(top + '\n');
@@ -133,7 +133,7 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
 export function renderFunctionalTable(report: EvalSuiteReport): void {
   const { results, metrics } = report;
 
-  const tableData: string[][] = [['ID', 'Prompt', 'W/o p@1', 'W/ p@1']];
+  const tableData: string[][] = [['ID', 'Prompt', 'Without Skill', 'With Skill']];
 
   let hasPartialErrors = false;
 

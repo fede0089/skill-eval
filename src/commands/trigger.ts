@@ -6,6 +6,7 @@ import { Logger } from '../utils/logger.js';
 import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
+import { AgentPool } from '../core/agent-pool.js';
 import { aggregatePassAtK } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
@@ -17,7 +18,7 @@ export async function triggerCommand(
   agent: string,
   workspace: string,
   skillPath: string,
-  concurrency: number = 5,
+  maxAgents: number = 4,
   injectedSuite?: EvalSuite,
   numTrials: number = 3,
   reporter: Reporter = new JsonReporter(),
@@ -66,10 +67,14 @@ export async function triggerCommand(
     timeoutMs
   });
 
+  const pool = new AgentPool(maxAgents);
   const ui = new ListrEvalUI();
 
+  // Barrier chain: each prompt waits until the previous prompt's trials have all acquired slots.
+  let barrier = Promise.resolve();
+
   try {
-    renderRunHeader({ command: 'trigger', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, concurrency, timeoutMs: timeoutMs ?? 600000, runDir, evalId });
+    renderRunHeader({ command: 'trigger', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs: timeoutMs ?? 600000, runDir, evalId });
     Logger.write(`--- Trigger Pass ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
 
@@ -77,48 +82,57 @@ export async function triggerCommand(
       const task = tasks[i];
       const promptSnippet = `${task.prompt.substring(0, 50)}${task.prompt.length > 50 ? '...' : ''}`;
       const taskLabel = `${promptSnippet} (#${task.id})`;
+
+      const thisBarrier = barrier;
+      let resolveBarrier!: () => void;
+      barrier = new Promise<void>(r => { resolveBarrier = r; });
+
       ui.addTask({
         id: task.id,
         title: taskLabel,
         numTrials,
         task: async (uiCtx, multi) => {
-          let completed = 0;
-          const trials = await Promise.all(
-            Array.from({ length: numTrials }, (_, idx) => {
-              const trialId = idx + 1;
-              const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
-              return withRetry(
-                (attempt) =>
-                  runner.runTriggerTask(task, i, trialId, trialCtx, attempt)
-                    .catch((error): EvalTrial => ({
-                      id: trialId,
-                      transcript: { error: error instanceof Error ? error.message : String(error) },
-                      assertionResults: [{
-                        assertion: 'Runner Execution',
-                        passed: false,
-                        reason: error instanceof Error ? error.message : String(error)
-                      }],
-                      trialPassed: false,
-                      isError: true
-                    })),
-                2,
-                1000,
-                (nextAttempt, lastTrial) => {
-                  const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
-                  trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
-                }
-              ).then(trial => {
-                  if (multi) {
-                    const reason = trial.assertionResults.find(r => !r.passed)?.reason;
-                    multi.markTrialComplete(trialId, trial.trialPassed, reason, trial.isError);
-                  } else {
-                    completed++;
-                    if (numTrials > 1) uiCtx.updateLog(`${completed}/${numTrials} trials done`);
-                  }
-                  return trial;
-                });
-            })
-          );
+          await thisBarrier;
+
+          const trialPromises: Promise<EvalTrial>[] = [];
+          for (let idx = 0; idx < numTrials; idx++) {
+            const trialId = idx + 1;
+            const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
+            const release = await pool.acquire();
+            const p = withRetry(
+              (attempt) =>
+                runner.runTriggerTask(task, i, trialId, trialCtx, attempt)
+                  .catch((error): EvalTrial => ({
+                    id: trialId,
+                    transcript: { error: error instanceof Error ? error.message : String(error) },
+                    assertionResults: [{
+                      assertion: 'Runner Execution',
+                      passed: false,
+                      reason: error instanceof Error ? error.message : String(error)
+                    }],
+                    trialPassed: false,
+                    isError: true
+                  })),
+              2,
+              1000,
+              (nextAttempt, lastTrial) => {
+                const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
+                trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
+              }
+            ).then(trial => {
+              if (multi) {
+                const reason = trial.assertionResults.find(r => !r.passed)?.reason;
+                multi.markTrialComplete(trialId, trial.trialPassed, reason, trial.isError);
+              }
+              return trial;
+            }).finally(release);
+            trialPromises.push(p);
+          }
+
+          // All trials for this prompt have acquired a slot — signal the next prompt.
+          resolveBarrier();
+
+          const trials = await Promise.all(trialPromises);
 
           const passedCount = trials.filter(t => t.trialPassed).length;
           const score = trials.length > 0 ? passedCount / trials.length : 0;
@@ -141,7 +155,7 @@ export async function triggerCommand(
       });
     }
 
-    await ui.run(concurrency);
+    await ui.run(tasks.length);
 
     // Compute aggregate metrics and build report
     const { passAtK } = aggregatePassAtK(taskResults, numTrials, r => r.trials);

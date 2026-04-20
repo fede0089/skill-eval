@@ -26,8 +26,14 @@ export type EvalTaskFn = (ctx: EvalTaskContext, multi?: MultiTrialContext) => Pr
 export interface EvalTaskDescriptor {
   id: string | number;
   title: string;
-  /** When > 1, creates one listr2 subtask ("Trial N") per trial with its own spinner */
+  /** When > 1, creates one listr2 subtask per trial with its own spinner */
   numTrials?: number;
+  /**
+   * Optional custom labels for subtasks (1-indexed). When provided, its length
+   * determines the trial count (overriding `numTrials`) and each entry is used
+   * as the subtask base label instead of "Trial N".
+   */
+  subtaskLabels?: string[];
   task: EvalTaskFn;
 }
 
@@ -43,7 +49,9 @@ export class ListrEvalUI {
   private tasks: ListrTask<unknown, any>[] = [];
 
   addTask(descriptor: EvalTaskDescriptor): void {
-    const numTrials = descriptor.numTrials ?? 0;
+    const numTrials = descriptor.subtaskLabels
+      ? descriptor.subtaskLabels.length
+      : (descriptor.numTrials ?? 0);
 
     if (numTrials <= 1) {
       // Single-trial path: existing behaviour unchanged
@@ -88,6 +96,10 @@ export class ListrEvalUI {
         const pendingTitle: Array<string | undefined> = new Array(numTrials).fill(undefined);
         const trialDone: boolean[] = new Array(numTrials).fill(false);
 
+        const subtaskBaseLabels: string[] = descriptor.subtaskLabels
+          ? descriptor.subtaskLabels
+          : Array.from({ length: numTrials }, (_, idx) => `Trial ${idx + 1}`);
+
         const subtasks = Array.from({ length: numTrials }, (_, idx) => {
           let resolve!: () => void, reject!: (e: Error) => void;
           const promise = new Promise<void>((res, rej) => {
@@ -97,7 +109,7 @@ export class ListrEvalUI {
           deferreds.push({ resolve, reject });
 
           return {
-            title: `Trial ${idx + 1}`,
+            title: subtaskBaseLabels[idx],
             task: async (_: unknown, subtask: any) => {
               outputSetters[idx] = (s: string) => {
                 subtask.output = s;
@@ -120,7 +132,7 @@ export class ListrEvalUI {
             updateLog: (log: string) => {
               const i = trialId - 1;
               if (trialDone[i]) return;
-              const title = `Trial ${trialId} — ${sanitizeLog(log)}`;
+              const title = `${subtaskBaseLabels[i]} — ${sanitizeLog(log)}`;
               if (titleSetterReady[i]) {
                 titleSetters[i](title);
               } else {
@@ -133,14 +145,14 @@ export class ListrEvalUI {
             if (trialDone[i]) return;
             trialDone[i] = true;
             if (passed) {
-              titleSetters[i](`Trial ${trialId} — passed`);
+              titleSetters[i](`${subtaskBaseLabels[i]} — passed`);
               deferreds[i].resolve();
             } else {
               if (isError) {
-                titleSetters[i](`Trial ${trialId} — error`);
+                titleSetters[i](`${subtaskBaseLabels[i]} — error`);
                 outputSetters[i]('(!) ERROR');
               } else {
-                titleSetters[i](`Trial ${trialId} — failed`);
+                titleSetters[i](`${subtaskBaseLabels[i]} — not-passed`);
               }
               deferreds[i].reject(new Error(''));
             }

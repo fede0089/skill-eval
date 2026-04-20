@@ -140,7 +140,7 @@ function renderTrial(trial: EvalTrial, prefix: string): string {
     ? '<span class="pill amber">! ERROR</span>'
     : trial.trialPassed
       ? '<span class="pill green">✓ PASS</span>'
-      : '<span class="pill red">✗ FAIL</span>';
+      : '<span class="pill red">✗ NOT PASSED</span>';
   return `<div class="trial ${cls}">
   <div class="trial-header">${escapeHtml(prefix)} Trial ${trial.id} ${badge}</div>
   <div class="trial-assertions">${renderAssertions(trial.assertionResults)}</div>
@@ -171,7 +171,7 @@ function renderTaskTable(report: EvalSuiteReport): string {
   const functional = isFunctional(report);
 
   const headerCells = functional
-    ? ['#', 'Prompt', 'W/o p@1', 'W/ p@1', 'Details']
+    ? ['#', 'Prompt', 'Without Skill', 'With Skill', 'Details']
     : numTrials > 1
       ? ['#', 'Prompt', 'pass@1', 'Details']
       : ['#', 'Prompt', 'Status', 'Details'];
