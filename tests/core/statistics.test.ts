@@ -81,7 +81,7 @@ test('aggregatePassAtK: uses trialSelector to choose trial set', () => {
 // ---------------------------------------------------------------------------
 
 function makeTokenStats(total: number, input: number, output: number, cached: number): TrialTokenStats {
-  return { total_tokens: total, input_tokens: input, output_tokens: output, cached_tokens: cached };
+  return { totalTokens: total, inputTokens: input, outputTokens: output, cachedTokens: cached };
 }
 
 test('aggregateTokenStats: empty array → null', () => {

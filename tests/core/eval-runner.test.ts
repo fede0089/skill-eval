@@ -11,16 +11,32 @@ import { Logger } from '../../src/utils/logger.js';
 import { withRetry } from '../../src/core/trial-utils.js';
 import type { EvalTrial } from '../../src/types/index.js';
 
+// ── Shared test helpers ──────────────────────────────────────────────────────
+
+/** Creates a standard agent runner mock. Pass a custom runPrompt to override the default no-op. */
+function makeAgentRunnerMock(runPrompt?: () => Promise<object>) {
+  return {
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(runPrompt ?? (async () => ({ response: 'ok', raw_output: '' }))),
+    linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
+  };
+}
+
+/**
+ * Stubs EvalEnvironment worktree methods with no-ops.
+ * Pass stubExec:true to also stub executor.execSync (needed for functional tasks that run git diff).
+ */
+function stubWorktree({ stubExec = false }: { stubExec?: boolean } = {}) {
+  if (stubExec) mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
+  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+}
+
 // ── Phase 2: System Prompt Restriction ──────────────────────────────────────
 
 test('EvalRunner.runFunctionalTask baseline prompt should include negative instruction', async () => {
-  const agentRunnerMock = {
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-
-  };
+  const agentRunnerMock = makeAgentRunnerMock();
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
@@ -28,9 +44,7 @@ test('EvalRunner.runFunctionalTask baseline prompt should include negative instr
     runDir: '/tmp', isBaseline: true
   });
 
-  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree({ stubExec: true });
 
   await runner.runFunctionalTask({ id: 99, prompt: 'do the thing', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
 
@@ -40,30 +54,21 @@ test('EvalRunner.runFunctionalTask baseline prompt should include negative instr
 
 // ── Phase 3: Transcription Validation ───────────────────────────────────────
 
-const skillActivationLog = (toolId = 'tool-1', includeResult = false) => {
+const makeSkillActivationNdjson = (toolId = 'tool-1', includeResult = false) => {
   const lines = [JSON.stringify({ type: 'tool_use', tool_name: 'activate_skill', tool_id: toolId, parameters: { name: 'mock-skill' } })];
   if (includeResult) lines.push(JSON.stringify({ type: 'tool_result', tool_id: toolId, status: 'success' }));
   return lines.join('\n');
 };
 
 test('EvalRunner.runFunctionalTask baseline with skill activation → Invalid Baseline', async () => {
-  const agentRunnerMock = {
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: skillActivationLog() })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-
-  };
-  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: makeSkillActivationNdjson() })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: true
   });
 
-  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree({ stubExec: true });
 
   const result = await runner.runFunctionalTask({ id: 2, prompt: 'test', assertions: ['anything'] }, 0, 1, { updateLog: () => {} } as any);
 
@@ -72,23 +77,14 @@ test('EvalRunner.runFunctionalTask baseline with skill activation → Invalid Ba
 });
 
 test('EvalRunner.runFunctionalTask baseline with clean log → validation passes', async () => {
-  const agentRunnerMock = {
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-
-  };
-  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: true
   });
 
-  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree({ stubExec: true });
 
   const result = await runner.runFunctionalTask({ id: 3, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
 
@@ -97,23 +93,14 @@ test('EvalRunner.runFunctionalTask baseline with clean log → validation passes
 });
 
 test('EvalRunner.runFunctionalTask target with no skill activation → Invalid Target', async () => {
-  const agentRunnerMock = {
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-
-  };
-  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: false
   });
 
-  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree({ stubExec: true });
 
   const result = await runner.runFunctionalTask({ id: 4, prompt: 'test', assertions: ['anything'] }, 0, 1, { updateLog: () => {} } as any);
 
@@ -122,23 +109,14 @@ test('EvalRunner.runFunctionalTask target with no skill activation → Invalid T
 });
 
 test('EvalRunner.runFunctionalTask with error transcript sets isError:true', async () => {
-  const agentRunnerMock = {
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ error: 'Process timeout exceeded (600 seconds)' })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-
-  };
-  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ error: 'Process timeout exceeded (600 seconds)' })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: false
   });
 
-  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree({ stubExec: true });
 
   const result = await runner.runFunctionalTask({ id: 99, prompt: 'test', assertions: ['check something'] }, 0, 1, { updateLog: () => {} } as any);
 
@@ -147,23 +125,14 @@ test('EvalRunner.runFunctionalTask with error transcript sets isError:true', asy
 });
 
 test('EvalRunner.runFunctionalTask target with successful skill activation → validation passes', async () => {
-  const agentRunnerMock = {
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: skillActivationLog('t1', true) })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-
-  };
-  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: makeSkillActivationNdjson('t1', true) })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: false
   });
 
-  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree({ stubExec: true });
 
   const result = await runner.runFunctionalTask({ id: 5, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
 
@@ -175,20 +144,14 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
 
 test('EvalRunner.runTriggerTask with stream-json error result sets isError:true', async () => {
   const ndjsonError = JSON.stringify({ type: 'result', status: 'error', error: { message: 'Gemini CLI blocked on interactive prompt' } });
-  mock.method(RunnerFactory, 'create', () => ({
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: ndjsonError, raw_output: '' })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-  }));
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: ndjsonError, raw_output: '' })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: false
   });
 
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree();
 
   const result = await runner.runTriggerTask({ id: 20, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
 
@@ -198,20 +161,14 @@ test('EvalRunner.runTriggerTask with stream-json error result sets isError:true'
 
 test('EvalRunner.runFunctionalTask with stream-json error result sets isError:true', async () => {
   const ndjsonError = JSON.stringify({ type: 'result', status: 'error', error: { message: 'Gemini CLI blocked on interactive prompt' } });
-  mock.method(RunnerFactory, 'create', () => ({
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: ndjsonError, raw_output: '' })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-  }));
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: ndjsonError, raw_output: '' })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: false
   });
 
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree();
 
   const result = await runner.runFunctionalTask({ id: 21, prompt: 'test', assertions: ['check something'] }, 0, 1, { updateLog: () => {} } as any);
 
@@ -283,14 +240,14 @@ test('EvalRunner.runTriggerTask uses unique worktree name per retry attempt', as
   mock.method(EvalEnvironment.prototype, 'removeWorktree', mock.fn(() => {}));
 
   await runner.runTriggerTask({ id: 7, prompt: 'test' }, 0, 3, { updateLog: () => {} } as any, 0);
-  const attempt0Id = createWorktreeMock.mock.calls[0].arguments[0] as string;
+  const firstAttemptWorktreeId = createWorktreeMock.mock.calls[0].arguments[0] as string;
 
   await runner.runTriggerTask({ id: 7, prompt: 'test' }, 0, 3, { updateLog: () => {} } as any, 1);
-  const attempt1Id = createWorktreeMock.mock.calls[1].arguments[0] as string;
+  const firstRetryWorktreeId = createWorktreeMock.mock.calls[1].arguments[0] as string;
 
-  assert.strictEqual(attempt0Id, 'task-7-trial-3', 'First attempt uses base name');
-  assert.strictEqual(attempt1Id, 'task-7-trial-3-r1', 'First retry uses -r1 suffix');
-  assert.notStrictEqual(attempt0Id, attempt1Id, 'Retry must use a different worktree name');
+  assert.strictEqual(firstAttemptWorktreeId, 'task-7-trial-3', 'First attempt uses base name');
+  assert.strictEqual(firstRetryWorktreeId, 'task-7-trial-3-r1', 'First retry uses -r1 suffix');
+  assert.notStrictEqual(firstAttemptWorktreeId, firstRetryWorktreeId, 'Retry must use a different worktree name');
 });
 
 test('withRetry passes attempt number 0, 1, 2 to fn and stops on success', async () => {
@@ -313,7 +270,7 @@ test('withRetry passes attempt number 0, 1, 2 to fn and stops on success', async
 
 test('EvalRunner.runFunctionalTask retries only the judge when gradeModelBased throws, succeeds on second attempt', async () => {
   let runPromptCallCount = 0;
-  const skillLog = skillActivationLog('t1', true);
+  const skillLog = makeSkillActivationNdjson('t1', true);
   const judgeResponse = JSON.stringify([{ assertion: 'test', passed: true, reason: 'ok' }]);
   const ndjsonJudgeResponse = `${JSON.stringify({ type: 'message', role: 'assistant', content: judgeResponse })}\n${JSON.stringify({ type: 'result', status: 'success' })}`;
 
@@ -354,7 +311,7 @@ test('EvalRunner.runFunctionalTask retries only the judge when gradeModelBased t
 
 test('EvalRunner.runFunctionalTask returns inconclusive failure (isError unset) when judge exhausts all retries', async () => {
   let runPromptCallCount = 0;
-  const skillLog = skillActivationLog('t1', true);
+  const skillLog = makeSkillActivationNdjson('t1', true);
 
   mock.method(RunnerFactory, 'create', () => ({
     skillDispatchToolName: 'activate_skill',
@@ -470,45 +427,33 @@ const resultWithStats = JSON.stringify({
 });
 
 test('EvalRunner.runTriggerTask extracts tokenStats when result event has stats', async () => {
-  mock.method(RunnerFactory, 'create', () => ({
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: resultWithStats, raw_output: '' })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-  }));
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: resultWithStats, raw_output: '' })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp'
   });
 
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree();
 
   const result = await runner.runTriggerTask({ id: 50, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
 
   assert.ok(result.tokenStats, 'tokenStats should be populated');
-  assert.strictEqual(result.tokenStats?.total_tokens, 5000);
-  assert.strictEqual(result.tokenStats?.input_tokens, 4500);
-  assert.strictEqual(result.tokenStats?.output_tokens, 500);
-  assert.strictEqual(result.tokenStats?.cached_tokens, 2000);
+  assert.strictEqual(result.tokenStats?.totalTokens, 5000);
+  assert.strictEqual(result.tokenStats?.inputTokens, 4500);
+  assert.strictEqual(result.tokenStats?.outputTokens, 500);
+  assert.strictEqual(result.tokenStats?.cachedTokens, 2000);
 });
 
 test('EvalRunner.runTriggerTask has no tokenStats when result event lacks stats', async () => {
-  mock.method(RunnerFactory, 'create', () => ({
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: JSON.stringify({ type: 'result', status: 'success' }), raw_output: '' })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-  }));
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: JSON.stringify({ type: 'result', status: 'success' }), raw_output: '' })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp'
   });
 
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree();
 
   const result = await runner.runTriggerTask({ id: 51, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
 
@@ -522,50 +467,36 @@ test('EvalRunner.runFunctionalTask extracts tokenStats for with-skill trial', as
     resultWithStats
   ].join('\n');
 
-  mock.method(RunnerFactory, 'create', () => ({
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: ndjsonWithSkill, raw_output: ndjsonWithSkill })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-  }));
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: ndjsonWithSkill, raw_output: ndjsonWithSkill })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: false
   });
 
-  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree({ stubExec: true });
 
   const result = await runner.runFunctionalTask({ id: 52, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
 
   assert.ok(result.tokenStats, 'tokenStats should be populated for with-skill functional trial');
-  assert.strictEqual(result.tokenStats?.total_tokens, 5000);
+  assert.strictEqual(result.tokenStats?.totalTokens, 5000);
 });
 
 test('EvalRunner.runFunctionalTask extracts tokenStats for without-skill trial', async () => {
   const ndjsonBaseline = resultWithStats;
 
-  mock.method(RunnerFactory, 'create', () => ({
-    skillDispatchToolName: 'activate_skill',
-    runPrompt: mock.fn(async () => ({ response: ndjsonBaseline, raw_output: '' })),
-    linkSkill: mock.fn(async () => {}),
-    applyRunnerConfig: mock.fn(() => {}),
-  }));
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: ndjsonBaseline, raw_output: '' })));
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', isBaseline: true
   });
 
-  mock.method(executor, 'execSync', mock.fn(() => Buffer.from('')));
-  mock.method(EvalEnvironment.prototype, 'createWorktree', () => '/tmp/worktree');
-  mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
+  stubWorktree({ stubExec: true });
 
   const result = await runner.runFunctionalTask({ id: 53, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
 
   assert.ok(result.tokenStats, 'tokenStats should be populated for without-skill functional trial');
-  assert.strictEqual(result.tokenStats?.total_tokens, 5000);
+  assert.strictEqual(result.tokenStats?.totalTokens, 5000);
 });
 

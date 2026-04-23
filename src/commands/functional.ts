@@ -54,8 +54,8 @@ export async function functionalCommand(
   fs.mkdirSync(runDir, { recursive: true });
 
   const taskResults: TaskResult[] = [];
-  let withSkillTasksPassedCount = 0;
-  let withoutSkillTasksPassedCount = 0;
+  let withSkillTasksAllPassedCount = 0;
+  let baselineTasksAllPassedCount = 0;
 
   // Per-task trial storage, indexed by task.id
   const withoutSkillTrialsByTask = new Map<number, EvalTrial[]>();
@@ -115,7 +115,7 @@ export async function functionalCommand(
           await thisBarrier;
 
           // ── Without Skill trials (subtask IDs 1..numTrials) ──────────────
-          const woPromises: Promise<EvalTrial>[] = [];
+          const baselineTrialPromises: Promise<EvalTrial>[] = [];
           for (let idx = 0; idx < numTrials; idx++) {
             const trialId = idx + 1;
             const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
@@ -143,11 +143,11 @@ export async function functionalCommand(
               }
               return trial;
             }).finally(release);
-            woPromises.push(p);
+            baselineTrialPromises.push(p);
           }
 
           // ── With Skill trials (subtask IDs numTrials+1..2*numTrials) ─────
-          const wiPromises: Promise<EvalTrial>[] = [];
+          const withSkillTrialPromises: Promise<EvalTrial>[] = [];
           for (let idx = 0; idx < numTrials; idx++) {
             const subtaskId = numTrials + idx + 1;   // Listr subtask position
             const runnerTrialId = idx + 1;            // 1-based trial number within WI pass
@@ -176,21 +176,21 @@ export async function functionalCommand(
               }
               return trial;
             }).finally(release);
-            wiPromises.push(p);
+            withSkillTrialPromises.push(p);
           }
 
           // All WO + WI slots for this prompt have been acquired — signal the next prompt.
           resolveBarrier();
 
           const [woTrials, wiTrials] = await Promise.all([
-            Promise.all(woPromises),
-            Promise.all(wiPromises)
+            Promise.all(baselineTrialPromises),
+            Promise.all(withSkillTrialPromises)
           ]);
 
           withoutSkillTrialsByTask.set(task.id, woTrials);
 
           const woPassedCount = woTrials.filter(t => t.trialPassed).length;
-          if (woPassedCount === woTrials.length) withoutSkillTasksPassedCount++;
+          if (woPassedCount === woTrials.length) baselineTasksAllPassedCount++;
 
           const wiPassedCount = wiTrials.filter(t => t.trialPassed).length;
           const score = wiTrials.length > 0 ? wiPassedCount / wiTrials.length : 0;
@@ -206,7 +206,7 @@ export async function functionalCommand(
           taskResults.push(taskResult);
 
           if (wiPassedCount === wiTrials.length) {
-            withSkillTasksPassedCount++;
+            withSkillTasksAllPassedCount++;
           } else if (!multi) {
             const failureReason = wiTrials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'With Skill failed';
             throw new Error(failureReason);
@@ -236,7 +236,7 @@ export async function functionalCommand(
         withSkillScore: `${withSkillPercentage}%`,
         withoutSkillScore: `${withoutSkillPercentage}%`,
         skillUplift: `${skillUplift > 0 ? '+' : ''}${skillUplift}%`,
-        passedCount: withSkillTasksPassedCount,
+        passedCount: withSkillTasksAllPassedCount,
         totalCount: tasks.length,
         numTrials,
         passAtK: Math.round(passAtK * 1000) / 1000,

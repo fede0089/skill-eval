@@ -62,9 +62,11 @@ export class EvalEnvironment {
   }
 
   /**
-   * Removes a previously created git worktree.
+   * Removes a previously created git worktree and its associated branch.
    */
   public removeWorktree(worktreePath: string): void {
+    const branchName = path.basename(worktreePath);
+
     const child = executor.spawnSync('git', ['worktree', 'remove', '--force', worktreePath], {
       stdio: 'ignore',
       encoding: 'utf-8',
@@ -82,6 +84,17 @@ export class EvalEnvironment {
       } catch (err) {
         Logger.warn(`Failed to remove worktree at ${worktreePath}. Process exited with code ${child.status}. Manual cleanup may be required.`);
       }
+    }
+
+    // Always try to delete the branch created for this worktree.
+    // Wrap in try-catch because the branch might already be gone.
+    try {
+      executor.spawnSync('git', ['branch', '-D', branchName], {
+        stdio: 'ignore',
+        cwd: this.workspace
+      });
+    } catch (err) {
+      // Ignore errors deleting the temporary branch
     }
   }
 }

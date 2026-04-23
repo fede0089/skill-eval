@@ -75,10 +75,10 @@ export function parseTokenStats(output: string): TrialTokenStats | null {
       const s = event.stats;
       if (typeof s.total_tokens === 'number') {
         return {
-          total_tokens: s.total_tokens,
-          input_tokens:  typeof s.input_tokens  === 'number' ? s.input_tokens  : 0,
-          output_tokens: typeof s.output_tokens === 'number' ? s.output_tokens : 0,
-          cached_tokens: typeof s.cached        === 'number' ? s.cached        : 0,
+          totalTokens:  s.total_tokens,
+          inputTokens:  typeof s.input_tokens  === 'number' ? s.input_tokens  : 0,
+          outputTokens: typeof s.output_tokens === 'number' ? s.output_tokens : 0,
+          cachedTokens: typeof s.cached        === 'number' ? s.cached        : 0,
         };
       }
     }

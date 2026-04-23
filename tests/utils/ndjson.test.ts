@@ -172,10 +172,10 @@ describe('parseTokenStats', () => {
     });
     const result = parseTokenStats(input);
     assert.deepStrictEqual(result, {
-      total_tokens: 119002,
-      input_tokens: 113266,
-      output_tokens: 571,
-      cached_tokens: 73501
+      totalTokens: 119002,
+      inputTokens: 113266,
+      outputTokens: 571,
+      cachedTokens: 73501
     });
   });
 
@@ -207,10 +207,10 @@ describe('parseTokenStats', () => {
     });
     const result = parseTokenStats(input);
     assert.deepStrictEqual(result, {
-      total_tokens: 500,
-      input_tokens: 0,
-      output_tokens: 0,
-      cached_tokens: 0
+      totalTokens: 500,
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedTokens: 0
     });
   });
 

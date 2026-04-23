@@ -84,7 +84,7 @@ export class GeminiCliRunner implements AgentRunner {
       // Use -p, --approval-mode auto_edit and --output-format stream-json for headless NDJSON mode.
       const args: string[] = ['-p', prompt, '--approval-mode', 'auto_edit', '--output-format', 'stream-json', ...extraArgs];
 
-      const spawnOptions: any = {
+      const spawnOptions: child_process.SpawnOptions = {
         cwd: cwd,
         env: { ...process.env, FORCE_COLOR: '1' },
         stdio: ['ignore', 'pipe', 'pipe'],  // stdin closed → interactive reads get EOF immediately

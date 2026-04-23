@@ -3,6 +3,7 @@ import path from 'path';
 import type { AssertionResult, EvalSuiteReport, EvalTrial, TaskResult } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
 import type { Reporter } from './reporter.js';
+import { formatTokens } from '../utils/table-renderer.js';
 
 export class HtmlReporter implements Reporter {
   generate(report: EvalSuiteReport, runDir: string): void {
@@ -29,11 +30,6 @@ function formatPercent(val: number): string {
   return `${Math.round(val * 100)}%`;
 }
 
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
-  return `${n}`;
-}
 
 function passColorClass(val: number): string {
   if (val >= 0.8) return 'green';

@@ -119,13 +119,13 @@ export class EvalRunner {
   }
 
   async runFunctionalTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext, attempt = 0): Promise<EvalTrial> {
-    const isBaseline = this.options.isBaseline;
-    const passName = isBaseline ? 'without-skill' : 'with-skill';
-    const promptToUse = isBaseline
+    const skillDisabled = this.options.isBaseline;
+    const evalModeLabel = skillDisabled ? 'without-skill' : 'with-skill';
+    const promptToUse = skillDisabled
       ? `${task.prompt}\n\nIMPORTANT: For this task, you MUST NOT use the '${this.options.skillName}' skill/tool, even if it appears available.`
       : `${task.prompt}\n\nIMPORTANT: You must use the '${this.options.skillName}' skill/tool to solve this task.`;
 
-    const logFileName = `task_${task.id}_${passName}_trial_${trialId}.log`;
+    const logFileName = `task_${task.id}_${evalModeLabel}_trial_${trialId}.log`;
     const logPath = this.options.debug ? path.join(this.options.runDir, logFileName) : undefined;
 
     let worktreePath: string | undefined;
@@ -133,23 +133,23 @@ export class EvalRunner {
     let trialPassed = false;
     let transcript: AgentTranscript | null = null;
 
-    const worktreeId = attempt > 0 ? `task-${task.id}-${passName}-trial-${trialId}-r${attempt}` : `task-${task.id}-${passName}-trial-${trialId}`;
+    const worktreeId = attempt > 0 ? `task-${task.id}-${evalModeLabel}-trial-${trialId}-r${attempt}` : `task-${task.id}-${evalModeLabel}-trial-${trialId}`;
     if (attempt > 0) {
       const prevId = attempt === 1
-        ? `task-${task.id}-${passName}-trial-${trialId}`
-        : `task-${task.id}-${passName}-trial-${trialId}-r${attempt - 1}`;
+        ? `task-${task.id}-${evalModeLabel}-trial-${trialId}`
+        : `task-${task.id}-${evalModeLabel}-trial-${trialId}-r${attempt - 1}`;
       this.env.removeWorktree(path.resolve(this.options.workspace, '.project-skill-evals', 'worktrees', prevId));
     }
     try {
       uiCtx.updateLog('Setting up…');
       worktreePath = this.env.createWorktree(worktreeId);
-      if (!isBaseline) {
+      if (!skillDisabled) {
         await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
       }
       this.runner.applyRunnerConfig(path.resolve(this.options.workspace, this.options.skillPath, 'evals', 'config'), worktreePath);
 
       uiCtx.updateLog('Executing prompt…');
-      if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} AGENT RUN\n`);
+      if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${evalModeLabel.toUpperCase()} AGENT RUN\n`);
       transcript = await this.runner.runPrompt(promptToUse, worktreePath, undefined, logPath, undefined, this.options.timeoutMs);
 
       // Propagate stream-json errors: when the agent fails (e.g. quota), Gemini CLI still
@@ -168,7 +168,7 @@ export class EvalRunner {
         : undefined;
 
       if (transcript && !transcript.error) {
-        if (isBaseline && this.triggerGrader.detectSkillAttempt(transcript)) {
+        if (skillDisabled && this.triggerGrader.detectSkillAttempt(transcript)) {
           return {
             id: trialId,
             transcript,
@@ -182,7 +182,7 @@ export class EvalRunner {
             tokenStats
           };
         }
-        if (!isBaseline && !this.triggerGrader.gradeTrigger(transcript)) {
+        if (!skillDisabled && !this.triggerGrader.gradeTrigger(transcript)) {
           return {
             id: trialId,
             transcript,
@@ -212,7 +212,7 @@ export class EvalRunner {
 
         if (task.assertions && task.assertions.length > 0) {
           uiCtx.updateLog('Grading…');
-          if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${passName.toUpperCase()} JUDGE RUN\n`);
+          if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${evalModeLabel.toUpperCase()} JUDGE RUN\n`);
           // Use the already-parsed stream result to get clean text for the judge.
           const streamResult = parseStreamResult(transcript.response || '');
           const streamText = streamResult && 'response' in streamResult ? streamResult.response : '';
@@ -222,7 +222,7 @@ export class EvalRunner {
           // The agent has already run successfully — no need to re-run it.
           const MAX_JUDGE_RETRIES = 2;
           const judgeDelayMs = this.options.judgeRetryDelayMs ?? 1000;
-          let lastJudgeError: Error | null = null;
+          let judgeErrorAfterAllRetries: Error | null = null;
           for (let judgeAttempt = 0; judgeAttempt <= MAX_JUDGE_RETRIES; judgeAttempt++) {
             if (judgeAttempt > 0) {
               uiCtx.updateLog(`Judge error, retrying (${judgeAttempt}/${MAX_JUDGE_RETRIES})…`);
@@ -238,18 +238,18 @@ export class EvalRunner {
                 logPath,
                 worktreePath
               );
-              lastJudgeError = null;
+              judgeErrorAfterAllRetries = null;
               break;
             } catch (e) {
-              lastJudgeError = e instanceof Error ? e : new Error(String(e));
+              judgeErrorAfterAllRetries = e instanceof Error ? e : new Error(String(e));
             }
           }
 
-          if (lastJudgeError) {
+          if (judgeErrorAfterAllRetries) {
             // Judge exhausted all retries — return an inconclusive failure.
             // isError is intentionally NOT set so the outer withRetry does not
             // re-run the expensive agent for a judge infrastructure issue.
-            const reason = lastJudgeError.message;
+            const reason = judgeErrorAfterAllRetries.message;
             return {
               id: trialId,
               transcript: transcript || { error: 'No transcript produced' },

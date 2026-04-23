@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import ora, { Ora } from 'ora';
-import Table from 'cli-table3';
+import Table, { type TableConstructorOptions } from 'cli-table3';
 
 export class Logger {
   static info(message: string): void {
@@ -46,7 +46,7 @@ export class Logger {
     process.stdout.write(message);
   }
 
-  static table(data: any[][], options: any = {}): void {
+  static table(data: string[][], options: TableConstructorOptions = {}): void {
     const table = new Table({
       chars: {
         'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',

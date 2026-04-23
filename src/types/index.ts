@@ -21,10 +21,10 @@ export interface AssertionResult {
  * and the trial never reached a judge verdict. These trials are candidates for retry.
  */
 export interface TrialTokenStats {
-  total_tokens: number;
-  input_tokens: number;
-  output_tokens: number;
-  cached_tokens: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
 }
 
 export interface AggregatedTokenStats {

@@ -39,10 +39,10 @@ export function aggregateTokenStats(trials: EvalTrial[]): AggregatedTokenStats |
   if (withStats.length === 0) return null;
   const n = withStats.length;
   return {
-    avgTotal:  Math.round(withStats.reduce((s, t) => s + t.tokenStats!.total_tokens,  0) / n),
-    avgInput:  Math.round(withStats.reduce((s, t) => s + t.tokenStats!.input_tokens,  0) / n),
-    avgOutput: Math.round(withStats.reduce((s, t) => s + t.tokenStats!.output_tokens, 0) / n),
-    avgCached: Math.round(withStats.reduce((s, t) => s + t.tokenStats!.cached_tokens, 0) / n),
+    avgTotal:  Math.round(withStats.reduce((s, t) => s + t.tokenStats!.totalTokens,  0) / n),
+    avgInput:  Math.round(withStats.reduce((s, t) => s + t.tokenStats!.inputTokens,  0) / n),
+    avgOutput: Math.round(withStats.reduce((s, t) => s + t.tokenStats!.outputTokens, 0) / n),
+    avgCached: Math.round(withStats.reduce((s, t) => s + t.tokenStats!.cachedTokens, 0) / n),
     trialCount: n,
   };
 }

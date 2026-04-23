@@ -8,7 +8,7 @@ import { computePassAtK } from '../core/statistics.js';
  * Formats a token count for human-readable display.
  * Numbers >= 1M are shown as "1.2M", >= 1K as "119K", else as-is.
  */
-function formatTokens(n: number): string {
+export function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
   return `${n}`;
@@ -147,9 +147,9 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
   const percentage = Math.round((metrics.passAtK || 0) * 100);
   Logger.write(`\n   Trigger Success Rate:   ${percentage}%`);
 
-  const wi = metrics.tokenStats?.withSkill;
-  if (wi) {
-    Logger.write(`\n   Avg Tokens:             ${formatTokenStatsLine(wi)}`);
+  const withSkillTokenStats = metrics.tokenStats?.withSkill;
+  if (withSkillTokenStats) {
+    Logger.write(`\n   Avg Tokens:             ${formatTokenStatsLine(withSkillTokenStats)}`);
   }
 }
 
@@ -168,11 +168,11 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
     const withoutSkillTrials = result.withoutSkillTrials || [];
     const withSkillTrials = result.trials;
 
-    const bSomeError = withoutSkillTrials.some(t => t.isError);
-    const bAllError = withoutSkillTrials.length > 0 && withoutSkillTrials.every(t => t.isError);
-    const tSomeError = withSkillTrials.some(t => t.isError);
-    const tAllError = withSkillTrials.length > 0 && withSkillTrials.every(t => t.isError);
-    if ((bSomeError && !bAllError) || (tSomeError && !tAllError)) hasPartialErrors = true;
+    const baselineSomeError = withoutSkillTrials.some(t => t.isError);
+    const baselineAllError = withoutSkillTrials.length > 0 && withoutSkillTrials.every(t => t.isError);
+    const withSkillSomeError = withSkillTrials.some(t => t.isError);
+    const withSkillAllError = withSkillTrials.length > 0 && withSkillTrials.every(t => t.isError);
+    if ((baselineSomeError && !baselineAllError) || (withSkillSomeError && !withSkillAllError)) hasPartialErrors = true;
 
     tableData.push([
       result.taskId.toString(),
@@ -194,15 +194,15 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
   Logger.write(`\n   Without Skill Rate:   ${withoutSkillPercentage}%`);
   Logger.write(`\n   With Skill Rate:      ${withSkillPercentage}%`);
 
-  const wo = metrics.tokenStats?.withoutSkill;
-  const wi = metrics.tokenStats?.withSkill;
-  if (wo || wi) {
-    if (wo) Logger.write(`\n   Tokens (w/o skill):   ${formatTokenStatsLine(wo)}`);
-    if (wi) Logger.write(`\n   Tokens (w/ skill):    ${formatTokenStatsLine(wi)}`);
-    if (wo && wi && wo.avgTotal > 0) {
-      const delta = wi.avgTotal - wo.avgTotal;
+  const baselineTokenStats = metrics.tokenStats?.withoutSkill;
+  const withSkillTokenStats = metrics.tokenStats?.withSkill;
+  if (baselineTokenStats || withSkillTokenStats) {
+    if (baselineTokenStats) Logger.write(`\n   Tokens (w/o skill):   ${formatTokenStatsLine(baselineTokenStats)}`);
+    if (withSkillTokenStats) Logger.write(`\n   Tokens (w/ skill):    ${formatTokenStatsLine(withSkillTokenStats)}`);
+    if (baselineTokenStats && withSkillTokenStats && baselineTokenStats.avgTotal > 0) {
+      const delta = withSkillTokenStats.avgTotal - baselineTokenStats.avgTotal;
       const deltaSign = delta >= 0 ? '+' : '';
-      const deltaPct = Math.round((delta / wo.avgTotal) * 100);
+      const deltaPct = Math.round((delta / baselineTokenStats.avgTotal) * 100);
       const deltaStr = `${deltaSign}${formatTokens(Math.abs(delta))} (${deltaSign}${deltaPct}%)`;
       Logger.write(`\n   Token Delta:          ${delta >= 0 ? chalk.yellow(deltaStr) : chalk.green(deltaStr)}`);
     }
