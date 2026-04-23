@@ -87,50 +87,6 @@ function renderMetricsCards(report: EvalSuiteReport): string {
 }
 
 // ---------------------------------------------------------------------------
-// Chart
-// ---------------------------------------------------------------------------
-
-function renderChart(report: EvalSuiteReport): string {
-  const { results, metrics } = report;
-  const numTrials = metrics.numTrials ?? 1;
-  const labels = results.map(r => `Task #${r.taskId}`);
-
-  let datasets: object[];
-
-  if (isFunctional(report)) {
-    const withoutSkillData = results.map(r => {
-      const bt = r.withoutSkillTrials ?? [];
-      return bt.length === 0 ? 0 : Math.round((bt.filter(t => t.trialPassed).length / bt.length) * 100);
-    });
-    const withSkillData = results.map(r =>
-      Math.round((r.trials.filter(t => t.trialPassed).length / Math.max(r.trials.length, 1)) * 100)
-    );
-    datasets = [
-      { label: 'Without Skill Success Rate', data: withoutSkillData, backgroundColor: '#94a3b8', borderRadius: 4 },
-      { label: 'With Skill Success Rate', data: withSkillData, backgroundColor: '#3b82f6', borderRadius: 4 },
-    ];
-  } else {
-    const passData = results.map(r =>
-      Math.round((r.trials.filter(t => t.trialPassed).length / Math.max(r.trials.length, 1)) * 100)
-    );
-    datasets = [{
-      label: numTrials > 1 ? 'Success Rate' : 'Score',
-      data: passData,
-      backgroundColor: passData.map(v => v >= 80 ? '#22c55e' : v >= 50 ? '#f59e0b' : '#ef4444'),
-      borderRadius: 4,
-    }];
-  }
-
-  const chartData = JSON.stringify({ labels, datasets });
-
-  return `
-<div class="chart-wrap">
-  <script type="application/json" id="chart-data">${chartData}</script>
-  <canvas id="eval-chart"></canvas>
-</div>`;
-}
-
-// ---------------------------------------------------------------------------
 // Trial details
 // ---------------------------------------------------------------------------
 
@@ -244,7 +200,6 @@ export function generateHtml(report: EvalSuiteReport): string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Skill Eval — ${escapeHtml(skill_name)}</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; font-size: 14px; }
@@ -277,10 +232,6 @@ a { color: #3b82f6; }
 /* Section */
 .section { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
 .section-title { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; padding: 12px 16px; border-bottom: 1px solid #f1f5f9; }
-
-/* Chart */
-.chart-wrap { padding: 16px; }
-#eval-chart { max-height: 300px; }
 
 /* Table */
 .table-wrap { overflow-x: auto; }
@@ -345,12 +296,6 @@ tr:last-child td { border-bottom: none; }
   <!-- Metric Cards -->
   ${renderMetricsCards(report)}
 
-  <!-- Chart -->
-  <div class="section">
-    <div class="section-title">Pass rate by task</div>
-    ${renderChart(report)}
-  </div>
-
   <!-- Task Table -->
   <div class="section">
     <div class="section-title">Task results</div>
@@ -360,28 +305,6 @@ tr:last-child td { border-bottom: none; }
 </div>
 <script>
 (function () {
-  // Chart
-  const rawData = document.getElementById('chart-data');
-  if (rawData) {
-    const data = JSON.parse(rawData.textContent || '{}');
-    const ctx = document.getElementById('eval-chart');
-    if (ctx) {
-      new Chart(ctx, {
-        type: 'bar',
-        data: data,
-        options: {
-          indexAxis: 'y',
-          responsive: true,
-          plugins: { legend: { display: ${functional ? 'true' : 'false'} } },
-          scales: {
-            x: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#f1f5f9' } },
-            y: { grid: { display: false } }
-          }
-        }
-      });
-    }
-  }
-
   // Accordion
   document.querySelectorAll('.details-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
