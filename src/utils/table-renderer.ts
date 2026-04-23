@@ -45,7 +45,7 @@ export interface RunHeaderConfig {
   tasks: number;
   trials: number;
   maxAgents: number;
-  timeoutMs: number;
+  timeoutMs?: number;
   runDir: string;
   evalId?: number;
 }
@@ -74,8 +74,11 @@ function boxLabel(key: string, value: string): string {
 export function renderRunHeader(config: RunHeaderConfig): void {
   const { command, skillName, agent, workspace, tasks, trials, maxAgents, timeoutMs, runDir, evalId } = config;
 
-  const timeoutSec = timeoutMs / 1000;
-  const timeoutStr = timeoutSec % 60 === 0 ? `${timeoutSec / 60}m` : `${timeoutSec}s`;
+  let timeoutStr = 'None';
+  if (timeoutMs && timeoutMs > 0) {
+    const timeoutSec = timeoutMs / 1000;
+    timeoutStr = timeoutSec % 60 === 0 ? `${timeoutSec / 60}m` : `${timeoutSec}s`;
+  }
 
   const relRunDir = path.relative(workspace, runDir);
   const maxOutputLen = BOX_INNER - 13; // 11 label + 2 spaces

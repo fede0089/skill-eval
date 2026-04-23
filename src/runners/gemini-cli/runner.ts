@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import child_process from 'child_process';
-import { AgentOutput, DEFAULT_TIMEOUT_MS } from '../../types/index.js';
+import { AgentOutput } from '../../types/index.js';
 import { AgentRunner } from '../runner.interface.js';
 import { Logger } from '../../utils/logger.js';
 import { executor } from '../../utils/exec.js';
@@ -24,7 +24,7 @@ export class GeminiCliRunner implements AgentRunner {
     onLog?: (log: string) => void,
     logPath?: string,
     extraArgs: string[] = [],
-    timeoutMs: number = DEFAULT_TIMEOUT_MS
+    timeoutMs?: number
   ): Promise<AgentOutput | null> {
     return new Promise((resolve) => {
       let stdout = '';
@@ -42,11 +42,24 @@ export class GeminiCliRunner implements AgentRunner {
       // happens to contain "[Y/n]" in the middle of a line.
       const INTERACTIVE_PROMPT_RE = /\[[yYnN]\/[yYnN]\]\s*:?\s*$/;
 
+      let timeout: NodeJS.Timeout | undefined;
+
+      function killProcessGroup() {
+        if (child.pid) {
+          try {
+            // Signal the entire process group by using negative PID (Unix only)
+            process.kill(-child.pid, 'SIGKILL');
+          } catch (err) {
+            // Process might have already exited
+          }
+        }
+      }
+
       function killOnInteractivePrompt(chunk: string): boolean {
         if (!resolved && INTERACTIVE_PROMPT_RE.test(chunk)) {
           resolved = true;
-          clearTimeout(timeout);
-          child.kill('SIGKILL');
+          if (timeout) clearTimeout(timeout);
+          killProcessGroup();
           terminationReason = 'interactive-prompt';
           if (logStream) {
             logStream.write('\n\n--- Gemini CLI blocked on interactive prompt — killed ---\n');
@@ -74,7 +87,8 @@ export class GeminiCliRunner implements AgentRunner {
       const spawnOptions: any = {
         cwd: cwd,
         env: { ...process.env, FORCE_COLOR: '1' },
-        stdio: ['ignore', 'pipe', 'pipe']  // stdin closed → interactive reads get EOF immediately
+        stdio: ['ignore', 'pipe', 'pipe'],  // stdin closed → interactive reads get EOF immediately
+        detached: true
       };
 
       const child = child_process.spawn('gemini', args, spawnOptions);
@@ -99,18 +113,20 @@ export class GeminiCliRunner implements AgentRunner {
         }
       }
 
-      // Safety timeout (default: 10 minutes / 600,000 ms, configurable via timeoutMs)
-      const timeout = setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          child.kill('SIGKILL');
-          terminationReason = 'timeout';
-          // logStream is finalized (marker + stderr + end) in child.on('close')
-          const timeoutSec = timeoutMs / 1000;
-          Logger.error(`\nGemini CLI process timed out after ${timeoutSec} seconds.`);
-          resolve({ error: `Process timeout exceeded (${timeoutSec} seconds)`, raw_output: stderr });
-        }
-      }, timeoutMs);
+      // Safety timeout (configurable via timeoutMs)
+      if (timeoutMs && timeoutMs > 0) {
+        timeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            killProcessGroup();
+            terminationReason = 'timeout';
+            // logStream is finalized (marker + stderr + end) in child.on('close')
+            const timeoutSec = timeoutMs / 1000;
+            Logger.error(`\nGemini CLI process timed out after ${timeoutSec} seconds.`);
+            resolve({ error: `Process timeout exceeded (${timeoutSec} seconds)`, raw_output: stderr });
+          }
+        }, timeoutMs);
+      }
 
       // Track completion of streams
       let stdoutDone = false;
@@ -120,7 +136,7 @@ export class GeminiCliRunner implements AgentRunner {
       function checkAllDone() {
         if (stdoutDone && stderrDone && processDone && logStreamDone && !resolved) {
           resolved = true;
-          clearTimeout(timeout);
+          if (timeout) clearTimeout(timeout);
 
           if (!stdout || stdout.trim() === '') {
             return resolve({ error: 'Empty output from Gemini CLI', raw_output: stderr });
@@ -175,7 +191,7 @@ export class GeminiCliRunner implements AgentRunner {
       child.on('error', (err) => {
         if (!resolved) {
           resolved = true;
-          clearTimeout(timeout);
+          if (timeout) clearTimeout(timeout);
           terminationReason = 'error';
           // logStream is finalized (marker + stderr + end) in child.on('close')
           Logger.error(`Failed to start gemini CLI. Error: ${err.message}`);

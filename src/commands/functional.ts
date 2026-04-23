@@ -95,7 +95,7 @@ export async function functionalCommand(
   ];
 
   try {
-    renderRunHeader({ command: 'functional', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs: timeoutMs ?? 600000, runDir, evalId });
+    renderRunHeader({ command: 'functional', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId });
     Logger.write(`──────────────────────────────────────────────────\n`);
 
     for (let i = 0; i < tasks.length; i++) {

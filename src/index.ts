@@ -6,7 +6,6 @@ import { Logger } from './utils/logger.js';
 import { AppError } from './core/errors.js';
 import { HtmlReporter } from './reporters/index.js';
 import { DEFAULT_AGENT } from './runners/registry.js';
-import { DEFAULT_TIMEOUT_MS } from './types/index.js';
 
 import * as path from 'path';
 import * as fs from 'fs';
@@ -43,14 +42,14 @@ program
   .requiredOption('--skill <path>', 'Path to the skill directory')
   .option('--agents <number>', 'Number of parallel agents')
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
-  .option('--timeout <seconds>', 'Agent timeout in seconds', String(DEFAULT_TIMEOUT_MS / 1000))
+  .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
     const maxAgents = parseInt(options.agents, 10) || 4;
     const numTrials = options.trials !== undefined ? (parseInt(options.trials, 10) || 3) : 3;
-    const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
+    const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     triggerCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId).catch(errorHandler);
   });
@@ -62,14 +61,14 @@ program
   .requiredOption('--skill <path>', 'Path to the skill directory')
   .option('--agents <number>', 'Number of parallel agents')
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
-  .option('--timeout <seconds>', 'Agent timeout in seconds', String(DEFAULT_TIMEOUT_MS / 1000))
+  .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
     const maxAgents = parseInt(options.agents, 10) || 4;
     const numTrials = options.trials !== undefined ? (parseInt(options.trials, 10) || 3) : 3;
-    const timeoutMs = parseInt(options.timeout, 10) * 1000 || DEFAULT_TIMEOUT_MS;
+    const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId).catch(errorHandler);
   });

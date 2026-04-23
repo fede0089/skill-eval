@@ -13,6 +13,7 @@ import * as os from 'node:os';
  */
 function createMockChild() {
   const child = new EventEmitter() as any;
+  child.pid = 12345;
   child.stdout = new Readable({
     read() {}
   });
@@ -153,6 +154,7 @@ test('GeminiCliRunner.runPrompt should write to logPath if provided', async (t) 
 test('GeminiCliRunner.runPrompt should kill process and return error when stdout contains interactive Y/N prompt', async (t) => {
   const mockChild = createMockChild();
   const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
+  const killMock = mock.method(process, 'kill', () => {});
 
   const runner = new GeminiCliRunner();
   const promise = runner.runPrompt('test prompt');
@@ -166,14 +168,17 @@ test('GeminiCliRunner.runPrompt should kill process and return error when stdout
 
   assert.ok(result, 'result should be defined');
   assert.ok(result?.error, 'result should have an error');
-  assert.ok((mockChild.kill as ReturnType<typeof mock.fn>).mock.callCount() >= 1, 'child.kill should have been called');
+  assert.ok(killMock.mock.callCount() >= 1, 'process.kill should have been called');
+  assert.strictEqual(killMock.mock.calls[0].arguments[0], -mockChild.pid, 'Should kill the process group');
 
   spawnMock.mock.restore();
+  killMock.mock.restore();
 });
 
 test('GeminiCliRunner.runPrompt should kill process and return error when stderr contains interactive Y/N prompt', async (t) => {
   const mockChild = createMockChild();
   const spawnMock = mock.method(child_process, 'spawn', () => mockChild);
+  const killMock = mock.method(process, 'kill', () => {});
 
   const runner = new GeminiCliRunner();
   const promise = runner.runPrompt('test prompt');
@@ -187,9 +192,11 @@ test('GeminiCliRunner.runPrompt should kill process and return error when stderr
 
   assert.ok(result, 'result should be defined');
   assert.ok(result?.error, 'result should have an error');
-  assert.ok((mockChild.kill as ReturnType<typeof mock.fn>).mock.callCount() >= 1, 'child.kill should have been called');
+  assert.ok(killMock.mock.callCount() >= 1, 'process.kill should have been called');
+  assert.strictEqual(killMock.mock.calls[0].arguments[0], -mockChild.pid, 'Should kill the process group');
 
   spawnMock.mock.restore();
+  killMock.mock.restore();
 });
 
 test('GeminiCliRunner.runPrompt should log triggering text and stderr when killing on interactive prompt', async (t) => {

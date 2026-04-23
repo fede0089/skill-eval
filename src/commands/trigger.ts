@@ -74,7 +74,7 @@ export async function triggerCommand(
   let barrier = Promise.resolve();
 
   try {
-    renderRunHeader({ command: 'trigger', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs: timeoutMs ?? 600000, runDir, evalId });
+    renderRunHeader({ command: 'trigger', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId });
     Logger.write(`--- Trigger Pass ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
 
