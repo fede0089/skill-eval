@@ -7,7 +7,7 @@ import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
 import { AgentPool } from '../core/agent-pool.js';
-import { aggregatePassAtK, aggregateTokenStats, aggregateDurationStats } from '../core/statistics.js';
+import { aggregatePassAtK, aggregateAssertionPassRate, aggregateTokenStats, aggregateDurationStats } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderFunctionalTable, renderRunHeader } from '../utils/table-renderer.js';
@@ -139,7 +139,9 @@ export async function functionalCommand(
             ).then(trial => {
               if (multi) {
                 const reason = trial.assertionResults.find(r => !r.passed)?.reason;
-                multi.markTrialComplete(trialId, trial.trialPassed, reason, trial.isError);
+                const passedCount = trial.assertionResults.filter(r => r.passed).length;
+                const totalCount = trial.assertionResults.length;
+                multi.markTrialComplete(trialId, trial.trialPassed, reason, trial.isError, passedCount, totalCount);
               }
               return trial;
             }).finally(release);
@@ -172,7 +174,9 @@ export async function functionalCommand(
             ).then(trial => {
               if (multi) {
                 const reason = trial.assertionResults.find(r => !r.passed)?.reason;
-                multi.markTrialComplete(subtaskId, trial.trialPassed, reason, trial.isError);
+                const passedCount = trial.assertionResults.filter(r => r.passed).length;
+                const totalCount = trial.assertionResults.length;
+                multi.markTrialComplete(subtaskId, trial.trialPassed, reason, trial.isError, passedCount, totalCount);
               }
               return trial;
             }).finally(release);
@@ -221,8 +225,11 @@ export async function functionalCommand(
     const { passAtK } = aggregatePassAtK(taskResults, numTrials, r => r.trials);
     const { passAtK: withoutSkillPassAtK } = aggregatePassAtK(taskResults, numTrials, r => r.withoutSkillTrials ?? []);
 
-    const withSkillPercentage = Math.round(passAtK * 100);
-    const withoutSkillPercentage = Math.round(withoutSkillPassAtK * 100);
+    const assertionPassRate = aggregateAssertionPassRate(taskResults, r => r.trials);
+    const withoutSkillAssertionPassRate = aggregateAssertionPassRate(taskResults, r => r.withoutSkillTrials ?? []);
+
+    const withSkillPercentage = Math.round(assertionPassRate * 100);
+    const withoutSkillPercentage = Math.round(withoutSkillAssertionPassRate * 100);
     const skillUplift = withSkillPercentage - withoutSkillPercentage;
 
     const withSkillTokenStats    = aggregateTokenStats(taskResults.flatMap(r => r.trials)) ?? undefined;
@@ -243,6 +250,8 @@ export async function functionalCommand(
         numTrials,
         passAtK: Math.round(passAtK * 1000) / 1000,
         withoutSkillPassAtK: Math.round(withoutSkillPassAtK * 1000) / 1000,
+        assertionPassRate: Math.round(assertionPassRate * 1000) / 1000,
+        withoutSkillAssertionPassRate: Math.round(withoutSkillAssertionPassRate * 1000) / 1000,
         tokenStats: (withSkillTokenStats || withoutSkillTokenStats)
           ? { withSkill: withSkillTokenStats, withoutSkill: withoutSkillTokenStats }
           : undefined,

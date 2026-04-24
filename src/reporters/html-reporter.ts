@@ -4,7 +4,7 @@ import type { AssertionResult, EvalSuiteReport, EvalTrial, TaskResult } from '..
 import { Logger } from '../utils/logger.js';
 import type { Reporter } from './reporter.js';
 import { formatTokens, formatDuration } from '../utils/table-renderer.js';
-import { computePassAtK } from '../core/statistics.js';
+import { computeAssertionPassRate } from '../core/statistics.js';
 
 export class HtmlReporter implements Reporter {
   generate(report: EvalSuiteReport, runDir: string): void {
@@ -59,8 +59,8 @@ function renderMetricsGrid(report: EvalSuiteReport): string {
   const functional = isFunctional(report);
 
   if (functional) {
-    const bk = metrics.withoutSkillPassAtK ?? 0;
-    const tk = metrics.passAtK ?? 0;
+    const bk = metrics.withoutSkillAssertionPassRate ?? metrics.withoutSkillPassAtK ?? 0;
+    const tk = metrics.assertionPassRate ?? metrics.passAtK ?? 0;
     const upliftRaw = parseInt(metrics.skillUplift ?? '0', 10);
     const upliftClass = upliftRaw > 0 ? 'green' : upliftRaw < 0 ? 'red' : '';
 
@@ -145,12 +145,17 @@ function renderAssertions(assertions: AssertionResult[]): string {
 }
 
 function renderTrial(trial: EvalTrial): string {
-  const cls = trial.isError ? 'trial-error' : trial.trialPassed ? 'trial-pass' : 'trial-fail';
+  const passedCount = trial.assertionResults.filter(r => r.passed).length;
+  const totalCount = trial.assertionResults.length;
+  const isPartial = !trial.trialPassed && !trial.isError && passedCount > 0;
+  const cls = trial.isError ? 'trial-error' : trial.trialPassed ? 'trial-pass' : isPartial ? 'trial-partial' : 'trial-fail';
   const badge = trial.isError
     ? '<span class="pill amber">! ERROR</span>'
     : trial.trialPassed
       ? '<span class="pill green">✓ PASS</span>'
-      : '<span class="pill red">✗ NOT PASSED</span>';
+      : isPartial
+        ? `<span class="pill amber">~ PARTIAL ${passedCount}/${totalCount}</span>`
+        : '<span class="pill red">✗ NOT PASSED</span>';
   return `<div class="trial ${cls}">
   <div class="trial-header">Trial ${trial.id} ${badge}</div>
   <div class="trial-assertions">${renderAssertions(trial.assertionResults)}</div>
@@ -173,8 +178,8 @@ function renderTaskMiniGrid(result: TaskResult): string {
   const woTrials = result.withoutSkillTrials ?? [];
   const wiTrials = result.trials;
 
-  const bk = woTrials.length ? Math.round(computePassAtK(woTrials) * 100) : 0;
-  const tk = wiTrials.length ? Math.round(computePassAtK(wiTrials) * 100) : 0;
+  const bk = woTrials.length ? Math.round(computeAssertionPassRate(woTrials) * 100) : 0;
+  const tk = wiTrials.length ? Math.round(computeAssertionPassRate(wiTrials) * 100) : 0;
   const rateDelta = tk - bk;
   const rateDeltaSign = rateDelta >= 0 ? '+' : '';
   const rateDeltaClass = rateDelta > 0 ? 'green' : rateDelta < 0 ? 'red' : '';
@@ -344,9 +349,10 @@ tr:last-child td { border-bottom: none; }
 /* Trials */
 .trial { border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
 .trial-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-weight: 500; font-size: 13px; background: #f8fafc; }
-.trial-pass  .trial-header { border-left: 3px solid #22c55e; }
-.trial-fail  .trial-header { border-left: 3px solid #ef4444; }
-.trial-error .trial-header { border-left: 3px solid #f59e0b; }
+.trial-pass    .trial-header { border-left: 3px solid #22c55e; }
+.trial-partial .trial-header { border-left: 3px solid #f59e0b; }
+.trial-fail    .trial-header { border-left: 3px solid #ef4444; }
+.trial-error   .trial-header { border-left: 3px solid #f59e0b; }
 .trial-assertions { padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
 
 /* Pills */

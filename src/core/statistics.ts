@@ -1,6 +1,30 @@
 import { AggregatedTokenStats, AggregatedDurationStats, EvalTrial, TaskResult } from '../types/index.js';
 
 /**
+ * Computes the fraction of individual assertions that passed across all non-error trials.
+ * Returns 0 if there are no non-error trials or no assertions.
+ */
+export function computeAssertionPassRate(trials: EvalTrial[]): number {
+  const relevant = trials.filter(t => !t.isError);
+  if (relevant.length === 0) return 0;
+  const total = relevant.reduce((s, t) => s + t.assertionResults.length, 0);
+  if (total === 0) return 0;
+  const passed = relevant.reduce((s, t) => s + t.assertionResults.filter(r => r.passed).length, 0);
+  return passed / total;
+}
+
+/**
+ * Averages computeAssertionPassRate across all task results.
+ */
+export function aggregateAssertionPassRate(
+  results: TaskResult[],
+  trialSelector: (r: TaskResult) => EvalTrial[]
+): number {
+  if (results.length === 0) return 0;
+  return results.reduce((sum, r) => sum + computeAssertionPassRate(trialSelector(r)), 0) / results.length;
+}
+
+/**
  * Computes the pass rate (pass@1) for a set of trials.
  * Returns the fraction of trials that passed: c / n.
  */

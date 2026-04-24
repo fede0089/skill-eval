@@ -55,6 +55,8 @@ function makeFunctionalReport(): EvalSuiteReport {
       passAtN: 0.9,
       withoutSkillPassAtK: 0.6,
       withoutSkillPassAtN: 0.7,
+      assertionPassRate: 0.8,
+      withoutSkillAssertionPassRate: 0.6,
     },
     results: [
       {
@@ -115,6 +117,49 @@ test('generateHtml formats passAtK 0.667 as 67%', () => {
   const report = makeTriggerReport();
   const html = generateHtml(report);
   assert.ok(html.includes('67%'), 'pass@1 should be formatted as 67%');
+});
+
+test('generateHtml renders PARTIAL badge for trials where some but not all assertions pass', () => {
+  const report = makeTriggerReport({
+    results: [{
+      taskId: 1,
+      prompt: 'Do something',
+      score: 0,
+      trials: [{
+        id: 1,
+        transcript: {},
+        assertionResults: [
+          { assertion: 'First check', passed: true, reason: 'ok' },
+          { assertion: 'Second check', passed: false, reason: 'missing' },
+        ],
+        trialPassed: false,
+      }],
+    }],
+  });
+  const html = generateHtml(report);
+  assert.ok(html.includes('PARTIAL 1/2'), 'partial badge should show passed/total counts');
+  assert.ok(html.includes('trial-partial'), 'trial-partial CSS class should be applied');
+});
+
+test('generateHtml renders NOT PASSED badge when zero assertions pass', () => {
+  const report = makeTriggerReport({
+    results: [{
+      taskId: 1,
+      prompt: 'Do something',
+      score: 0,
+      trials: [{
+        id: 1,
+        transcript: {},
+        assertionResults: [
+          { assertion: 'First check', passed: false, reason: 'missing' },
+        ],
+        trialPassed: false,
+      }],
+    }],
+  });
+  const html = generateHtml(report);
+  assert.ok(html.includes('NOT PASSED'), 'full fail badge should still appear');
+  assert.ok(!html.includes('PARTIAL'), 'partial badge should NOT appear when 0 assertions pass');
 });
 
 test('generateHtml escapes HTML special characters in prompt', () => {

@@ -135,6 +135,8 @@ export interface EvalSuiteReport {
     numTrials?: number; // Number of trials per task
     passAtK?: number;              // Average pass@1 across tasks (pass rate)
     withoutSkillPassAtK?: number;  // Average without-skill pass@1 (functional only)
+    assertionPassRate?: number;              // Avg fraction of assertions passing (with skill)
+    withoutSkillAssertionPassRate?: number;  // Avg fraction of assertions passing (without skill)
     tokenStats?: {
       withSkill?: AggregatedTokenStats;
       withoutSkill?: AggregatedTokenStats;  // functional only

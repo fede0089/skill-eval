@@ -5,6 +5,26 @@ import { Logger } from './logger.js';
 import { computePassAtK } from '../core/statistics.js';
 
 /**
+ * Returns a color-coded assertion pass rate string for a set of trials.
+ * Only non-error trials contribute assertions to the rate.
+ * Color thresholds: ≥80% green, ≥50% yellow, <50% red.
+ */
+function formatAssertionRate(trials: EvalTrial[]): string {
+  if (trials.length === 0) return chalk.gray('—');
+  const allError = trials.every(t => t.isError);
+  const someError = trials.some(t => t.isError);
+  const relevant = trials.filter(t => !t.isError);
+  const total = relevant.reduce((s, t) => s + t.assertionResults.length, 0);
+  const passed = relevant.reduce((s, t) => s + t.assertionResults.filter(r => r.passed).length, 0);
+  const pct = total > 0 ? Math.round((passed / total) * 100) : 0;
+  if (allError) return chalk.yellow('Error');
+  if (someError) return chalk.yellow(`${pct}%*`);
+  if (pct >= 80) return chalk.green(`${pct}%`);
+  if (pct >= 50) return chalk.yellow(`${pct}%`);
+  return chalk.red(`${pct}%`);
+}
+
+/**
  * Formats a duration in milliseconds for human-readable display.
  * e.g. 45000 → "45s", 90000 → "1m 30s"
  */
@@ -194,8 +214,8 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
     tableData.push([
       result.taskId.toString(),
       promptSnippet,
-      formatPassAt1(withoutSkillTrials),
-      formatPassAt1(withSkillTrials),
+      formatAssertionRate(withoutSkillTrials),
+      formatAssertionRate(withSkillTrials),
     ]);
   }
 
@@ -205,8 +225,8 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
     Logger.write(chalk.yellow('\n   * Some trials did not complete due to infrastructure errors. success rate is computed over the trials that ran.'));
   }
 
-  const withoutSkillPercentage = Math.round((metrics.withoutSkillPassAtK || 0) * 100);
-  const withSkillPercentage = Math.round((metrics.passAtK || 0) * 100);
+  const withoutSkillPercentage = Math.round(((metrics.withoutSkillAssertionPassRate ?? metrics.withoutSkillPassAtK) || 0) * 100);
+  const withSkillPercentage = Math.round(((metrics.assertionPassRate ?? metrics.passAtK) || 0) * 100);
 
   Logger.write(`\n   Without Skill Rate:   ${withoutSkillPercentage}%`);
   Logger.write(`\n   With Skill Rate:      ${withSkillPercentage}%`);

@@ -15,7 +15,7 @@ export interface MultiTrialContext {
   /** Returns an EvalTaskContext whose updateLog writes to the given trial's subtask output */
   getTrialCtx(trialId: number): EvalTaskContext;
   /** Resolves or rejects the deferred promise for the given trial's subtask */
-  markTrialComplete(trialId: number, passed: boolean, failureReason?: string, isError?: boolean): void;
+  markTrialComplete(trialId: number, passed: boolean, failureReason?: string, isError?: boolean, assertionsPassed?: number, assertionsTotal?: number): void;
 }
 
 export type EvalTaskFn = (ctx: EvalTaskContext, multi?: MultiTrialContext) => Promise<void>;
@@ -140,7 +140,7 @@ export class ListrEvalUI {
               }
             }
           }),
-          markTrialComplete: (trialId: number, passed: boolean, failureReason?: string, isError?: boolean) => {
+          markTrialComplete: (trialId: number, passed: boolean, failureReason?: string, isError?: boolean, assertionsPassed?: number, assertionsTotal?: number) => {
             const i = trialId - 1;
             if (trialDone[i]) return;
             trialDone[i] = true;
@@ -151,6 +151,8 @@ export class ListrEvalUI {
               if (isError) {
                 titleSetters[i](`${subtaskBaseLabels[i]} — error`);
                 outputSetters[i]('(!) ERROR');
+              } else if (assertionsPassed !== undefined && assertionsTotal !== undefined && assertionsPassed > 0) {
+                titleSetters[i](`${subtaskBaseLabels[i]} — partial ${assertionsPassed}/${assertionsTotal}`);
               } else {
                 titleSetters[i](`${subtaskBaseLabels[i]} — not-passed`);
               }
