@@ -1,136 +1,164 @@
 # skill-eval
 
-A robust Node.js CLI tool specifically built to test and evaluate Agent Skills locally. It supports evaluating skill triggers and validating functional correctness through an LLM judge.
+A CLI tool for evaluating Agent Skills locally. Tests whether your skill triggers reliably and produces the right output, using an LLM as the judge.
 
-The agent executes in a **headless mode** (e.g., using `--approval-mode auto_edit` under the hood) without interrupting your CI/CD or development environment. 
+## How it works
 
-> **⚠️ Important Note on Permissions:** 
-> Because the execution is headless, the agent needs non-interactive permissions for the tools it intends to use. 
-> - **Minimum requirement:** Permissions to use the skill dispatch tool (e.g., `activate_skill` for Gemini CLI).
-> - **Functional edits:** If your evaluations require the agent to edit files, run commands, or use other specific tools, you MUST configure your environment (e.g., Gemini CLI policies) to allow these tools to run non-interactively. Otherwise, the agent will block waiting for user approval, and the evaluation will timeout or fail.
+For each eval prompt, skill-eval spins up parallel agent processes — some with the skill installed, others without (the baseline). Each agent runs headlessly and produces a transcript. An LLM judge then grades each transcript against your expectations. Results are aggregated into **pass@k** metrics, giving you a clear measure of how much your skill actually improves the agent's behavior versus the unassisted baseline.
 
-## Requirements
-- Node.js environment
-- TypeScript (`npm install` to grab all `devDependencies`)
-- `gemini` CLI (or target agent CLI) installed and available in `$PATH`.
+```
+                  eval prompt
+                       │
+               ┌───────▼───────┐
+               │   skill-eval  │
+               └───────┬───────┘
+                       │
+           ┌───────────┴───────────┐
+      ─ with skill ─          ─ baseline ─
+      ┌──────┴──────┐         ┌─────┴──────┐
+    agent 1      agent 2   agent 3      agent 4
+      │              │         │             │
+    judge          judge     judge         judge
+      └──────┬──────┘         └──────┬──────┘
+             └──────────┬────────────┘
+                        │
+                     pass@k
+```
 
-## Setup and Installation
+> The `trigger` command only runs with-skill trials and checks whether the skill dispatch tool was actually invoked — no judge or baseline needed.
 
-In the local repository, build and link the CLI:
+## Quick Start
+
 ```sh
+git clone <this-repo>
+cd skill-eval
 npm install
 npm run build
 npm link
 ```
 
-This will make the `skill-eval` binary available globally on your terminal.
+This makes `skill-eval` available globally in your terminal.
 
-## Usage
+**Requirements:** Node.js, and the agent CLI you want to evaluate (e.g. `gemini`) installed and on `$PATH`.
 
-Evaluations are defined via an `evals/evals.json` file inside your target skill directory.
+## Commands
 
-1. Ensure the destination skill has the typical structure:
-   ```txt
-   my-skill/
-     SKILL.md
-     evals/
-       evals.json
-       config/               # optional: runner-specific configuration
-         gemini-cli/         # copied into <worktree>/.gemini/ before each run
-           settings.json
-   ```
+```sh
+# Checks that the skill is triggered (invoked) for each prompt
+skill-eval trigger --workspace <path> --skill <path> [options] [agent]
 
-2. Run evaluations by specifying the workspace (the repo the agent will run in) and the skill path:
+# Checks that the skill produces correct output, measured against a baseline
+skill-eval functional --workspace <path> --skill <path> [options] [agent]
+```
 
-   **Evaluate Triggers (Trigger Command):**
-   ```sh
-   skill-eval trigger --workspace /path/to/repo --skill /path/to/skill
-   ```
+### Options
 
-   **Evaluate Functional Correctness (Functional Command):**
-   ```sh
-   skill-eval functional --workspace /path/to/repo --skill /path/to/skill
-   ```
+| Flag | Required | Default | Description |
+|------|----------|---------|-------------|
+| `--workspace <path>` | yes | — | Path to the repo the agent will run in |
+| `--skill <path>` | yes | — | Path to the skill directory |
+| `--agents <number>` | no | `4` | Number of parallel agent processes |
+| `--trials <number>` | no | `3` | Trials per task (for pass@k) |
+| `--timeout <seconds>` | no | none | Kill the agent after this many seconds |
+| `--eval-id <id>` | no | all | Run only the eval with this numeric ID |
+| `-v, --debug` | no | `false` | Enable verbose debug logging |
+| `[agent]` | no | `gemini-cli` | Agent backend to use |
 
-   Both commands support `--trials <number>` (default: 3) to run multiple trials per task and compute **pass@k** metrics, and `--concurrency <number>` (default: 5) to control parallel execution.
+### Skill directory structure
 
-   > **Runner config (`evals/config/<agent>/`):** Each skill can include runner-specific configuration files under `evals/config/`. Before every trial, skill-eval copies the matching subdirectory into the worktree's agent config directory (e.g., `evals/config/gemini-cli/` → `<worktree>/.gemini/`). Use this to pin `settings.json`, policies, or any other runner config needed for the eval to work correctly — without touching your workspace's own config.
+```
+my-skill/
+├── SKILL.md                        # skill definition (required)
+└── evals/                          # evaluation suite (required)
+    ├── my-evals.json               # one or more eval files (*.json)
+    └── config/                     # runner configuration (optional but often needed)
+        └── gemini-cli/             # runner-specific config folder
+            └── settings.json       # copied to <worktree>/.gemini/ before each trial
+```
 
-3. `skill-eval` will automatically:
-   - Validate the agent binary and skill directory structure before starting (pre-flight check).
-   - Create isolated git worktrees for each evaluation to prevent destructive changes to your main workspace.
-   - Fire up the agent in a headless mode reading the eval prompts.
-   - Detect if the skill tools actually fired (via NDJSON stream output).
-   - Evaluate expectations via an LLM judge (for the `functional` command).
-   - Compute pass@k metrics across multiple trials per task.
-   - Create a local directory `.project-skill-evals/runs/<timestamp>/` and dump the raw full evaluation JSONs, logs, and a summary report there for deeper debugging.
+All `.json` files in `evals/` are loaded and merged into a single suite — you can split them by feature or regression category.
 
-## JSON Valid Structure (evals.json)
-Minimum structure required for triggers:
+**Trigger eval** — `id` must be a unique integer across all eval files:
 ```json
 {
-  "skill_name": "example-skill",
+  "skill_name": "my-skill",
   "evals": [
-    {
-      "id": "1",
-      "prompt": "Activate my skill by doing XYZ"
-    }
+    { "id": 1, "prompt": "Do the thing that my skill handles" }
   ]
 }
 ```
 
-For functional evaluations, include `expectations`:
+**Functional eval** — add `expectations` for the LLM judge to evaluate:
 ```json
 {
-  "skill_name": "example-skill",
+  "skill_name": "my-skill",
   "evals": [
     {
-      "id": "1",
-      "prompt": "Create a new file called hello.txt with the word 'world'",
+      "id": 1,
+      "prompt": "Create a file called hello.txt containing the word 'world'",
       "expectations": [
-        "A file named hello.txt should be created",
-        "The file should contain the exact text 'world'"
+        "A file named hello.txt was created",
+        "The file contains the text 'world'"
       ]
     }
   ]
 }
 ```
 
+## Permissions
+
+**This is the most common cause of eval failures.**
+
+skill-eval runs the agent headlessly — stdin is closed, there is no terminal. If the agent encounters a tool that requires interactive approval, it will either fail immediately or hang until the trial timeout kills it.
+
+The runner already uses `--approval-mode auto_edit`, which auto-approves standard file operations (create, edit, delete). But if your skill needs to run shell commands, read environment variables, make network calls, or use any other tool category — those still require explicit permission.
+
+**Solution:** place a config file inside your skill at `evals/config/<runner>/`. Before every trial, skill-eval automatically copies that directory into the agent's config location inside the isolated worktree:
+
+```
+evals/config/gemini-cli/  →  <worktree>/.gemini/
+```
+
+Use this to ship both settings and policies alongside your evals. For Gemini CLI, for example, you can use `settings.json` to configure tool permissions and approval policies so that every tool your skill relies on runs without prompting:
+
+```json
+{
+  "telemetry": { "enabled": false }
+}
+```
+
+Refer to your runner's documentation for the full list of available settings and policy keys.
+
+> This config only applies inside the temporary worktree created for each trial. Your real workspace config is never touched.
+
+## Try it out
+
+This repo includes a `mock-skill/` directory — a complete, working example of a license-generator skill with trigger and functional evals. Run it directly with:
+
+```sh
+npm run test:trigger     # trigger evaluation against mock-skill
+npm run test:functional  # functional evaluation against mock-skill
+```
+
+Results are saved to `.project-skill-evals/runs/<timestamp>/` with logs, raw eval JSONs, and an HTML report.
+
 ## Extending
 
 ### Adding a new agent runner
 
-1. Create a folder `src/runners/<your-agent>/` with two files:
-   ```
-   src/runners/<your-agent>/
-   ├── runner.ts    # implements AgentRunner interface
-   └── index.ts     # export { YourRunner } from './runner.js'
-   ```
-2. Implement all methods of `AgentRunner`, including `applyRunnerConfig(evalConfigBaseDir, worktreePath)`. This method should copy `evalConfigBaseDir/<your-agent>/` into the appropriate config directory inside the worktree (e.g., `.gemini/` for Gemini CLI, `.claude/` for a hypothetical Claude runner). No-op silently if the directory doesn't exist.
-3. Open `src/runners/registry.ts` and add one entry:
+1. Create `src/runners/<your-agent>/runner.ts` implementing the `AgentRunner` interface (see `src/runners/runner.interface.ts`).
+2. Export it from `src/runners/<your-agent>/index.ts`.
+3. Register it in `src/runners/registry.ts`:
    ```ts
-   import { YourRunner } from './<your-agent>/index.js';
-
-   export const RUNNER_REGISTRY: Record<string, RunnerEntry> = {
-     'gemini-cli': { Runner: GeminiCliRunner, binary: 'gemini' },
-     '<your-agent>': { Runner: YourRunner, binary: '<cli-binary-name>' },
-   };
+   '<your-agent>': { Runner: YourRunner, binary: '<cli-binary-name>' },
    ```
-4. Done — the factory, preflight check, and CLI all pick it up automatically.
+
+The factory, preflight check, and CLI all pick it up automatically.
+
+> Implement `applyRunnerConfig(evalConfigBaseDir, worktreePath)` to copy `evalConfigBaseDir/<your-agent>/` into the appropriate config directory in the worktree (e.g. `.claude/` for a Claude runner). No-op silently if the directory doesn't exist.
 
 ### Adding a new report format
 
 1. Create `src/reporters/<format>-reporter.ts` implementing `Reporter`.
-2. Add it to `src/reporters/index.ts`: export the class and add a case in `createReporter()`.
-3. Add the new format string to `ReportFormat` in `src/types/index.ts`.
-
-## CLI flags
-
-| Flag | Required | Default | Description |
-|------|----------|---------|-------------|
-| `--workspace <path>` | yes | — | Path to the repo the agent will run in |
-| `--skill <path>` | yes | — | Path to the skill directory |
-| `--concurrency <number>` | no | `5` | Concurrent tasks |
-| `--trials <number>` | no | `3` | Trials per task (for pass@k) |
-| `--report <format>` | no | `html` | Output format: `html` or `json` |
-| `[agent]` | no | `gemini-cli` | Agent backend to use |
+2. Export it and add a case in `createReporter()` in `src/reporters/index.ts`.
+3. Add the format string to `ReportFormat` in `src/types/index.ts`.
