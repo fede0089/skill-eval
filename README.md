@@ -2,6 +2,12 @@
 
 A CLI tool for evaluating Agent Skills locally. Tests whether your skill triggers reliably and produces the right output, using an LLM as the judge.
 
+## Why skill evals?
+
+Skills are instructions that change how the agent behaves. But a single successful run isn't enough to trust one — agents are non-deterministic, and a good isolated result can be exactly that: an isolated case.
+
+Skill evals let you turn that intuition into evidence: run several comparable tasks with and without the skill, measure them against the same criteria, and validate whether the agent improves consistently against a baseline.
+
 ## How it works
 
 For each eval prompt, skill-eval spins up parallel agent processes — some with the skill installed, others without (the baseline). Each agent runs headlessly and produces a transcript. An LLM judge then grades each transcript against your expectations. Results are aggregated into **pass@k** metrics, giving you a clear measure of how much your skill actually improves the agent's behavior versus the unassisted baseline.
