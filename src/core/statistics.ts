@@ -1,4 +1,4 @@
-import { AggregatedTokenStats, EvalTrial, TaskResult } from '../types/index.js';
+import { AggregatedTokenStats, AggregatedDurationStats, EvalTrial, TaskResult } from '../types/index.js';
 
 /**
  * Computes the pass rate (pass@1) for a set of trials.
@@ -26,6 +26,20 @@ export function aggregatePassAtK(
   if (results.length === 0) return { passAtK: 0 };
   return {
     passAtK: results.reduce((sum, r) => sum + computePassAtK(trialSelector(r)), 0) / results.length
+  };
+}
+
+/**
+ * Computes average duration across trials that have durationMs set.
+ * Returns null if no trial has duration data.
+ */
+export function aggregateDurationStats(trials: EvalTrial[]): AggregatedDurationStats | null {
+  const withDuration = trials.filter(t => t.durationMs != null);
+  if (withDuration.length === 0) return null;
+  const n = withDuration.length;
+  return {
+    avgMs: Math.round(withDuration.reduce((s, t) => s + t.durationMs!, 0) / n),
+    trialCount: n,
   };
 }
 

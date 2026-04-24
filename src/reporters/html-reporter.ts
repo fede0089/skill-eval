@@ -3,7 +3,8 @@ import path from 'path';
 import type { AssertionResult, EvalSuiteReport, EvalTrial, TaskResult } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
 import type { Reporter } from './reporter.js';
-import { formatTokens } from '../utils/table-renderer.js';
+import { formatTokens, formatDuration } from '../utils/table-renderer.js';
+import { computePassAtK } from '../core/statistics.js';
 
 export class HtmlReporter implements Reporter {
   generate(report: EvalSuiteReport, runDir: string): void {
@@ -30,7 +31,6 @@ function formatPercent(val: number): string {
   return `${Math.round(val * 100)}%`;
 }
 
-
 function passColorClass(val: number): string {
   if (val >= 0.8) return 'green';
   if (val >= 0.5) return 'amber';
@@ -42,48 +42,87 @@ function isFunctional(report: EvalSuiteReport): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Cards
+// Metrics Grid
 // ---------------------------------------------------------------------------
 
-function renderCard(label: string, value: string, colorClass: string): string {
-  return `<div class="card"><div class="card-value ${colorClass}">${escapeHtml(value)}</div><div class="card-label">${escapeHtml(label)}</div></div>`;
+function renderDeltaCell(base: number, target: number, format: (n: number) => string, cellClass: string): string {
+  if (base <= 0) return `<span class="metric-val muted">—</span>`;
+  const delta = target - base;
+  const sign = delta >= 0 ? '+' : '';
+  const pct = Math.round((delta / base) * 100);
+  const cls = delta > 0 ? 'amber' : delta < 0 ? 'green' : '';
+  return `<span class="${cellClass} ${cls}">${sign}${pct}%</span>`;
 }
 
-function renderMetricsCards(report: EvalSuiteReport): string {
+function renderMetricsGrid(report: EvalSuiteReport): string {
   const { metrics } = report;
-  const numTrials = metrics.numTrials ?? 1;
-  const cards: string[] = [];
+  const functional = isFunctional(report);
 
-  if (isFunctional(report)) {
+  if (functional) {
     const bk = metrics.withoutSkillPassAtK ?? 0;
     const tk = metrics.passAtK ?? 0;
     const upliftRaw = parseInt(metrics.skillUplift ?? '0', 10);
-    const upliftClass = upliftRaw > 0 ? 'green' : upliftRaw < 0 ? 'red' : 'amber';
-    cards.push(renderCard('Without Skill Success Rate', formatPercent(bk), passColorClass(bk)));
-    cards.push(renderCard('With Skill Success Rate', formatPercent(tk), passColorClass(tk)));
-    cards.push(renderCard('Skill Uplift', escapeHtml(metrics.skillUplift ?? '0%'), upliftClass));
+    const upliftClass = upliftRaw > 0 ? 'green' : upliftRaw < 0 ? 'red' : '';
 
     const wo = metrics.tokenStats?.withoutSkill;
     const wi = metrics.tokenStats?.withSkill;
-    if (wo) cards.push(renderCard('Tokens (w/o skill)', formatTokens(wo.avgTotal) + ' avg', ''));
-    if (wi) cards.push(renderCard('Tokens (w/ skill)', formatTokens(wi.avgTotal) + ' avg', ''));
-    if (wo && wi && wo.avgTotal > 0) {
-      const delta = wi.avgTotal - wo.avgTotal;
-      const deltaSign = delta >= 0 ? '+' : '';
-      const deltaPct = Math.round((delta / wo.avgTotal) * 100);
-      const deltaClass = delta > 0 ? 'amber' : delta < 0 ? 'green' : '';
-      cards.push(renderCard('Token Delta', `${deltaSign}${deltaPct}%`, deltaClass));
-    }
+    const wod = metrics.durationStats?.withoutSkill;
+    const wid = metrics.durationStats?.withSkill;
+
+    return `<div class="metrics-grid">
+  <table>
+    <thead>
+      <tr><th></th><th>Without Skill</th><th>With Skill</th><th>Delta</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Success Rate</td>
+        <td><span class="metric-val ${passColorClass(bk)}">${formatPercent(bk)}</span></td>
+        <td><span class="metric-val ${passColorClass(tk)}">${formatPercent(tk)}</span></td>
+        <td><span class="metric-val ${upliftClass}">${escapeHtml(metrics.skillUplift ?? '0%')}</span></td>
+      </tr>
+      <tr>
+        <td>Tokens (avg)</td>
+        <td>${wo ? `<span class="metric-val">${formatTokens(wo.avgTotal)}</span><div class="metric-sub">avg total</div>` : '<span class="metric-val muted">—</span>'}</td>
+        <td>${wi ? `<span class="metric-val">${formatTokens(wi.avgTotal)}</span><div class="metric-sub">avg total</div>` : '<span class="metric-val muted">—</span>'}</td>
+        <td>${wo && wi ? renderDeltaCell(wo.avgTotal, wi.avgTotal, formatTokens, 'metric-val') : '<span class="metric-val muted">—</span>'}</td>
+      </tr>
+      <tr>
+        <td>Time (avg)</td>
+        <td>${wod ? `<span class="metric-val">${formatDuration(wod.avgMs)}</span>` : '<span class="metric-val muted">—</span>'}</td>
+        <td>${wid ? `<span class="metric-val">${formatDuration(wid.avgMs)}</span>` : '<span class="metric-val muted">—</span>'}</td>
+        <td>${wod && wid ? renderDeltaCell(wod.avgMs, wid.avgMs, formatDuration, 'metric-val') : '<span class="metric-val muted">—</span>'}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>`;
   } else {
     const k = metrics.passAtK ?? 0;
-    cards.push(renderCard('Success Rate', formatPercent(k), passColorClass(k)));
-    cards.push(renderCard('Tasks passed', `${metrics.passedCount}/${metrics.totalCount}`, passColorClass(metrics.passedCount / Math.max(metrics.totalCount, 1))));
-
     const wi = metrics.tokenStats?.withSkill;
-    if (wi) cards.push(renderCard('Avg Tokens', formatTokens(wi.avgTotal), ''));
-  }
+    const wid = metrics.durationStats?.withSkill;
 
-  return `<div class="cards">${cards.join('')}</div>`;
+    return `<div class="metrics-grid">
+  <table>
+    <thead>
+      <tr><th></th><th>Score</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Success Rate</td>
+        <td><span class="metric-val ${passColorClass(k)}">${formatPercent(k)}</span></td>
+      </tr>
+      <tr>
+        <td>Tokens (avg)</td>
+        <td>${wi ? `<span class="metric-val">${formatTokens(wi.avgTotal)}</span><div class="metric-sub">avg total</div>` : '<span class="metric-val muted">—</span>'}</td>
+      </tr>
+      <tr>
+        <td>Time (avg)</td>
+        <td>${wid ? `<span class="metric-val">${formatDuration(wid.avgMs)}</span>` : '<span class="metric-val muted">—</span>'}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>`;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -95,18 +134,17 @@ function renderAssertions(assertions: AssertionResult[]): string {
   return assertions.map(a => {
     const icon = a.passed ? '✓' : '✗';
     const cls = a.passed ? 'assert-pass' : 'assert-fail';
-    const grader = a.graderType ? `<span class="badge">${escapeHtml(a.graderType)}</span>` : '';
     return `<div class="assertion ${cls}">
   <span class="assert-icon">${icon}</span>
   <div class="assert-body">
-    <div class="assert-text">${escapeHtml(a.assertion)}${grader}</div>
+    <div class="assert-text">${escapeHtml(a.assertion)}</div>
     ${a.reason ? `<div class="assert-reason">${escapeHtml(a.reason)}</div>` : ''}
   </div>
 </div>`;
   }).join('');
 }
 
-function renderTrial(trial: EvalTrial, prefix: string): string {
+function renderTrial(trial: EvalTrial): string {
   const cls = trial.isError ? 'trial-error' : trial.trialPassed ? 'trial-pass' : 'trial-fail';
   const badge = trial.isError
     ? '<span class="pill amber">! ERROR</span>'
@@ -114,69 +152,107 @@ function renderTrial(trial: EvalTrial, prefix: string): string {
       ? '<span class="pill green">✓ PASS</span>'
       : '<span class="pill red">✗ NOT PASSED</span>';
   return `<div class="trial ${cls}">
-  <div class="trial-header">${escapeHtml(prefix)} Trial ${trial.id} ${badge}</div>
+  <div class="trial-header">Trial ${trial.id} ${badge}</div>
   <div class="trial-assertions">${renderAssertions(trial.assertionResults)}</div>
+</div>`;
+}
+
+function avgTrialTokens(trials: EvalTrial[]): number | null {
+  const withStats = trials.filter(t => t.tokenStats != null);
+  if (withStats.length === 0) return null;
+  return Math.round(withStats.reduce((s, t) => s + t.tokenStats!.totalTokens, 0) / withStats.length);
+}
+
+function avgTrialDuration(trials: EvalTrial[]): number | null {
+  const withDuration = trials.filter(t => t.durationMs != null);
+  if (withDuration.length === 0) return null;
+  return Math.round(withDuration.reduce((s, t) => s + t.durationMs!, 0) / withDuration.length);
+}
+
+function renderTaskMiniGrid(result: TaskResult): string {
+  const woTrials = result.withoutSkillTrials ?? [];
+  const wiTrials = result.trials;
+
+  const bk = woTrials.length ? Math.round(computePassAtK(woTrials) * 100) : 0;
+  const tk = wiTrials.length ? Math.round(computePassAtK(wiTrials) * 100) : 0;
+  const rateDelta = tk - bk;
+  const rateDeltaSign = rateDelta >= 0 ? '+' : '';
+  const rateDeltaClass = rateDelta > 0 ? 'green' : rateDelta < 0 ? 'red' : '';
+
+  const woTokens = avgTrialTokens(woTrials);
+  const wiTokens = avgTrialTokens(wiTrials);
+  const woMs = avgTrialDuration(woTrials);
+  const wiMs = avgTrialDuration(wiTrials);
+
+  const tokenDeltaCell = (woTokens && wiTokens)
+    ? renderDeltaCell(woTokens, wiTokens, formatTokens, 'metric-val-sm')
+    : '<span class="metric-val-sm muted">—</span>';
+  const durationDeltaCell = (woMs && wiMs)
+    ? renderDeltaCell(woMs, wiMs, formatDuration, 'metric-val-sm')
+    : '<span class="metric-val-sm muted">—</span>';
+
+  return `<div class="metrics-grid-sm">
+  <table>
+    <thead>
+      <tr><th></th><th>Without Skill</th><th>With Skill</th><th>Delta</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Success Rate</td>
+        <td><span class="metric-val-sm ${passColorClass(bk / 100)}">${bk}%</span></td>
+        <td><span class="metric-val-sm ${passColorClass(tk / 100)}">${tk}%</span></td>
+        <td><span class="metric-val-sm ${rateDeltaClass}">${rateDeltaSign}${rateDelta}%</span></td>
+      </tr>
+      <tr>
+        <td>Tokens (avg)</td>
+        <td>${woTokens != null ? `<span class="metric-val-sm">${formatTokens(woTokens)}</span>` : '<span class="metric-val-sm muted">—</span>'}</td>
+        <td>${wiTokens != null ? `<span class="metric-val-sm">${formatTokens(wiTokens)}</span>` : '<span class="metric-val-sm muted">—</span>'}</td>
+        <td>${tokenDeltaCell}</td>
+      </tr>
+      <tr>
+        <td>Time (avg)</td>
+        <td>${woMs != null ? `<span class="metric-val-sm">${formatDuration(woMs)}</span>` : '<span class="metric-val-sm muted">—</span>'}</td>
+        <td>${wiMs != null ? `<span class="metric-val-sm">${formatDuration(wiMs)}</span>` : '<span class="metric-val-sm muted">—</span>'}</td>
+        <td>${durationDeltaCell}</td>
+      </tr>
+    </tbody>
+  </table>
 </div>`;
 }
 
 function renderTaskDetails(result: TaskResult, isFunctionalEval: boolean): string {
   const sections: string[] = [];
 
+  if (isFunctionalEval) {
+    sections.push(renderTaskMiniGrid(result));
+  }
+
   if (isFunctionalEval && result.withoutSkillTrials && result.withoutSkillTrials.length > 0) {
     sections.push('<div class="trial-group-label">Without Skill</div>');
-    sections.push(...result.withoutSkillTrials.map(t => renderTrial(t, 'Without Skill')));
+    sections.push(...result.withoutSkillTrials.map(t => renderTrial(t)));
     sections.push('<div class="trial-group-label">With Skill</div>');
   }
 
-  sections.push(...result.trials.map(t => renderTrial(t, 'With Skill')));
+  sections.push(...result.trials.map(t => renderTrial(t)));
 
   return `<div class="task-details" id="details-${result.taskId}">${sections.join('')}</div>`;
 }
 
 // ---------------------------------------------------------------------------
-// Task table
+// Eval results table
 // ---------------------------------------------------------------------------
 
 function renderTaskTable(report: EvalSuiteReport): string {
-  const { results, metrics } = report;
-  const numTrials = metrics.numTrials ?? 1;
+  const { results } = report;
   const functional = isFunctional(report);
 
-  const headerCells = functional
-    ? ['#', 'Prompt', 'Without Skill', 'With Skill', 'Details']
-    : numTrials > 1
-      ? ['#', 'Prompt', 'Success Rate', 'Details']
-      : ['#', 'Prompt', 'Status', 'Details'];
-
-  const headerRow = `<tr>${headerCells.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>`;
+  const headerRow = `<tr><th>#</th><th>Prompt</th><th>Details</th></tr>`;
 
   const rows = results.map(result => {
     const prompt = escapeHtml(result.prompt);
-    const trials = result.trials;
-    const bt = result.withoutSkillTrials ?? [];
-
-    let statCells: string;
-    if (functional) {
-      const bp1 = bt.length ? Math.round((bt.filter(t => t.trialPassed).length / bt.length) * 100) : 0;
-      const tp1 = trials.length ? Math.round((trials.filter(t => t.trialPassed).length / trials.length) * 100) : 0;
-      statCells = `<td class="${passColorClass(bp1 / 100)}">${bp1}%</td><td class="${passColorClass(tp1 / 100)}">${tp1}%</td>`;
-    } else if (numTrials > 1) {
-      const p1 = Math.round((trials.filter(t => t.trialPassed).length / Math.max(trials.length, 1)) * 100);
-      statCells = `<td class="${passColorClass(p1 / 100)}">${p1}%</td>`;
-    } else {
-      const trial = trials[0];
-      if (trial?.isError) {
-        statCells = `<td class="amber">(!) ERROR</td>`;
-      } else {
-        const passed = trial?.trialPassed ?? false;
-        statCells = `<td class="${passed ? 'green' : 'red'}">${passed ? '✓ PASS' : '✗ FAIL'}</td>`;
-      }
-    }
-
     const detailsBtn = `<button class="details-btn" data-target="details-${result.taskId}">▶</button>`;
-    const detailsRow = `<tr class="details-row"><td colspan="${headerCells.length}">${renderTaskDetails(result, functional)}</td></tr>`;
-
-    return `<tr><td>${result.taskId}</td><td class="prompt-cell">${prompt}</td>${statCells}<td>${detailsBtn}</td></tr>${detailsRow}`;
+    const detailsRow = `<tr class="details-row"><td colspan="3">${renderTaskDetails(result, functional)}</td></tr>`;
+    return `<tr><td>${result.taskId}</td><td class="prompt-cell">${prompt}</td><td>${detailsBtn}</td></tr>${detailsRow}`;
   }).join('');
 
   return `<div class="table-wrap"><table><thead>${headerRow}</thead><tbody>${rows}</tbody></table></div>`;
@@ -218,11 +294,26 @@ a { color: #3b82f6; }
 .status-bar.amber { background: #f59e0b; }
 .status-bar.red   { background: #ef4444; }
 
-/* Cards */
-.cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
-.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; min-width: 120px; flex: 1; }
-.card-value { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
-.card-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+/* Metrics Grid */
+.metrics-grid { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+.metrics-grid table { width: 100%; border-collapse: collapse; }
+.metrics-grid thead th { background: #f8fafc; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; padding: 10px 24px; text-align: right; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+.metrics-grid thead th:first-child { text-align: left; min-width: 120px; }
+.metrics-grid tbody td { padding: 14px 24px; border-bottom: 1px solid #f1f5f9; text-align: right; vertical-align: middle; }
+.metrics-grid tbody tr:last-child td { border-bottom: none; }
+.metrics-grid tbody td:first-child { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; white-space: nowrap; }
+.metric-val { font-size: 24px; font-weight: 700; line-height: 1; display: block; }
+.metric-sub { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+
+/* Metrics Grid — compact variant (inside task details) */
+.metrics-grid-sm { border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; margin-bottom: 14px; }
+.metrics-grid-sm table { width: 100%; border-collapse: collapse; }
+.metrics-grid-sm thead th { background: #f8fafc; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; padding: 6px 14px; text-align: right; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+.metrics-grid-sm thead th:first-child { text-align: left; }
+.metrics-grid-sm tbody td { padding: 8px 14px; border-bottom: 1px solid #f1f5f9; text-align: right; vertical-align: middle; }
+.metrics-grid-sm tbody tr:last-child td { border-bottom: none; }
+.metrics-grid-sm tbody td:first-child { text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; white-space: nowrap; }
+.metric-val-sm { font-size: 15px; font-weight: 700; line-height: 1; display: block; }
 
 /* Color utilities */
 .green { color: #16a34a; }
@@ -239,7 +330,7 @@ table { width: 100%; border-collapse: collapse; }
 th { background: #f8fafc; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
 td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
 tr:last-child td { border-bottom: none; }
-.prompt-cell { max-width: 360px; word-break: break-word; color: #334155; }
+.prompt-cell { max-width: 480px; word-break: break-word; color: #334155; }
 
 /* Details */
 .details-btn { background: none; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; padding: 2px 8px; font-size: 11px; color: #64748b; transition: background 0.15s; }
@@ -264,9 +355,6 @@ tr:last-child td { border-bottom: none; }
 .pill.red   { background: #fee2e2; color: #b91c1c; }
 .pill.amber { background: #fef3c7; color: #92400e; }
 
-/* Badge */
-.badge { display: inline-block; font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: 4px; background: #e2e8f0; color: #475569; margin-left: 6px; vertical-align: middle; }
-
 /* Assertions */
 .assertion { display: flex; gap: 8px; }
 .assert-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
@@ -288,24 +376,22 @@ tr:last-child td { border-bottom: none; }
       <span><b>Agent</b> ${escapeHtml(agent)}</span>
       <span><b>Type</b> ${evalType}</span>
       <span><b>Date</b> ${escapeHtml(formattedDate)}</span>
-      <span><b>Score</b> ${escapeHtml(metrics.withSkillScore)}</span>
     </div>
     <div class="status-bar ${statusClass}"></div>
   </div>
 
-  <!-- Metric Cards -->
-  ${renderMetricsCards(report)}
+  <!-- Metrics Grid -->
+  ${renderMetricsGrid(report)}
 
-  <!-- Task Table -->
+  <!-- Eval Results Table -->
   <div class="section">
-    <div class="section-title">Task results</div>
+    <div class="section-title">Eval results</div>
     ${renderTaskTable(report)}
   </div>
 
 </div>
 <script>
 (function () {
-  // Accordion
   document.querySelectorAll('.details-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       const target = document.getElementById(btn.getAttribute('data-target'));

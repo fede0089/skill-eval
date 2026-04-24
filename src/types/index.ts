@@ -35,6 +35,11 @@ export interface AggregatedTokenStats {
   trialCount: number;
 }
 
+export interface AggregatedDurationStats {
+  avgMs: number;
+  trialCount: number;
+}
+
 export interface EvalTrial {
   id: number;
   transcript: AgentTranscript;
@@ -42,6 +47,7 @@ export interface EvalTrial {
   trialPassed: boolean;
   isError?: boolean;
   tokenStats?: TrialTokenStats;
+  durationMs?: number;
 }
 
 /**
@@ -132,6 +138,10 @@ export interface EvalSuiteReport {
     tokenStats?: {
       withSkill?: AggregatedTokenStats;
       withoutSkill?: AggregatedTokenStats;  // functional only
+    };
+    durationStats?: {
+      withSkill?: AggregatedDurationStats;
+      withoutSkill?: AggregatedDurationStats;  // functional only
     };
     [key: string]: any;
   };

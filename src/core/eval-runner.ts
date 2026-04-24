@@ -42,6 +42,7 @@ export class EvalRunner {
 
     let worktreePath: string | undefined;
     let transcript: AgentTranscript | null = null;
+    let durationMs: number | undefined;
 
     const worktreeId = attempt > 0 ? `task-${task.id}-trial-${trialId}-r${attempt}` : `task-${task.id}-trial-${trialId}`;
     if (attempt > 0) {
@@ -57,7 +58,9 @@ export class EvalRunner {
       this.runner.applyRunnerConfig(path.resolve(this.options.workspace, this.options.skillPath, 'evals', 'config'), worktreePath);
 
       uiCtx.updateLog('Executing prompt…');
+      const startMs = Date.now();
       transcript = await this.runner.runPrompt(task.prompt, worktreePath, undefined, logPath, undefined, this.options.timeoutMs);
+      durationMs = Date.now() - startMs;
     } finally {
       if (worktreePath) {
         this.env.removeWorktree(worktreePath);
@@ -105,7 +108,8 @@ export class EvalRunner {
         assertionResults,
         trialPassed: false,
         isError: true,
-        tokenStats
+        tokenStats,
+        durationMs
       };
     }
 
@@ -114,7 +118,8 @@ export class EvalRunner {
       transcript: transcript || { error: 'No transcript produced' },
       assertionResults: assertionResults,
       trialPassed: triggered,
-      tokenStats
+      tokenStats,
+      durationMs
     };
   }
 
@@ -132,6 +137,7 @@ export class EvalRunner {
     let assertionResults: AssertionResult[] = [];
     let trialPassed = false;
     let transcript: AgentTranscript | null = null;
+    let durationMs: number | undefined;
 
     const worktreeId = attempt > 0 ? `task-${task.id}-${evalModeLabel}-trial-${trialId}-r${attempt}` : `task-${task.id}-${evalModeLabel}-trial-${trialId}`;
     if (attempt > 0) {
@@ -150,7 +156,9 @@ export class EvalRunner {
 
       uiCtx.updateLog('Executing prompt…');
       if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${evalModeLabel.toUpperCase()} AGENT RUN\n`);
+      const startMs = Date.now();
       transcript = await this.runner.runPrompt(promptToUse, worktreePath, undefined, logPath, undefined, this.options.timeoutMs);
+      durationMs = Date.now() - startMs;
 
       // Propagate stream-json errors: when the agent fails (e.g. quota), Gemini CLI still
       // writes a {"type":"result","status":"error",...} event to stdout so transcript.error
@@ -179,7 +187,8 @@ export class EvalRunner {
               graderType: 'programmatic'
             }],
             trialPassed: false,
-            tokenStats
+            tokenStats,
+            durationMs
           };
         }
         if (!skillDisabled && !this.triggerGrader.gradeTrigger(transcript)) {
@@ -193,7 +202,8 @@ export class EvalRunner {
               graderType: 'programmatic'
             }],
             trialPassed: false,
-            tokenStats
+            tokenStats,
+            durationMs
           };
         }
 
@@ -257,7 +267,8 @@ export class EvalRunner {
                 assertion: a, passed: false, reason, graderType: 'model-based' as const
               })),
               trialPassed: false,
-              tokenStats
+              tokenStats,
+              durationMs
             };
           }
 
@@ -271,7 +282,8 @@ export class EvalRunner {
           transcript: transcript || { error: 'No transcript produced' },
           assertionResults: assertionResults,
           trialPassed,
-          tokenStats
+          tokenStats,
+          durationMs
         };
       } else {
         const errorMsg = transcript?.error || 'Error: No transcript was produced';
@@ -290,7 +302,8 @@ export class EvalRunner {
           assertionResults,
           trialPassed: false,
           isError: true,
-          tokenStats
+          tokenStats,
+          durationMs
         };
       }
     } catch (e) {

@@ -5,6 +5,19 @@ import { Logger } from './logger.js';
 import { computePassAtK } from '../core/statistics.js';
 
 /**
+ * Formats a duration in milliseconds for human-readable display.
+ * e.g. 45000 → "45s", 90000 → "1m 30s"
+ */
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
+}
+
+/**
  * Formats a token count for human-readable display.
  * Numbers >= 1M are shown as "1.2M", >= 1K as "119K", else as-is.
  */
@@ -151,6 +164,10 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
   if (withSkillTokenStats) {
     Logger.write(`\n   Avg Tokens:             ${formatTokenStatsLine(withSkillTokenStats)}`);
   }
+  const withSkillDurationStats = metrics.durationStats?.withSkill;
+  if (withSkillDurationStats) {
+    Logger.write(`\n   Avg Time:               ${formatDuration(withSkillDurationStats.avgMs)}`);
+  }
 }
 
 /**
@@ -205,6 +222,20 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
       const deltaPct = Math.round((delta / baselineTokenStats.avgTotal) * 100);
       const deltaStr = `${deltaSign}${formatTokens(Math.abs(delta))} (${deltaSign}${deltaPct}%)`;
       Logger.write(`\n   Token Delta:          ${delta >= 0 ? chalk.yellow(deltaStr) : chalk.green(deltaStr)}`);
+    }
+  }
+
+  const baselineDurationStats = metrics.durationStats?.withoutSkill;
+  const withSkillDurationStats = metrics.durationStats?.withSkill;
+  if (baselineDurationStats || withSkillDurationStats) {
+    if (baselineDurationStats) Logger.write(`\n   Time (w/o skill):     ${formatDuration(baselineDurationStats.avgMs)} avg`);
+    if (withSkillDurationStats) Logger.write(`\n   Time (w/ skill):      ${formatDuration(withSkillDurationStats.avgMs)} avg`);
+    if (baselineDurationStats && withSkillDurationStats && baselineDurationStats.avgMs > 0) {
+      const delta = withSkillDurationStats.avgMs - baselineDurationStats.avgMs;
+      const deltaSign = delta >= 0 ? '+' : '';
+      const deltaPct = Math.round((delta / baselineDurationStats.avgMs) * 100);
+      const deltaStr = `${deltaSign}${formatDuration(Math.abs(delta))} (${deltaSign}${deltaPct}%)`;
+      Logger.write(`\n   Time Delta:           ${delta >= 0 ? chalk.yellow(deltaStr) : chalk.green(deltaStr)}`);
     }
   }
 }

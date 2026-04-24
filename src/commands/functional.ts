@@ -7,7 +7,7 @@ import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
 import { AgentPool } from '../core/agent-pool.js';
-import { aggregatePassAtK, aggregateTokenStats } from '../core/statistics.js';
+import { aggregatePassAtK, aggregateTokenStats, aggregateDurationStats } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderFunctionalTable, renderRunHeader } from '../utils/table-renderer.js';
@@ -227,6 +227,8 @@ export async function functionalCommand(
 
     const withSkillTokenStats    = aggregateTokenStats(taskResults.flatMap(r => r.trials)) ?? undefined;
     const withoutSkillTokenStats = aggregateTokenStats(taskResults.flatMap(r => r.withoutSkillTrials ?? [])) ?? undefined;
+    const withSkillDurationStats    = aggregateDurationStats(taskResults.flatMap(r => r.trials)) ?? undefined;
+    const withoutSkillDurationStats = aggregateDurationStats(taskResults.flatMap(r => r.withoutSkillTrials ?? [])) ?? undefined;
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
@@ -243,6 +245,9 @@ export async function functionalCommand(
         withoutSkillPassAtK: Math.round(withoutSkillPassAtK * 1000) / 1000,
         tokenStats: (withSkillTokenStats || withoutSkillTokenStats)
           ? { withSkill: withSkillTokenStats, withoutSkill: withoutSkillTokenStats }
+          : undefined,
+        durationStats: (withSkillDurationStats || withoutSkillDurationStats)
+          ? { withSkill: withSkillDurationStats, withoutSkill: withoutSkillDurationStats }
           : undefined
       },
       results: taskResults

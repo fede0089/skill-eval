@@ -78,7 +78,6 @@ test('generateHtml produces valid HTML for a trigger report', () => {
 
   assert.ok(html.includes('<!DOCTYPE html>'), 'should start with DOCTYPE');
   assert.ok(html.includes('<html'), 'should contain html tag');
-  assert.ok(html.includes('chart.js'), 'should include Chart.js CDN');
   assert.ok(html.includes('test-skill'), 'should contain skill name');
   assert.ok(html.includes('Do something useful'), 'should contain task prompt');
   assert.ok(html.includes('Trigger'), 'should indicate Trigger eval type');
