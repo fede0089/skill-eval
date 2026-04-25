@@ -33,19 +33,32 @@ For each eval prompt, skill-eval spins up parallel agent processes — some with
 
 > The `trigger` command only runs with-skill trials and checks whether the skill dispatch tool was actually invoked — no judge or baseline needed.
 
-## Quick Start
+## Installation
+
+**Requirements:** Node.js, and the agent CLI you want to evaluate (e.g. `gemini`) installed and on `$PATH`.
+
+### Run without installing
 
 ```sh
-git clone <this-repo>
+npx @fede0089/skill-eval --help
+```
+
+### Install globally
+
+```sh
+npm install -g @fede0089/skill-eval
+skill-eval --help
+```
+
+### From source
+
+```sh
+git clone https://github.com/fede0089/skill-eval.git
 cd skill-eval
 npm install
 npm run build
-npm link
+npm link        # makes `skill-eval` available globally
 ```
-
-This makes `skill-eval` available globally in your terminal.
-
-**Requirements:** Node.js, and the agent CLI you want to evaluate (e.g. `gemini`) installed and on `$PATH`.
 
 ## Commands
 
