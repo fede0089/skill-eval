@@ -1,3 +1,7 @@
 node_modules/
 .project-skill-evals/
 dist/
+tmp/
+conductor/
+.claude/
+.DS_Store

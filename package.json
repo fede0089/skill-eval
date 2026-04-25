@@ -21,8 +21,12 @@
     "llm",
     "gemini"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Federico Mete",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fede0089/skill-eval.git"
+  },
   "dependencies": {
     "chalk": "^4.1.2",
     "cli-table3": "^0.6.5",
