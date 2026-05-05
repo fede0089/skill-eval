@@ -1,0 +1,8 @@
+{
+  "track_id": "simultaneous_ab_testing_20260505",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-05-05T12:00:00Z",
+  "updated_at": "2026-05-05T12:00:00Z",
+  "description": "Simultaneous A/B testing against historical skill versions"
+}
