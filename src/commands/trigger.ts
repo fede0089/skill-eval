@@ -13,7 +13,7 @@ import { withRetry } from '../core/trial-utils.js';
 import { renderTriggerTable, renderRunHeader } from '../utils/table-renderer.js';
 import { JsonReporter } from '../reporters/index.js';
 import chalk from 'chalk';
-import { extractSkillRef } from '../utils/git.js';
+import { git } from '../utils/git.js';
 import type { Reporter } from '../reporters/index.js';
 
 export async function triggerCommand(
@@ -69,7 +69,7 @@ export async function triggerCommand(
   for (const ref of compareRefs) {
     const refDir = path.join(refPathBase, ref);
     Logger.write(`   Extracting ref '${ref}'... `);
-    extractSkillRef(skillPath, ref, refDir);
+    git.extractSkillRef(skillPath, ref, refDir);
     Logger.write(chalk.green('Done\n'));
     
     variantRunners.set(`ref:${ref}`, new EvalRunner({
