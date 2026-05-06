@@ -49,18 +49,22 @@ test('EvalEnvironment.removeWorktree should silently clean up when git fails but
   mock.reset();
 });
 
-test('EvalEnvironment.teardown cleans up remaining worktrees', async (t) => {
+test('EvalEnvironment.teardown cleans up remaining worktrees and skill-refs', async (t) => {
   // Use a real temp workspace so we avoid re-mocking fs properties across tests
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
   const worktreesDir = path.join(workspace, '.project-skill-evals', 'worktrees');
   fs.mkdirSync(path.join(worktreesDir, 'leftover-1'), { recursive: true });
   fs.mkdirSync(path.join(worktreesDir, 'leftover-2'), { recursive: true });
+  
+  const skillRefsDir = path.join(workspace, '.project-skill-evals', 'skill-refs');
+  fs.mkdirSync(path.join(skillRefsDir, 'ref-1'), { recursive: true });
 
   const env = new EvalEnvironment({ workspace });
   const spawnMock = t.mock.method(executor, 'spawnSync', () => ({ status: 0 }));
 
   try {
     await env.teardown();
+    assert.ok(!fs.existsSync(skillRefsDir), 'Expected skill-refs directory to be removed');
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
   }

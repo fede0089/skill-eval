@@ -19,14 +19,26 @@ export class EvalEnvironment {
   }
 
   public async teardown(): Promise<void> {
-    const worktreesDir = path.resolve(this.workspace, '.project-skill-evals', 'worktrees');
-    if (!fs.existsSync(worktreesDir)) return;
-
-    for (const entry of fs.readdirSync(worktreesDir)) {
-      this.removeWorktree(path.join(worktreesDir, entry));
+    const evalsDir = path.resolve(this.workspace, '.project-skill-evals');
+    
+    // 1. Cleanup Worktrees
+    const worktreesDir = path.join(evalsDir, 'worktrees');
+    if (fs.existsSync(worktreesDir)) {
+      for (const entry of fs.readdirSync(worktreesDir)) {
+        this.removeWorktree(path.join(worktreesDir, entry));
+      }
+      executor.spawnSync('git', ['worktree', 'prune'], { stdio: 'ignore', cwd: this.workspace });
     }
 
-    executor.spawnSync('git', ['worktree', 'prune'], { stdio: 'ignore', cwd: this.workspace });
+    // 2. Cleanup Skill Refs
+    const skillRefsDir = path.join(evalsDir, 'skill-refs');
+    if (fs.existsSync(skillRefsDir)) {
+      try {
+        fs.rmSync(skillRefsDir, { recursive: true, force: true });
+      } catch (err) {
+        Logger.warn(`Failed to remove skill-refs directory at ${skillRefsDir}. Manual cleanup may be required.`);
+      }
+    }
   }
 
   /**
