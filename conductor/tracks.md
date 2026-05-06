@@ -9,5 +9,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [~] **Track: Simultaneous A/B testing against historical skill versions**
+- [x] **Track: Simultaneous A/B testing against historical skill versions**
   *Link: [./tracks/simultaneous_ab_testing_20260505/](./tracks/simultaneous_ab_testing_20260505/)*
