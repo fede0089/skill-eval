@@ -9,30 +9,34 @@ function makeTriggerReport(overrides: Partial<EvalSuiteReport> = {}): EvalSuiteR
     skill_name: 'test-skill',
     agent: 'gemini-cli',
     metrics: {
-      withSkillScore: '67%',
       passedCount: 2,
       totalCount: 3,
       numTrials: 3,
-      passAtK: 0.667,
-      passAtN: 1.0,
+      scores: { 'local': '67%' },
+      passAtK: { 'local': 0.667 },
+      assertionPassRate: { 'local': 0.667 },
     },
     results: [
       {
         taskId: 1,
         prompt: 'Do something useful',
-        score: 1.0,
-        trials: [
-          { id: 1, transcript: {}, assertionResults: [{ assertion: 'Did it work?', passed: true, reason: 'Yes', graderType: 'model-based' }], trialPassed: true },
-          { id: 2, transcript: {}, assertionResults: [{ assertion: 'Did it work?', passed: true, reason: 'Yes', graderType: 'model-based' }], trialPassed: true },
-        ],
+        baselineTrials: [],
+        skillTrials: {
+          'local': [
+            { id: 1, transcript: {}, assertionResults: [{ assertion: 'Did it work?', passed: true, reason: 'Yes', graderType: 'model-based' }], trialPassed: true },
+            { id: 2, transcript: {}, assertionResults: [{ assertion: 'Did it work?', passed: true, reason: 'Yes', graderType: 'model-based' }], trialPassed: true },
+          ],
+        }
       },
       {
         taskId: 2,
         prompt: 'Do something else',
-        score: 0.0,
-        trials: [
-          { id: 1, transcript: {}, assertionResults: [{ assertion: 'Check output', passed: false, reason: 'Missing field' }], trialPassed: false },
-        ],
+        baselineTrials: [],
+        skillTrials: {
+          'local': [
+            { id: 1, transcript: {}, assertionResults: [{ assertion: 'Check output', passed: false, reason: 'Missing field' }], trialPassed: false },
+          ],
+        }
       },
     ],
     ...overrides,
@@ -45,34 +49,31 @@ function makeFunctionalReport(): EvalSuiteReport {
     skill_name: 'func-skill',
     agent: 'gemini-cli',
     metrics: {
-      withSkillScore: '80%',
-      withoutSkillScore: '60%',
-      skillUplift: '+20%',
       passedCount: 4,
       totalCount: 5,
       numTrials: 2,
-      passAtK: 0.8,
-      passAtN: 0.9,
-      withoutSkillPassAtK: 0.6,
-      withoutSkillPassAtN: 0.7,
-      assertionPassRate: 0.8,
-      withoutSkillAssertionPassRate: 0.6,
+      scores: { 'baseline': '60%', 'local': '80%' },
+      passAtK: { 'baseline': 0.6, 'local': 0.8 },
+      assertionPassRate: { 'baseline': 0.6, 'local': 0.8 },
+      skillUplift: '+20%',
     },
     results: [
       {
         taskId: 1,
         prompt: 'Functional prompt',
-        score: 1.0,
-        trials: [
-          { id: 1, transcript: {}, assertionResults: [{ assertion: 'With Skill assertion', passed: true, reason: 'Passed' }], trialPassed: true },
-        ],
-        withoutSkillTrials: [
+        baselineTrials: [
           { id: 1, transcript: {}, assertionResults: [{ assertion: 'Without Skill assertion', passed: false, reason: 'Not triggered' }], trialPassed: false },
         ],
+        skillTrials: {
+          'local': [
+            { id: 1, transcript: {}, assertionResults: [{ assertion: 'With Skill assertion', passed: true, reason: 'Passed' }], trialPassed: true },
+          ],
+        }
       },
     ],
   };
 }
+
 
 test('generateHtml produces valid HTML for a trigger report', () => {
   const report = makeTriggerReport();
@@ -91,16 +92,24 @@ test('generateHtml produces functional report with baseline and uplift data', ()
   const html = generateHtml(report);
 
   assert.ok(html.includes('Functional'), 'should indicate Functional eval type');
-  assert.ok(html.includes('Without Skill'), 'should contain Without Skill label');
-  assert.ok(html.includes('With Skill'), 'should contain With Skill label');
-  assert.ok(html.includes('+20%'), 'should contain skill uplift value');
+  assert.ok(html.includes('baseline'), 'should contain baseline label');
+  assert.ok(html.includes('local'), 'should contain local label');
   assert.ok(html.includes('Functional prompt'), 'should contain task prompt');
   assert.ok(html.includes('Without Skill assertion'), 'should contain without-skill assertion text');
   assert.ok(html.includes('With Skill assertion'), 'should contain with-skill assertion text');
 });
 
 test('generateHtml handles empty results without throwing', () => {
-  const report = makeTriggerReport({ results: [], metrics: { withSkillScore: '0%', passedCount: 0, totalCount: 0 } });
+  const report = makeTriggerReport({ 
+    results: [], 
+    metrics: { 
+      passedCount: 0, 
+      totalCount: 0,
+      scores: { 'local': '0%' },
+      passAtK: { 'local': 0 },
+      assertionPassRate: { 'local': 0 }
+    } 
+  });
   assert.doesNotThrow(() => generateHtml(report));
   const html = generateHtml(report);
   assert.ok(html.includes('<!DOCTYPE html>'));
@@ -124,16 +133,18 @@ test('generateHtml renders PARTIAL badge for trials where some but not all asser
     results: [{
       taskId: 1,
       prompt: 'Do something',
-      score: 0,
-      trials: [{
-        id: 1,
-        transcript: {},
-        assertionResults: [
-          { assertion: 'First check', passed: true, reason: 'ok' },
-          { assertion: 'Second check', passed: false, reason: 'missing' },
-        ],
-        trialPassed: false,
-      }],
+      baselineTrials: [],
+      skillTrials: {
+        'local': [{
+          id: 1,
+          transcript: {},
+          assertionResults: [
+            { assertion: 'First check', passed: true, reason: 'ok' },
+            { assertion: 'Second check', passed: false, reason: 'missing' },
+          ],
+          trialPassed: false,
+        }]
+      },
     }],
   });
   const html = generateHtml(report);
@@ -146,15 +157,17 @@ test('generateHtml renders NOT PASSED badge when zero assertions pass', () => {
     results: [{
       taskId: 1,
       prompt: 'Do something',
-      score: 0,
-      trials: [{
-        id: 1,
-        transcript: {},
-        assertionResults: [
-          { assertion: 'First check', passed: false, reason: 'missing' },
-        ],
-        trialPassed: false,
-      }],
+      baselineTrials: [],
+      skillTrials: {
+        'local': [{
+          id: 1,
+          transcript: {},
+          assertionResults: [
+            { assertion: 'First check', passed: false, reason: 'missing' },
+          ],
+          trialPassed: false,
+        }]
+      },
     }],
   });
   const html = generateHtml(report);
@@ -167,8 +180,10 @@ test('generateHtml escapes HTML special characters in prompt', () => {
     results: [{
       taskId: 1,
       prompt: '<script>alert("xss")</script>',
-      score: 0,
-      trials: [{ id: 1, transcript: {}, assertionResults: [], trialPassed: false }],
+      baselineTrials: [],
+      skillTrials: {
+        'local': [{ id: 1, transcript: {}, assertionResults: [], trialPassed: false }]
+      },
     }],
   });
   const html = generateHtml(report);

@@ -44,6 +44,7 @@ program
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
   .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
+  .option('--compare-ref [refs...]', 'Compare against historical git references')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
@@ -51,7 +52,8 @@ program
     const numTrials = options.trials !== undefined ? (parseInt(options.trials, 10) || 3) : 3;
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
-    triggerCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId).catch(errorHandler);
+    const compareRefs = options.compareRef || [];
+    triggerCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs).catch(errorHandler);
   });
 
 program
@@ -63,6 +65,7 @@ program
   .option('--trials <number>', 'Number of trials per task for pass@k calculation')
   .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
+  .option('--compare-ref [refs...]', 'Compare against historical git references')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
@@ -70,7 +73,8 @@ program
     const numTrials = options.trials !== undefined ? (parseInt(options.trials, 10) || 3) : 3;
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
-    functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId).catch(errorHandler);
+    const compareRefs = options.compareRef || [];
+    functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs).catch(errorHandler);
   });
 
 

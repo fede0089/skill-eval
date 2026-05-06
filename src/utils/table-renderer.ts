@@ -146,29 +146,46 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
   const { results, metrics } = report;
   const numTrials = metrics.numTrials || 1;
 
-  const tableData = numTrials > 1
-    ? [['ID', 'Prompt', 'Trials', 'success rate']]
-    : [['ID', 'Prompt', 'success rate']];
+  // Identify all skill versions present in the results
+  const skillVersions = results.length > 0 ? Object.keys(results[0].skillTrials) : ['local'];
 
+  const header = ['ID', 'Prompt'];
+  if (numTrials > 1) {
+    for (const version of skillVersions) {
+      header.push(`${version} Trials`, `${version} Rate`);
+    }
+  } else {
+    for (const version of skillVersions) {
+      header.push(`${version} Rate`);
+    }
+  }
+
+  const tableData = [header];
   let hasPartialErrors = false;
 
   for (const result of results) {
     const promptSnippet = result.prompt.substring(0, 40) + (result.prompt.length > 40 ? '...' : '');
-    const p1Cell = formatPassAt1(result.trials);
-    const someError = result.trials.some(t => t.isError);
-    const allError = result.trials.length > 0 && result.trials.every(t => t.isError);
-    if (someError && !allError) hasPartialErrors = true;
+    const row = [result.taskId.toString(), promptSnippet];
 
-    if (numTrials > 1) {
-      const errorCount = result.trials.filter(t => t.isError).length;
-      const passedCount = result.trials.filter(t => t.trialPassed).length;
-      const trialsBase = `${passedCount}/${result.trials.length}`;
-      const trialsStr = errorCount > 0 ? `${trialsBase} (${errorCount}!)` : trialsBase;
-      const trials = result.score === 1.0 ? chalk.green(trialsStr) : errorCount > 0 ? chalk.yellow(trialsStr) : chalk.red(trialsStr);
-      tableData.push([result.taskId.toString(), promptSnippet, trials, p1Cell]);
-    } else {
-      tableData.push([result.taskId.toString(), promptSnippet, p1Cell]);
+    for (const version of skillVersions) {
+      const trials = result.skillTrials[version] || [];
+      const p1Cell = formatPassAt1(trials);
+      const someError = trials.some(t => t.isError);
+      const allError = trials.length > 0 && trials.every(t => t.isError);
+      if (someError && !allError) hasPartialErrors = true;
+
+      if (numTrials > 1) {
+        const errorCount = trials.filter(t => t.isError).length;
+        const passedCount = trials.filter(t => t.trialPassed).length;
+        const trialsBase = `${passedCount}/${trials.length}`;
+        const trialsStr = errorCount > 0 ? `${trialsBase} (${errorCount}!)` : trialsBase;
+        const trialsCell = passedCount === trials.length ? chalk.green(trialsStr) : errorCount > 0 ? chalk.yellow(trialsStr) : chalk.red(trialsStr);
+        row.push(trialsCell, p1Cell);
+      } else {
+        row.push(p1Cell);
+      }
     }
+    tableData.push(row);
   }
 
   Logger.table(tableData);
@@ -177,16 +194,18 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
     Logger.write(chalk.yellow('\n   * Some trials did not complete due to infrastructure errors. success rate is computed over the trials that ran.'));
   }
 
-  const percentage = Math.round((metrics.passAtK || 0) * 100);
-  Logger.write(`\n   Trigger Success Rate:   ${percentage}%`);
+  for (const version of skillVersions) {
+    const percentage = Math.round((metrics.passAtK[version] || 0) * 100);
+    Logger.write(`\n   ${version} Success Rate:   ${percentage}%`);
 
-  const withSkillTokenStats = metrics.tokenStats?.withSkill;
-  if (withSkillTokenStats) {
-    Logger.write(`\n   Avg Tokens:             ${formatTokenStatsLine(withSkillTokenStats)}`);
-  }
-  const withSkillDurationStats = metrics.durationStats?.withSkill;
-  if (withSkillDurationStats) {
-    Logger.write(`\n   Avg Time:               ${formatDuration(withSkillDurationStats.avgMs)}`);
+    const tokenStats = metrics.tokenStats?.[version];
+    if (tokenStats) {
+      Logger.write(`\n   Avg Tokens (${version}):   ${formatTokenStatsLine(tokenStats)}`);
+    }
+    const durationStats = metrics.durationStats?.[version];
+    if (durationStats) {
+      Logger.write(`\n   Avg Time (${version}):     ${formatDuration(durationStats.avgMs)}`);
+    }
   }
 }
 
@@ -196,27 +215,35 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
 export function renderFunctionalTable(report: EvalSuiteReport): void {
   const { results, metrics } = report;
 
-  const tableData: string[][] = [['ID', 'Prompt', 'Without Skill', 'With Skill']];
+  // Identify all versions present (baseline + skill versions)
+  const skillVersions = results.length > 0 ? Object.keys(results[0].skillTrials) : ['local'];
+  const allVersions = ['baseline', ...skillVersions];
 
+  const header = ['ID', 'Prompt'];
+  for (const version of allVersions) {
+    header.push(version);
+  }
+
+  const tableData: string[][] = [header];
   let hasPartialErrors = false;
 
   for (const result of results) {
     const promptSnippet = result.prompt.substring(0, 40) + (result.prompt.length > 40 ? '...' : '');
-    const withoutSkillTrials = result.withoutSkillTrials || [];
-    const withSkillTrials = result.trials;
+    const row = [result.taskId.toString(), promptSnippet];
 
-    const baselineSomeError = withoutSkillTrials.some(t => t.isError);
-    const baselineAllError = withoutSkillTrials.length > 0 && withoutSkillTrials.every(t => t.isError);
-    const withSkillSomeError = withSkillTrials.some(t => t.isError);
-    const withSkillAllError = withSkillTrials.length > 0 && withSkillTrials.every(t => t.isError);
-    if ((baselineSomeError && !baselineAllError) || (withSkillSomeError && !withSkillAllError)) hasPartialErrors = true;
+    // Baseline
+    const woTrials = result.baselineTrials || [];
+    if (woTrials.some(t => t.isError) && !woTrials.every(t => t.isError)) hasPartialErrors = true;
+    row.push(formatAssertionRate(woTrials));
 
-    tableData.push([
-      result.taskId.toString(),
-      promptSnippet,
-      formatAssertionRate(withoutSkillTrials),
-      formatAssertionRate(withSkillTrials),
-    ]);
+    // Skills
+    for (const version of skillVersions) {
+      const wiTrials = result.skillTrials[version] || [];
+      if (wiTrials.some(t => t.isError) && !wiTrials.every(t => t.isError)) hasPartialErrors = true;
+      row.push(formatAssertionRate(wiTrials));
+    }
+    
+    tableData.push(row);
   }
 
   Logger.table(tableData);
@@ -225,37 +252,17 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
     Logger.write(chalk.yellow('\n   * Some trials did not complete due to infrastructure errors. success rate is computed over the trials that ran.'));
   }
 
-  const withoutSkillPercentage = Math.round(((metrics.withoutSkillAssertionPassRate ?? metrics.withoutSkillPassAtK) || 0) * 100);
-  const withSkillPercentage = Math.round(((metrics.assertionPassRate ?? metrics.passAtK) || 0) * 100);
+  for (const version of allVersions) {
+    const rate = Math.round(((metrics.assertionPassRate[version] ?? metrics.passAtK[version]) || 0) * 100);
+    Logger.write(`\n   ${version} Rate:   ${rate}%`);
 
-  Logger.write(`\n   Without Skill Rate:   ${withoutSkillPercentage}%`);
-  Logger.write(`\n   With Skill Rate:      ${withSkillPercentage}%`);
-
-  const baselineTokenStats = metrics.tokenStats?.withoutSkill;
-  const withSkillTokenStats = metrics.tokenStats?.withSkill;
-  if (baselineTokenStats || withSkillTokenStats) {
-    if (baselineTokenStats) Logger.write(`\n   Tokens (w/o skill):   ${formatTokenStatsLine(baselineTokenStats)}`);
-    if (withSkillTokenStats) Logger.write(`\n   Tokens (w/ skill):    ${formatTokenStatsLine(withSkillTokenStats)}`);
-    if (baselineTokenStats && withSkillTokenStats && baselineTokenStats.avgTotal > 0) {
-      const delta = withSkillTokenStats.avgTotal - baselineTokenStats.avgTotal;
-      const deltaSign = delta >= 0 ? '+' : '';
-      const deltaPct = Math.round((delta / baselineTokenStats.avgTotal) * 100);
-      const deltaStr = `${deltaSign}${formatTokens(Math.abs(delta))} (${deltaSign}${deltaPct}%)`;
-      Logger.write(`\n   Token Delta:          ${delta >= 0 ? chalk.yellow(deltaStr) : chalk.green(deltaStr)}`);
+    const stats = metrics.tokenStats?.[version];
+    if (stats) {
+      Logger.write(`\n   Tokens (${version}):   ${formatTokenStatsLine(stats)}`);
     }
-  }
-
-  const baselineDurationStats = metrics.durationStats?.withoutSkill;
-  const withSkillDurationStats = metrics.durationStats?.withSkill;
-  if (baselineDurationStats || withSkillDurationStats) {
-    if (baselineDurationStats) Logger.write(`\n   Time (w/o skill):     ${formatDuration(baselineDurationStats.avgMs)} avg`);
-    if (withSkillDurationStats) Logger.write(`\n   Time (w/ skill):      ${formatDuration(withSkillDurationStats.avgMs)} avg`);
-    if (baselineDurationStats && withSkillDurationStats && baselineDurationStats.avgMs > 0) {
-      const delta = withSkillDurationStats.avgMs - baselineDurationStats.avgMs;
-      const deltaSign = delta >= 0 ? '+' : '';
-      const deltaPct = Math.round((delta / baselineDurationStats.avgMs) * 100);
-      const deltaStr = `${deltaSign}${formatDuration(Math.abs(delta))} (${deltaSign}${deltaPct}%)`;
-      Logger.write(`\n   Time Delta:           ${delta >= 0 ? chalk.yellow(deltaStr) : chalk.green(deltaStr)}`);
+    const dStats = metrics.durationStats?.[version];
+    if (dStats) {
+      Logger.write(`\n   Time (${version}):     ${formatDuration(dStats.avgMs)} avg`);
     }
   }
 }

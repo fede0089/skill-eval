@@ -13,12 +13,21 @@ function makeTriggerReport(numTrials = 1, overrides: Partial<EvalSuiteReport> = 
     timestamp: '2026-01-01T00:00:00.000Z',
     skill_name: 'test-skill',
     agent: 'gemini-cli',
-    metrics: { withSkillScore: '100%', passedCount: 1, totalCount: 1, numTrials, passAtK: 1, passAtN: 1 },
+    metrics: { 
+      passedCount: 1, 
+      totalCount: 1, 
+      numTrials, 
+      scores: { 'local': '100%' },
+      passAtK: { 'local': 1 },
+      assertionPassRate: { 'local': 1 }
+    },
     results: [{
       taskId: 1,
       prompt: 'Do something useful',
-      score: 1.0,
-      trials: [makeTrial(true, 1), makeTrial(true, 2), makeTrial(false, 3)].slice(0, numTrials)
+      baselineTrials: [],
+      skillTrials: {
+        'local': [makeTrial(true, 1), makeTrial(true, 2), makeTrial(false, 3)].slice(0, numTrials)
+      }
     }],
     ...overrides
   };
@@ -30,17 +39,19 @@ function makeFunctionalReport(numTrials = 1): EvalSuiteReport {
     skill_name: 'test-skill',
     agent: 'gemini-cli',
     metrics: {
-      withSkillScore: '100%', withoutSkillScore: '0%', skillUplift: '+100%',
       passedCount: 1, totalCount: 1, numTrials,
-      passAtK: 1, passAtN: 1,
-      withoutSkillPassAtK: 0, withoutSkillPassAtN: 0
+      scores: { 'baseline': '0%', 'local': '100%' },
+      passAtK: { 'baseline': 0, 'local': 1 },
+      assertionPassRate: { 'baseline': 0, 'local': 1 },
+      skillUplift: '+100%'
     },
     results: [{
       taskId: 1,
       prompt: 'Generate a license',
-      score: 1.0,
-      trials: [makeTrial(true, 1)],
-      withoutSkillTrials: [makeTrial(false, 1)]
+      baselineTrials: [makeTrial(false, 1)],
+      skillTrials: {
+        'local': [makeTrial(true, 1)]
+      }
     }]
   };
 }
@@ -55,11 +66,11 @@ test('renderTriggerTable: calls Logger.table and Logger.write with rate line (1 
 
   assert.strictEqual(tableMock.mock.callCount(), 1, 'Logger.table should be called once');
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
-  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'success rate'], 'Header should have success rate column for 1 trial');
+  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'local Rate'], 'Header should have success rate column for 1 trial');
   assert.ok(rows.length > 1, 'Table should have at least one data row');
 
   const written = writeMock.mock.calls.map(c => c.arguments[0] as string).join('');
-  assert.ok(written.includes('Trigger Success Rate'), 'Should include rate line');
+  assert.ok(written.includes('local Success Rate'), 'Should include rate line');
 
   mock.reset();
 });
@@ -72,7 +83,7 @@ test('renderTriggerTable: uses pass@k columns for multi-trial reports', () => {
   renderTriggerTable(makeTriggerReport(3));
 
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
-  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'Trials', 'success rate'], 'Header should have success rate column');
+  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'local Trials', 'local Rate'], 'Header should have success rate column');
 
   mock.reset();
 });
@@ -87,11 +98,11 @@ test('renderFunctionalTable: calls Logger.table and Logger.write with rate lines
 
   assert.strictEqual(tableMock.mock.callCount(), 1, 'Logger.table should be called once');
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
-  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'Without Skill', 'With Skill'], 'Header should have skill columns');
+  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'baseline', 'local'], 'Header should have skill columns');
 
   const written = writeMock.mock.calls.map(c => c.arguments[0] as string).join('');
-  assert.ok(written.includes('Without Skill Rate'), 'Should include without-skill rate line');
-  assert.ok(written.includes('With Skill Rate'), 'Should include with-skill rate line');
+  assert.ok(written.includes('baseline Rate'), 'Should include without-skill rate line');
+  assert.ok(written.includes('local Rate'), 'Should include with-skill rate line');
 
   mock.reset();
 });
@@ -104,8 +115,8 @@ test('renderFunctionalTable: uses pass@k columns for multi-trial reports', () =>
   renderFunctionalTable(makeFunctionalReport(3));
 
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
-  assert.ok(rows[0].includes('Without Skill'), 'Header should include Without Skill for multi-trial');
-  assert.ok(rows[0].includes('With Skill'), 'Header should include With Skill for multi-trial');
+  assert.ok(rows[0].includes('baseline'), 'Header should include baseline for multi-trial');
+  assert.ok(rows[0].includes('local'), 'Header should include local for multi-trial');
 
   mock.reset();
 });

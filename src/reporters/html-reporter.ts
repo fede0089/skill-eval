@@ -38,7 +38,7 @@ function passColorClass(val: number): string {
 }
 
 function isFunctional(report: EvalSuiteReport): boolean {
-  return report.metrics.withoutSkillScore !== undefined;
+  return report.metrics.assertionPassRate['baseline'] !== undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,74 +55,49 @@ function renderDeltaCell(base: number, target: number, format: (n: number) => st
 }
 
 function renderMetricsGrid(report: EvalSuiteReport): string {
-  const { metrics } = report;
+  const { metrics, results } = report;
   const functional = isFunctional(report);
+  const skillVersions = results.length > 0 ? Object.keys(results[0].skillTrials) : ['local'];
+  const allVersions = functional ? ['baseline', ...skillVersions] : skillVersions;
 
-  if (functional) {
-    const bk = metrics.withoutSkillAssertionPassRate ?? metrics.withoutSkillPassAtK ?? 0;
-    const tk = metrics.assertionPassRate ?? metrics.passAtK ?? 0;
-    const upliftRaw = parseInt(metrics.skillUplift ?? '0', 10);
-    const upliftClass = upliftRaw > 0 ? 'green' : upliftRaw < 0 ? 'red' : '';
+  const headerCells = allVersions.map(v => `<th>${v}</th>`).join('');
+  
+  const successRows = `<tr>
+    <td>Success Rate</td>
+    ${allVersions.map(v => {
+      const val = metrics.assertionPassRate[v] ?? metrics.passAtK[v] ?? 0;
+      return `<td><span class="metric-val ${passColorClass(val)}">${formatPercent(val)}</span></td>`;
+    }).join('')}
+  </tr>`;
 
-    const wo = metrics.tokenStats?.withoutSkill;
-    const wi = metrics.tokenStats?.withSkill;
-    const wod = metrics.durationStats?.withoutSkill;
-    const wid = metrics.durationStats?.withSkill;
+  const tokenRows = `<tr>
+    <td>Tokens (avg)</td>
+    ${allVersions.map(v => {
+      const stats = metrics.tokenStats?.[v];
+      return `<td>${stats ? `<span class="metric-val">${formatTokens(stats.avgTotal)}</span><div class="metric-sub">avg total</div>` : '<span class="metric-val muted">—</span>'}</td>`;
+    }).join('')}
+  </tr>`;
 
-    return `<div class="metrics-grid">
+  const timeRows = `<tr>
+    <td>Time (avg)</td>
+    ${allVersions.map(v => {
+      const stats = metrics.durationStats?.[v];
+      return `<td>${stats ? `<span class="metric-val">${formatDuration(stats.avgMs)}</span>` : '<span class="metric-val muted">—</span>'}</td>`;
+    }).join('')}
+  </tr>`;
+
+  return `<div class="metrics-grid">
   <table>
     <thead>
-      <tr><th></th><th>Without Skill</th><th>With Skill</th><th>Delta</th></tr>
+      <tr><th></th>${headerCells}</tr>
     </thead>
     <tbody>
-      <tr>
-        <td>Success Rate</td>
-        <td><span class="metric-val ${passColorClass(bk)}">${formatPercent(bk)}</span></td>
-        <td><span class="metric-val ${passColorClass(tk)}">${formatPercent(tk)}</span></td>
-        <td><span class="metric-val ${upliftClass}">${escapeHtml(metrics.skillUplift ?? '0%')}</span></td>
-      </tr>
-      <tr>
-        <td>Tokens (avg)</td>
-        <td>${wo ? `<span class="metric-val">${formatTokens(wo.avgTotal)}</span><div class="metric-sub">avg total</div>` : '<span class="metric-val muted">—</span>'}</td>
-        <td>${wi ? `<span class="metric-val">${formatTokens(wi.avgTotal)}</span><div class="metric-sub">avg total</div>` : '<span class="metric-val muted">—</span>'}</td>
-        <td>${wo && wi ? renderDeltaCell(wo.avgTotal, wi.avgTotal, formatTokens, 'metric-val') : '<span class="metric-val muted">—</span>'}</td>
-      </tr>
-      <tr>
-        <td>Time (avg)</td>
-        <td>${wod ? `<span class="metric-val">${formatDuration(wod.avgMs)}</span>` : '<span class="metric-val muted">—</span>'}</td>
-        <td>${wid ? `<span class="metric-val">${formatDuration(wid.avgMs)}</span>` : '<span class="metric-val muted">—</span>'}</td>
-        <td>${wod && wid ? renderDeltaCell(wod.avgMs, wid.avgMs, formatDuration, 'metric-val') : '<span class="metric-val muted">—</span>'}</td>
-      </tr>
+      ${successRows}
+      ${tokenRows}
+      ${timeRows}
     </tbody>
   </table>
 </div>`;
-  } else {
-    const k = metrics.passAtK ?? 0;
-    const wi = metrics.tokenStats?.withSkill;
-    const wid = metrics.durationStats?.withSkill;
-
-    return `<div class="metrics-grid">
-  <table>
-    <thead>
-      <tr><th></th><th>Score</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Success Rate</td>
-        <td><span class="metric-val ${passColorClass(k)}">${formatPercent(k)}</span></td>
-      </tr>
-      <tr>
-        <td>Tokens (avg)</td>
-        <td>${wi ? `<span class="metric-val">${formatTokens(wi.avgTotal)}</span><div class="metric-sub">avg total</div>` : '<span class="metric-val muted">—</span>'}</td>
-      </tr>
-      <tr>
-        <td>Time (avg)</td>
-        <td>${wid ? `<span class="metric-val">${formatDuration(wid.avgMs)}</span>` : '<span class="metric-val muted">—</span>'}</td>
-      </tr>
-    </tbody>
-  </table>
-</div>`;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -174,52 +149,48 @@ function avgTrialDuration(trials: EvalTrial[]): number | null {
   return Math.round(withDuration.reduce((s, t) => s + t.durationMs!, 0) / withDuration.length);
 }
 
-function renderTaskMiniGrid(result: TaskResult): string {
-  const woTrials = result.withoutSkillTrials ?? [];
-  const wiTrials = result.trials;
+function renderTaskMiniGrid(result: TaskResult, isFunctionalEval: boolean): string {
+  const skillVersions = Object.keys(result.skillTrials);
+  const allVersions = isFunctionalEval ? ['baseline', ...skillVersions] : skillVersions;
 
-  const bk = woTrials.length ? Math.round(computeAssertionPassRate(woTrials) * 100) : 0;
-  const tk = wiTrials.length ? Math.round(computeAssertionPassRate(wiTrials) * 100) : 0;
-  const rateDelta = tk - bk;
-  const rateDeltaSign = rateDelta >= 0 ? '+' : '';
-  const rateDeltaClass = rateDelta > 0 ? 'green' : rateDelta < 0 ? 'red' : '';
+  const headerCells = allVersions.map(v => `<th>${v}</th>`).join('');
 
-  const woTokens = avgTrialTokens(woTrials);
-  const wiTokens = avgTrialTokens(wiTrials);
-  const woMs = avgTrialDuration(woTrials);
-  const wiMs = avgTrialDuration(wiTrials);
+  const successRows = `<tr>
+    <td>Success Rate</td>
+    ${allVersions.map(v => {
+      const trials = v === 'baseline' ? result.baselineTrials : result.skillTrials[v];
+      const rate = trials.length ? Math.round(computeAssertionPassRate(trials) * 100) : 0;
+      return `<td><span class="metric-val-sm ${passColorClass(rate / 100)}">${rate}%</span></td>`;
+    }).join('')}
+  </tr>`;
 
-  const tokenDeltaCell = (woTokens && wiTokens)
-    ? renderDeltaCell(woTokens, wiTokens, formatTokens, 'metric-val-sm')
-    : '<span class="metric-val-sm muted">—</span>';
-  const durationDeltaCell = (woMs && wiMs)
-    ? renderDeltaCell(woMs, wiMs, formatDuration, 'metric-val-sm')
-    : '<span class="metric-val-sm muted">—</span>';
+  const tokenRows = `<tr>
+    <td>Tokens (avg)</td>
+    ${allVersions.map(v => {
+      const trials = v === 'baseline' ? result.baselineTrials : result.skillTrials[v];
+      const tokens = avgTrialTokens(trials);
+      return `<td>${tokens != null ? `<span class="metric-val-sm">${formatTokens(tokens)}</span>` : '<span class="metric-val-sm muted">—</span>'}</td>`;
+    }).join('')}
+  </tr>`;
+
+  const timeRows = `<tr>
+    <td>Time (avg)</td>
+    ${allVersions.map(v => {
+      const trials = v === 'baseline' ? result.baselineTrials : result.skillTrials[v];
+      const ms = avgTrialDuration(trials);
+      return `<td>${ms != null ? `<span class="metric-val-sm">${formatDuration(ms)}</span>` : '<span class="metric-val-sm muted">—</span>'}</td>`;
+    }).join('')}
+  </tr>`;
 
   return `<div class="metrics-grid-sm">
   <table>
     <thead>
-      <tr><th></th><th>Without Skill</th><th>With Skill</th><th>Delta</th></tr>
+      <tr><th></th>${headerCells}</tr>
     </thead>
     <tbody>
-      <tr>
-        <td>Success Rate</td>
-        <td><span class="metric-val-sm ${passColorClass(bk / 100)}">${bk}%</span></td>
-        <td><span class="metric-val-sm ${passColorClass(tk / 100)}">${tk}%</span></td>
-        <td><span class="metric-val-sm ${rateDeltaClass}">${rateDeltaSign}${rateDelta}%</span></td>
-      </tr>
-      <tr>
-        <td>Tokens (avg)</td>
-        <td>${woTokens != null ? `<span class="metric-val-sm">${formatTokens(woTokens)}</span>` : '<span class="metric-val-sm muted">—</span>'}</td>
-        <td>${wiTokens != null ? `<span class="metric-val-sm">${formatTokens(wiTokens)}</span>` : '<span class="metric-val-sm muted">—</span>'}</td>
-        <td>${tokenDeltaCell}</td>
-      </tr>
-      <tr>
-        <td>Time (avg)</td>
-        <td>${woMs != null ? `<span class="metric-val-sm">${formatDuration(woMs)}</span>` : '<span class="metric-val-sm muted">—</span>'}</td>
-        <td>${wiMs != null ? `<span class="metric-val-sm">${formatDuration(wiMs)}</span>` : '<span class="metric-val-sm muted">—</span>'}</td>
-        <td>${durationDeltaCell}</td>
-      </tr>
+      ${successRows}
+      ${tokenRows}
+      ${timeRows}
     </tbody>
   </table>
 </div>`;
@@ -228,17 +199,17 @@ function renderTaskMiniGrid(result: TaskResult): string {
 function renderTaskDetails(result: TaskResult, isFunctionalEval: boolean): string {
   const sections: string[] = [];
 
-  if (isFunctionalEval) {
-    sections.push(renderTaskMiniGrid(result));
+  sections.push(renderTaskMiniGrid(result, isFunctionalEval));
+
+  if (isFunctionalEval && result.baselineTrials && result.baselineTrials.length > 0) {
+    sections.push('<div class="trial-group-label">Baseline</div>');
+    sections.push(...result.baselineTrials.map(t => renderTrial(t)));
   }
 
-  if (isFunctionalEval && result.withoutSkillTrials && result.withoutSkillTrials.length > 0) {
-    sections.push('<div class="trial-group-label">Without Skill</div>');
-    sections.push(...result.withoutSkillTrials.map(t => renderTrial(t)));
-    sections.push('<div class="trial-group-label">With Skill</div>');
+  for (const version of Object.keys(result.skillTrials)) {
+    sections.push(`<div class="trial-group-label">${version}</div>`);
+    sections.push(...result.skillTrials[version].map(t => renderTrial(t)));
   }
-
-  sections.push(...result.trials.map(t => renderTrial(t)));
 
   return `<div class="task-details" id="details-${result.taskId}">${sections.join('')}</div>`;
 }
@@ -271,7 +242,7 @@ export function generateHtml(report: EvalSuiteReport): string {
   const { skill_name, agent, timestamp, metrics } = report;
   const functional = isFunctional(report);
   const evalType = functional ? 'Functional' : 'Trigger';
-  const overallScore = metrics.passAtK ?? 0;
+  const overallScore = metrics.passAtK['local'] ?? 0;
   const statusClass = passColorClass(overallScore);
   const formattedDate = new Date(timestamp).toLocaleString();
 

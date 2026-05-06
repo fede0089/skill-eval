@@ -23,7 +23,8 @@ export async function functionalCommand(
   numTrials: number = 3,
   reporter: Reporter = new JsonReporter(),
   timeoutMs?: number,
-  evalId?: number
+  evalId?: number,
+  compareRefs: string[] = []
 ): Promise<void> {
   if (!injectedSuite) preflight(agent, workspace, skillPath);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
@@ -203,9 +204,10 @@ export async function functionalCommand(
           const taskResult: TaskResult = {
             taskId: task.id,
             prompt: task.prompt,
-            score,
-            trials: wiTrials.map(t => ({ ...t, transcript: undefined as any })),
-            withoutSkillTrials: withoutSkillTrials.map(t => ({ ...t, transcript: undefined as any }))
+            baselineTrials: woTrials.map(t => ({ ...t, transcript: undefined as any })),
+            skillTrials: {
+              'local': wiTrials.map(t => ({ ...t, transcript: undefined as any }))
+            }
           };
           taskResults.push(taskResult);
 
@@ -222,42 +224,56 @@ export async function functionalCommand(
     await ui.run(tasks.length);
 
     // ==== REPORTING ====
-    const { passAtK } = aggregatePassAtK(taskResults, numTrials, r => r.trials);
-    const { passAtK: withoutSkillPassAtK } = aggregatePassAtK(taskResults, numTrials, r => r.withoutSkillTrials ?? []);
+    const versions = ['baseline', 'local']; // Later extended with compareRefs
+    
+    const scores: Record<string, string> = {};
+    const passAtK: Record<string, number> = {};
+    const assertionPassRate: Record<string, number> = {};
+    const tokenStats: Record<string, any> = {};
+    const durationStats: Record<string, any> = {};
 
-    const assertionPassRate = aggregateAssertionPassRate(taskResults, r => r.trials);
-    const withoutSkillAssertionPassRate = aggregateAssertionPassRate(taskResults, r => r.withoutSkillTrials ?? []);
+    // Baseline
+    const { passAtK: woPassAtK } = aggregatePassAtK(taskResults, numTrials, r => r.baselineTrials);
+    const woAssertionPassRate = aggregateAssertionPassRate(taskResults, r => r.baselineTrials);
+    const woPercentage = Math.round(woAssertionPassRate * 100);
+    
+    scores['baseline'] = `${woPercentage}%`;
+    passAtK['baseline'] = Math.round(woPassAtK * 1000) / 1000;
+    assertionPassRate['baseline'] = Math.round(woAssertionPassRate * 1000) / 1000;
+    const woTokens = aggregateTokenStats(taskResults.flatMap(r => r.baselineTrials));
+    if (woTokens) tokenStats['baseline'] = woTokens;
+    const woDuration = aggregateDurationStats(taskResults.flatMap(r => r.baselineTrials));
+    if (woDuration) durationStats['baseline'] = woDuration;
 
-    const withSkillPercentage = Math.round(assertionPassRate * 100);
-    const withoutSkillPercentage = Math.round(withoutSkillAssertionPassRate * 100);
-    const skillUplift = withSkillPercentage - withoutSkillPercentage;
+    // Local
+    const { passAtK: wiPassAtK } = aggregatePassAtK(taskResults, numTrials, r => r.skillTrials['local']);
+    const wiAssertionPassRate = aggregateAssertionPassRate(taskResults, r => r.skillTrials['local']);
+    const wiPercentage = Math.round(wiAssertionPassRate * 100);
 
-    const withSkillTokenStats    = aggregateTokenStats(taskResults.flatMap(r => r.trials)) ?? undefined;
-    const withoutSkillTokenStats = aggregateTokenStats(taskResults.flatMap(r => r.withoutSkillTrials ?? [])) ?? undefined;
-    const withSkillDurationStats    = aggregateDurationStats(taskResults.flatMap(r => r.trials)) ?? undefined;
-    const withoutSkillDurationStats = aggregateDurationStats(taskResults.flatMap(r => r.withoutSkillTrials ?? [])) ?? undefined;
+    scores['local'] = `${wiPercentage}%`;
+    passAtK['local'] = Math.round(wiPassAtK * 1000) / 1000;
+    assertionPassRate['local'] = Math.round(wiAssertionPassRate * 1000) / 1000;
+    const wiTokens = aggregateTokenStats(taskResults.flatMap(r => r.skillTrials['local']));
+    if (wiTokens) tokenStats['local'] = wiTokens;
+    const wiDuration = aggregateDurationStats(taskResults.flatMap(r => r.skillTrials['local']));
+    if (wiDuration) durationStats['local'] = wiDuration;
+
+    const skillUplift = wiPercentage - woPercentage;
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
       skill_name,
       agent,
       metrics: {
-        withSkillScore: `${withSkillPercentage}%`,
-        withoutSkillScore: `${withoutSkillPercentage}%`,
-        skillUplift: `${skillUplift > 0 ? '+' : ''}${skillUplift}%`,
         passedCount: withSkillTasksAllPassedCount,
         totalCount: tasks.length,
         numTrials,
-        passAtK: Math.round(passAtK * 1000) / 1000,
-        withoutSkillPassAtK: Math.round(withoutSkillPassAtK * 1000) / 1000,
-        assertionPassRate: Math.round(assertionPassRate * 1000) / 1000,
-        withoutSkillAssertionPassRate: Math.round(withoutSkillAssertionPassRate * 1000) / 1000,
-        tokenStats: (withSkillTokenStats || withoutSkillTokenStats)
-          ? { withSkill: withSkillTokenStats, withoutSkill: withoutSkillTokenStats }
-          : undefined,
-        durationStats: (withSkillDurationStats || withoutSkillDurationStats)
-          ? { withSkill: withSkillDurationStats, withoutSkill: withoutSkillDurationStats }
-          : undefined
+        scores,
+        passAtK,
+        assertionPassRate,
+        tokenStats,
+        durationStats,
+        skillUplift: `${skillUplift > 0 ? '+' : ''}${skillUplift}%`
       },
       results: taskResults
     };

@@ -56,9 +56,8 @@ export interface EvalTrial {
 export interface TaskResult {
   taskId: number;
   prompt: string;
-  score: number; // Trials passed / Total trials (0.0 to 1.0)
-  trials: EvalTrial[];
-  withoutSkillTrials?: EvalTrial[];
+  baselineTrials: EvalTrial[];
+  skillTrials: Record<string, EvalTrial[]>;
 }
 
 export interface EvalSuite {
@@ -118,33 +117,20 @@ export interface AgentTranscript {
   [key: string]: unknown;
 }
 
-/**
- * Final report for an evaluation suite run.
- * Previously known as EvalSummaryReport.
- */
 export interface EvalSuiteReport {
   timestamp: string;
   skill_name: string;
   agent: string;
   metrics: {
-    withSkillScore: string; // Aggregate score with skill
-    withoutSkillScore?: string; // Aggregate score without skill
-    skillUplift?: string;
-    passedCount: number;
+    passedCount?: number;
     totalCount: number;
     numTrials?: number; // Number of trials per task
-    passAtK?: number;              // Average pass@1 across tasks (pass rate)
-    withoutSkillPassAtK?: number;  // Average without-skill pass@1 (functional only)
-    assertionPassRate?: number;              // Avg fraction of assertions passing (with skill)
-    withoutSkillAssertionPassRate?: number;  // Avg fraction of assertions passing (without skill)
-    tokenStats?: {
-      withSkill?: AggregatedTokenStats;
-      withoutSkill?: AggregatedTokenStats;  // functional only
-    };
-    durationStats?: {
-      withSkill?: AggregatedDurationStats;
-      withoutSkill?: AggregatedDurationStats;  // functional only
-    };
+    // Version-specific metrics
+    scores: Record<string, string>; // e.g., { "local": "85%", "ref:main": "80%" }
+    passAtK: Record<string, number>; // e.g., { "local": 0.85, "baseline": 0.1 }
+    assertionPassRate: Record<string, number>;
+    tokenStats?: Record<string, AggregatedTokenStats>;
+    durationStats?: Record<string, AggregatedDurationStats>;
     [key: string]: any;
   };
   results: TaskResult[];

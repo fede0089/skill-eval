@@ -7,7 +7,7 @@ import * as evalLoader from '../utils/eval-loader.js';
 import { ListrEvalUI } from '../utils/ui.js';
 import { EvalRunner } from '../core/eval-runner.js';
 import { AgentPool } from '../core/agent-pool.js';
-import { aggregatePassAtK, aggregateTokenStats, aggregateDurationStats } from '../core/statistics.js';
+import { aggregatePassAtK, aggregateAssertionPassRate, aggregateTokenStats, aggregateDurationStats } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderTriggerTable, renderRunHeader } from '../utils/table-renderer.js';
@@ -23,7 +23,8 @@ export async function triggerCommand(
   numTrials: number = 3,
   reporter: Reporter = new JsonReporter(),
   timeoutMs?: number,
-  evalId?: number
+  evalId?: number,
+  compareRefs: string[] = []
 ): Promise<void> {
   if (!injectedSuite) preflight(agent, workspace, skillPath);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
@@ -134,21 +135,21 @@ export async function triggerCommand(
 
           const trials = await Promise.all(trialPromises);
 
-          const passedCount = trials.filter(t => t.trialPassed).length;
-          const score = trials.length > 0 ? passedCount / trials.length : 0;
-
           const taskResult: TaskResult = {
             taskId: task.id,
             prompt: task.prompt,
-            score,
-            trials: trials.map(t => ({ ...t, transcript: undefined as any }))
+            baselineTrials: [], // Trigger doesn't have a baseline usually, but let's keep it empty
+            skillTrials: {
+              'local': trials.map(t => ({ ...t, transcript: undefined as any }))
+            }
           };
           taskResults.push(taskResult);
 
+          const passedCount = trials.filter(t => t.trialPassed).length;
           if (passedCount === trials.length) {
             tasksPassedCount++;
           } else if (!multi) {
-            const failureReason = trials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'Task failed evaluation';
+            const failureReason = trials.find(t => t.trialPassed === false)?.assertionResults.find(r => !r.passed)?.reason || 'Task failed evaluation';
             throw new Error(failureReason);
           }
         }
@@ -158,24 +159,40 @@ export async function triggerCommand(
     await ui.run(tasks.length);
 
     // Compute aggregate metrics and build report
-    const { passAtK } = aggregatePassAtK(taskResults, numTrials, r => r.trials);
-    const percentage = Math.round(passAtK * 100);
+    const scores: Record<string, string> = {};
+    const passAtK: Record<string, number> = {};
+    const assertionPassRate: Record<string, number> = {};
+    const tokenStats: Record<string, any> = {};
+    const durationStats: Record<string, any> = {};
 
-    const withSkillTokenStats    = aggregateTokenStats(taskResults.flatMap(r => r.trials)) ?? undefined;
-    const withSkillDurationStats = aggregateDurationStats(taskResults.flatMap(r => r.trials)) ?? undefined;
+    const { passAtK: localPassAtK } = aggregatePassAtK(taskResults, numTrials, r => r.skillTrials['local']);
+    const percentage = Math.round(localPassAtK * 100);
+
+    scores['local'] = `${percentage}%`;
+    passAtK['local'] = Math.round(localPassAtK * 1000) / 1000;
+    // Trigger uses trigger grader which is usually modeled as pass/fail for the whole task, 
+    // but aggregateAssertionPassRate works too.
+    const localAssertionRate = aggregateAssertionPassRate(taskResults, r => r.skillTrials['local']);
+    assertionPassRate['local'] = Math.round(localAssertionRate * 1000) / 1000;
+
+    const wiTokens = aggregateTokenStats(taskResults.flatMap(r => r.skillTrials['local']));
+    if (wiTokens) tokenStats['local'] = wiTokens;
+    const wiDuration = aggregateDurationStats(taskResults.flatMap(r => r.skillTrials['local']));
+    if (wiDuration) durationStats['local'] = wiDuration;
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
       skill_name,
       agent,
       metrics: {
-        withSkillScore: `${percentage}%`,
         passedCount: tasksPassedCount,
         totalCount: tasks.length,
         numTrials,
-        passAtK: Math.round(passAtK * 1000) / 1000,
-        tokenStats: withSkillTokenStats ? { withSkill: withSkillTokenStats } : undefined,
-        durationStats: withSkillDurationStats ? { withSkill: withSkillDurationStats } : undefined
+        scores,
+        passAtK,
+        assertionPassRate,
+        tokenStats,
+        durationStats
       },
       results: taskResults
     };
