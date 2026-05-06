@@ -1,8 +1,8 @@
 # Phase 1: Single Historical Reference Comparison (E2E Vertical Slice)
 *Goal: Minimum viable A/B test. A user can evaluate the local skill against ONE historical reference (`--compare-ref <ref>`), with results displayed in the CLI Table. This requires end-to-end integration of data models, Git extraction, and runner instantiation.*
-- [ ] Task: Refactor `TaskResult` and CLI commands to support the new `skillTrials` dictionary and parse the `--compare-ref` flag.
-    - [ ] Write Tests
-    - [ ] Implement
+- [x] Task: Refactor TaskResult and CLI commands to support the new skillTrials dictionary and parse the --compare-ref flag. (cc5a35e)
+    - [x] Write Tests
+    - [x] Implement
 - [ ] Task: Implement Two-Step Extraction (`git archive`) to isolate the historical reference.
     - [ ] Write Tests
     - [ ] Implement
