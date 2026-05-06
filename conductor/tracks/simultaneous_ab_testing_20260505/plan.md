@@ -6,9 +6,9 @@
 - [x] Task: Implement Two-Step Extraction (`git archive`) to isolate the historical reference. (67e32cd)
     - [x] Write Tests
     - [x] Implement
-- [ ] Task: Integrate the AgentRunner to evaluate the extracted ref and update `table-renderer.ts` to display local vs ref results.
-    - [ ] Write Tests
-    - [ ] Implement
+- [x] Task: Integrate the AgentRunner to evaluate the extracted ref and update `table-renderer.ts` to display local vs ref results. (5b680c3)
+    - [x] Write Tests
+    - [x] Implement
 - [ ] Task: Conductor - User Manual Verification 'Single Historical Reference Comparison (E2E Vertical Slice)' (Protocol in workflow.md)
 
 # Phase 2: N-Version Comparison & Concurrency Limits
