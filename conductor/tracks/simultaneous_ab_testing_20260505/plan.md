@@ -23,10 +23,10 @@
 
 # Phase 3: Reporters Update & System Robustness
 *Goal: Complete the feature by updating all output formats (JSON/HTML), ensuring robust error handling (aborting on Git failures), and implementing post-run teardown cleanup.*
-- [ ] Task: Refactor `json-reporter.ts` and `html-reporter.ts` to process and display dynamic version keys.
-    - [ ] Write Tests
-    - [ ] Implement
-- [ ] Task: Implement strict error abortion for `git archive` failures and ephemeral directory cleanup (`.project-skill-evals/skill-refs/`).
-    - [ ] Write Tests
-    - [ ] Implement
+- [x] Task: Refactor `json-reporter.ts` and `html-reporter.ts` to process and display dynamic version keys. (cc5a35e)
+    - [x] Write Tests
+    - [x] Implement
+- [x] Task: Implement strict error abortion for `git archive` failures and ephemeral directory cleanup (`.project-skill-evals/skill-refs/`). (1bf05b4)
+    - [x] Write Tests
+    - [x] Implement
 - [ ] Task: Conductor - User Manual Verification 'Reporters Update & System Robustness' (Protocol in workflow.md)
