@@ -29,4 +29,4 @@
 - [x] Task: Implement strict error abortion for `git archive` failures and ephemeral directory cleanup (`.project-skill-evals/skill-refs/`). (1bf05b4)
     - [x] Write Tests
     - [x] Implement
-- [ ] Task: Conductor - User Manual Verification 'Reporters Update & System Robustness' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Reporters Update & System Robustness' (Protocol in workflow.md) (2bb07bf)
