@@ -9,7 +9,7 @@
 - [x] Task: Integrate the AgentRunner to evaluate the extracted ref and update `table-renderer.ts` to display local vs ref results. (5b680c3)
     - [x] Write Tests
     - [x] Implement
-- [ ] Task: Conductor - User Manual Verification 'Single Historical Reference Comparison (E2E Vertical Slice)' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Single Historical Reference Comparison (E2E Vertical Slice)' (Protocol in workflow.md) (070b9c0)
 
 # Phase 2: N-Version Comparison & Concurrency Limits
 *Goal: Extend the evaluation to support multiple historical references simultaneously (`--compare-ref ref1 ref2`) while strictly adhering to API rate limits via the `AgentPool`.*
