@@ -13,25 +13,21 @@ export function extractSkillRef(skillPath: string, ref: string, targetDir: strin
   // 1. Identify repo root
   let repoRoot: string;
   try {
-    repoRoot = executor.execSync('git rev-parse --show-tolevel', { cwd: skillPath }).toString().trim();
+    repoRoot = executor.execSync('git rev-parse --show-toplevel', { cwd: skillPath }).toString().trim();
   } catch (err) {
     throw new ExecutionError(`Path is not inside a git repository: ${skillPath}`);
   }
 
   // 2. Resolve relative path of skill within repo
-  const relativeSkillPath = path.relative(repoRoot, skillPath);
+  const relativeSkillPath = path.relative(repoRoot, path.resolve(skillPath));
 
   // 3. Create target directory
   fs.mkdirSync(targetDir, { recursive: true });
 
   // 4. Extract via git archive
-  // We extract the whole repo for simplicity as per spec, 
-  // but we could also archive just the subpath.
-  // git archive <ref> | tar -x -C <target>
   try {
-    // Note: Redirection is not allowed in Plan Mode run_shell_command, 
-    // but here we are using execSync which is fine for production code.
-    executor.execSync(`git archive ${ref} | tar -x -C ${targetDir}`, { cwd: repoRoot });
+    const cmd = `git archive ${ref} | tar -x -C ${targetDir}`;
+    executor.execSync(cmd, { cwd: repoRoot });
   } catch (err) {
     throw new ExecutionError(`Failed to extract git reference '${ref}': ${err instanceof Error ? err.message : String(err)}`);
   }

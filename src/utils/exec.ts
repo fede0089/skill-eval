@@ -2,9 +2,16 @@ import { execSync, ExecSyncOptions, spawnSync, SpawnSyncOptions, SpawnSyncReturn
 
 export const executor = {
   execSync(command: string, options?: ExecSyncOptions): Buffer | string {
-    return execSync(command, options);
+    return execSync(command, {
+      ...options,
+      shell: process.env.SHELL || '/bin/sh',
+      env: { ...process.env, ...options?.env }
+    });
   },
   spawnSync(command: string, args: string[], options?: SpawnSyncOptions): SpawnSyncReturns<Buffer | string> {
-    return spawnSync(command, args, options);
+    return spawnSync(command, args, {
+      ...options,
+      env: { ...process.env, ...options?.env }
+    });
   }
 };
