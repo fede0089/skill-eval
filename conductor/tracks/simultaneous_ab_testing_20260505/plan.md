@@ -13,12 +13,12 @@
 
 # Phase 2: N-Version Comparison & Concurrency Limits
 *Goal: Extend the evaluation to support multiple historical references simultaneously (`--compare-ref ref1 ref2`) while strictly adhering to API rate limits via the `AgentPool`.*
-- [ ] Task: Update extraction and runner loops to handle $N$ references concurrently.
-    - [ ] Write Tests
-    - [ ] Implement
-- [ ] Task: Enforce global concurrency limits across all skill variants using `AgentPool` to prevent rate-limiting.
-    - [ ] Write Tests
-    - [ ] Implement
+- [x] Task: Update extraction and runner loops to handle $N$ references concurrently. (4373081)
+    - [x] Write Tests
+    - [x] Implement
+- [x] Task: Enforce global concurrency limits across all skill variants using `AgentPool` to prevent rate-limiting. (4373081)
+    - [x] Write Tests
+    - [x] Implement
 - [ ] Task: Conductor - User Manual Verification 'N-Version Comparison & Concurrency Limits' (Protocol in workflow.md)
 
 # Phase 3: Reporters Update & System Robustness
