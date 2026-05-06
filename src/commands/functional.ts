@@ -14,6 +14,9 @@ import { renderFunctionalTable, renderRunHeader } from '../utils/table-renderer.
 import type { Reporter } from '../reporters/index.js';
 import { JsonReporter } from '../reporters/index.js';
 
+import chalk from 'chalk';
+import { extractSkillRef } from '../utils/git.js';
+
 export async function functionalCommand(
   agent: string,
   workspace: string,
@@ -54,34 +57,41 @@ export async function functionalCommand(
   const runDir = path.resolve(workspace, '.project-skill-evals', 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
 
+  const refPathBase = path.resolve(workspace, '.project-skill-evals', 'skill-refs');
+  const variantRunners = new Map<string, EvalRunner>();
+
+  // 1. Local Runner
+  variantRunners.set('local', new EvalRunner({
+    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, debug, timeoutMs
+  }));
+
+  // 2. Historical Runners
+  for (const ref of compareRefs) {
+    const refDir = path.join(refPathBase, ref);
+    Logger.write(`   Extracting ref '${ref}'... `);
+    extractSkillRef(skillPath, ref, refDir);
+    Logger.write(chalk.green('Done\n'));
+    
+    variantRunners.set(`ref:${ref}`, new EvalRunner({
+      agent,
+      workspace: refDir, // Run inside extracted repo
+      skillPath: path.join(refDir, path.relative(workspace, skillPath)), // Same relative path
+      skillName: skill_name,
+      runDir,
+      isBaseline: false,
+      debug,
+      timeoutMs
+    }));
+  }
+
+  // 3. Baseline Runner
+  const withoutSkillRunner = new EvalRunner({
+    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: true, debug, timeoutMs
+  });
+
   const taskResults: TaskResult[] = [];
   let withSkillTasksAllPassedCount = 0;
   let baselineTasksAllPassedCount = 0;
-
-  // Per-task trial storage, indexed by task.id
-  const withoutSkillTrialsByTask = new Map<number, EvalTrial[]>();
-
-  const withoutSkillRunner = new EvalRunner({
-    agent,
-    workspace,
-    skillPath,
-    skillName: skill_name,
-    runDir,
-    isBaseline: true,
-    debug,
-    timeoutMs
-  });
-
-  const withSkillRunner = new EvalRunner({
-    agent,
-    workspace,
-    skillPath,
-    skillName: skill_name,
-    runDir,
-    isBaseline: false,
-    debug,
-    timeoutMs
-  });
 
   const pool = new AgentPool(maxAgents);
   const ui = new ListrEvalUI();
@@ -89,10 +99,11 @@ export async function functionalCommand(
   // Barrier chain: each prompt waits until the previous prompt's trials have all acquired slots.
   let barrier = Promise.resolve();
 
-  // Subtask labels: Without Skill 1..N then With Skill 1..N for each prompt
+  // Subtask labels
+  const skillVersions = Array.from(variantRunners.keys());
   const subtaskLabels = [
     ...Array.from({ length: numTrials }, (_, i) => `Without Skill ${i + 1}`),
-    ...Array.from({ length: numTrials }, (_, i) => `With Skill ${i + 1}`)
+    ...skillVersions.flatMap(v => Array.from({ length: numTrials }, (_, i) => `${v} ${i + 1}`))
   ];
 
   try {
@@ -115,7 +126,7 @@ export async function functionalCommand(
         task: async (uiCtx, multi) => {
           await thisBarrier;
 
-          // ── Without Skill trials (subtask IDs 1..numTrials) ──────────────
+          // 1. Without Skill trials
           const baselineTrialPromises: Promise<EvalTrial>[] = [];
           for (let idx = 0; idx < numTrials; idx++) {
             const trialId = idx + 1;
@@ -149,73 +160,88 @@ export async function functionalCommand(
             baselineTrialPromises.push(p);
           }
 
-          // ── With Skill trials (subtask IDs numTrials+1..2*numTrials) ─────
-          const withSkillTrialPromises: Promise<EvalTrial>[] = [];
-          for (let idx = 0; idx < numTrials; idx++) {
-            const subtaskId = numTrials + idx + 1;   // Listr subtask position
-            const runnerTrialId = idx + 1;            // 1-based trial number within WI pass
-            const trialCtx = multi?.getTrialCtx(subtaskId) ?? uiCtx;
-            const release = await pool.acquire();
-            const p = withRetry(
-              (attempt) =>
-                withSkillRunner.runFunctionalTask(task, i, runnerTrialId, trialCtx, attempt)
-                  .catch((error): EvalTrial => ({
-                    id: runnerTrialId,
-                    transcript: { error: error instanceof Error ? error.message : String(error) },
-                    assertionResults: [{ assertion: 'With Skill Execution', passed: false, reason: String(error) }],
-                    trialPassed: false,
-                    isError: true
-                  })),
-              2,
-              1000,
-              (nextAttempt, lastTrial) => {
-                const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
-                trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
-              }
-            ).then(trial => {
-              if (multi) {
-                const reason = trial.assertionResults.find(r => !r.passed)?.reason;
-                const passedCount = trial.assertionResults.filter(r => r.passed).length;
-                const totalCount = trial.assertionResults.length;
-                multi.markTrialComplete(subtaskId, trial.trialPassed, reason, trial.isError, passedCount, totalCount);
-              }
-              return trial;
-            }).finally(release);
-            withSkillTrialPromises.push(p);
+          // 2. Skill variants trials
+          const variantTrialsPromises: Record<string, Promise<EvalTrial>[]> = {};
+          let currentSubtaskIdx = numTrials;
+
+          for (const [version, runner] of variantRunners.entries()) {
+            variantTrialsPromises[version] = [];
+            for (let idx = 0; idx < numTrials; idx++) {
+              currentSubtaskIdx++;
+              const subtaskId = currentSubtaskIdx;
+              const runnerTrialId = idx + 1;
+              const trialCtx = multi?.getTrialCtx(subtaskId) ?? uiCtx;
+              const release = await pool.acquire();
+              const p = withRetry(
+                (attempt) =>
+                  runner.runFunctionalTask(task, i, runnerTrialId, trialCtx, attempt)
+                    .catch((error): EvalTrial => ({
+                      id: runnerTrialId,
+                      transcript: { error: error instanceof Error ? error.message : String(error) },
+                      assertionResults: [{ assertion: `${version} Execution`, passed: false, reason: String(error) }],
+                      trialPassed: false,
+                      isError: true
+                    })),
+                2,
+                1000,
+                (nextAttempt, lastTrial) => {
+                  const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
+                  trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
+                }
+              ).then(trial => {
+                if (multi) {
+                  const reason = trial.assertionResults.find(r => !r.passed)?.reason;
+                  const passedCount = trial.assertionResults.filter(r => r.passed).length;
+                  const totalCount = trial.assertionResults.length;
+                  multi.markTrialComplete(subtaskId, trial.trialPassed, reason, trial.isError, passedCount, totalCount);
+                }
+                return trial;
+              }).finally(release);
+              variantTrialsPromises[version].push(p);
+            }
           }
 
-          // All WO + WI slots for this prompt have been acquired — signal the next prompt.
+          // All slots for this prompt have been acquired — signal the next prompt.
           resolveBarrier();
 
-          const [woTrials, wiTrials] = await Promise.all([
+          const [woTrials, ...versionsTrials] = await Promise.all([
             Promise.all(baselineTrialPromises),
-            Promise.all(withSkillTrialPromises)
+            ...Object.values(variantTrialsPromises).map(ps => Promise.all(ps))
           ]);
-
-          withoutSkillTrialsByTask.set(task.id, woTrials);
 
           const woPassedCount = woTrials.filter(t => t.trialPassed).length;
           if (woPassedCount === woTrials.length) baselineTasksAllPassedCount++;
 
-          const wiPassedCount = wiTrials.filter(t => t.trialPassed).length;
-          const score = wiTrials.length > 0 ? wiPassedCount / wiTrials.length : 0;
-          const withoutSkillTrials = withoutSkillTrialsByTask.get(task.id) ?? [];
+          const taskSkillTrials: Record<string, EvalTrial[]> = {};
+          const variantNames = Object.keys(variantTrialsPromises);
+          
+          let localAllPassed = true;
+          for (let vIdx = 0; vIdx < variantNames.length; vIdx++) {
+            const vName = variantNames[vIdx];
+            const vTrials = versionsTrials[vIdx];
+            taskSkillTrials[vName] = vTrials.map(t => ({ ...t, transcript: undefined as any }));
+            
+            if (vName === 'local') {
+              const passedCount = vTrials.filter(t => t.trialPassed).length;
+              if (passedCount === vTrials.length) {
+                withSkillTasksAllPassedCount++;
+              } else {
+                localAllPassed = false;
+              }
+            }
+          }
 
           const taskResult: TaskResult = {
             taskId: task.id,
             prompt: task.prompt,
             baselineTrials: woTrials.map(t => ({ ...t, transcript: undefined as any })),
-            skillTrials: {
-              'local': wiTrials.map(t => ({ ...t, transcript: undefined as any }))
-            }
+            skillTrials: taskSkillTrials
           };
           taskResults.push(taskResult);
 
-          if (wiPassedCount === wiTrials.length) {
-            withSkillTasksAllPassedCount++;
-          } else if (!multi) {
-            const failureReason = wiTrials.find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'With Skill failed';
-            throw new Error(failureReason);
+          if (!localAllPassed && !multi) {
+             const failureReason = taskSkillTrials['local'].find(t => !t.trialPassed)?.assertionResults.find(r => !r.passed)?.reason || 'With Skill failed';
+             throw new Error(failureReason);
           }
         }
       });
@@ -224,7 +250,8 @@ export async function functionalCommand(
     await ui.run(tasks.length);
 
     // ==== REPORTING ====
-    const versions = ['baseline', 'local']; // Later extended with compareRefs
+    const allSkillVersions = taskResults.length > 0 ? Object.keys(taskResults[0].skillTrials) : ['local'];
+    const allVersions = ['baseline', ...allSkillVersions];
     
     const scores: Record<string, string> = {};
     const passAtK: Record<string, number> = {};
@@ -232,7 +259,7 @@ export async function functionalCommand(
     const tokenStats: Record<string, any> = {};
     const durationStats: Record<string, any> = {};
 
-    // Baseline
+    // 1. Baseline Metrics
     const { passAtK: woPassAtK } = aggregatePassAtK(taskResults, numTrials, r => r.baselineTrials);
     const woAssertionPassRate = aggregateAssertionPassRate(taskResults, r => r.baselineTrials);
     const woPercentage = Math.round(woAssertionPassRate * 100);
@@ -245,20 +272,23 @@ export async function functionalCommand(
     const woDuration = aggregateDurationStats(taskResults.flatMap(r => r.baselineTrials));
     if (woDuration) durationStats['baseline'] = woDuration;
 
-    // Local
-    const { passAtK: wiPassAtK } = aggregatePassAtK(taskResults, numTrials, r => r.skillTrials['local']);
-    const wiAssertionPassRate = aggregateAssertionPassRate(taskResults, r => r.skillTrials['local']);
-    const wiPercentage = Math.round(wiAssertionPassRate * 100);
+    // 2. Skill Variants Metrics
+    for (const version of allSkillVersions) {
+      const { passAtK: wiPassAtK } = aggregatePassAtK(taskResults, numTrials, r => r.skillTrials[version] || []);
+      const wiAssertionPassRate = aggregateAssertionPassRate(taskResults, r => r.skillTrials[version] || []);
+      const wiPercentage = Math.round(wiAssertionPassRate * 100);
 
-    scores['local'] = `${wiPercentage}%`;
-    passAtK['local'] = Math.round(wiPassAtK * 1000) / 1000;
-    assertionPassRate['local'] = Math.round(wiAssertionPassRate * 1000) / 1000;
-    const wiTokens = aggregateTokenStats(taskResults.flatMap(r => r.skillTrials['local']));
-    if (wiTokens) tokenStats['local'] = wiTokens;
-    const wiDuration = aggregateDurationStats(taskResults.flatMap(r => r.skillTrials['local']));
-    if (wiDuration) durationStats['local'] = wiDuration;
+      scores[version] = `${wiPercentage}%`;
+      passAtK[version] = Math.round(wiPassAtK * 1000) / 1000;
+      assertionPassRate[version] = Math.round(wiAssertionPassRate * 1000) / 1000;
+      const wiTokens = aggregateTokenStats(taskResults.flatMap(r => r.skillTrials[version] || []));
+      if (wiTokens) tokenStats[version] = wiTokens;
+      const wiDuration = aggregateDurationStats(taskResults.flatMap(r => r.skillTrials[version] || []));
+      if (wiDuration) durationStats[version] = wiDuration;
+    }
 
-    const skillUplift = wiPercentage - woPercentage;
+    const localPercentage = Math.round((assertionPassRate['local'] || 0) * 100);
+    const skillUplift = localPercentage - woPercentage;
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),

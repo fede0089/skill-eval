@@ -12,6 +12,8 @@ import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderTriggerTable, renderRunHeader } from '../utils/table-renderer.js';
 import { JsonReporter } from '../reporters/index.js';
+import chalk from 'chalk';
+import { extractSkillRef } from '../utils/git.js';
 import type { Reporter } from '../reporters/index.js';
 
 export async function triggerCommand(
@@ -55,24 +57,45 @@ export async function triggerCommand(
   const runDir = path.resolve(workspace, '.project-skill-evals', 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
 
+  const refPathBase = path.resolve(workspace, '.project-skill-evals', 'skill-refs');
+  const variantRunners = new Map<string, EvalRunner>();
+
+  // 1. Local Runner
+  variantRunners.set('local', new EvalRunner({
+    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, debug, timeoutMs
+  }));
+
+  // 2. Historical Runners
+  for (const ref of compareRefs) {
+    const refDir = path.join(refPathBase, ref);
+    Logger.write(`   Extracting ref '${ref}'... `);
+    extractSkillRef(skillPath, ref, refDir);
+    Logger.write(chalk.green('Done\n'));
+    
+    variantRunners.set(`ref:${ref}`, new EvalRunner({
+      agent,
+      workspace: refDir,
+      skillPath: path.join(refDir, path.relative(workspace, skillPath)),
+      skillName: skill_name,
+      runDir,
+      isBaseline: false,
+      debug,
+      timeoutMs
+    }));
+  }
+
   const taskResults: TaskResult[] = [];
   let tasksPassedCount = 0;
-
-  const runner = new EvalRunner({
-    agent,
-    workspace,
-    skillPath,
-    skillName: skill_name,
-    runDir,
-    debug,
-    timeoutMs
-  });
 
   const pool = new AgentPool(maxAgents);
   const ui = new ListrEvalUI();
 
   // Barrier chain: each prompt waits until the previous prompt's trials have all acquired slots.
   let barrier = Promise.resolve();
+
+  // Subtask labels
+  const skillVersions = Array.from(variantRunners.keys());
+  const subtaskLabels = skillVersions.flatMap(v => Array.from({ length: numTrials }, (_, i) => `${v} ${i + 1}`));
 
   try {
     renderRunHeader({ command: 'trigger', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId });
@@ -91,65 +114,90 @@ export async function triggerCommand(
       ui.addTask({
         id: task.id,
         title: taskLabel,
-        numTrials,
+        subtaskLabels,
         task: async (uiCtx, multi) => {
           await thisBarrier;
 
-          const trialPromises: Promise<EvalTrial>[] = [];
-          for (let idx = 0; idx < numTrials; idx++) {
-            const trialId = idx + 1;
-            const trialCtx = multi?.getTrialCtx(trialId) ?? uiCtx;
-            const release = await pool.acquire();
-            const p = withRetry(
-              (attempt) =>
-                runner.runTriggerTask(task, i, trialId, trialCtx, attempt)
-                  .catch((error): EvalTrial => ({
-                    id: trialId,
-                    transcript: { error: error instanceof Error ? error.message : String(error) },
-                    assertionResults: [{
-                      assertion: 'Runner Execution',
-                      passed: false,
-                      reason: error instanceof Error ? error.message : String(error)
-                    }],
-                    trialPassed: false,
-                    isError: true
-                  })),
-              2,
-              1000,
-              (nextAttempt, lastTrial) => {
-                const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
-                trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
-              }
-            ).then(trial => {
-              if (multi) {
-                const reason = trial.assertionResults.find(r => !r.passed)?.reason;
-                multi.markTrialComplete(trialId, trial.trialPassed, reason, trial.isError);
-              }
-              return trial;
-            }).finally(release);
-            trialPromises.push(p);
+          const variantTrialsPromises: Record<string, Promise<EvalTrial>[]> = {};
+          let currentSubtaskIdx = 0;
+
+          for (const [version, runner] of variantRunners.entries()) {
+            variantTrialsPromises[version] = [];
+            for (let idx = 0; idx < numTrials; idx++) {
+              currentSubtaskIdx++;
+              const subtaskId = currentSubtaskIdx;
+              const runnerTrialId = idx + 1;
+              const trialCtx = multi?.getTrialCtx(subtaskId) ?? uiCtx;
+              const release = await pool.acquire();
+              const p = withRetry(
+                (attempt) =>
+                  runner.runTriggerTask(task, i, runnerTrialId, trialCtx, attempt)
+                    .catch((error): EvalTrial => ({
+                      id: runnerTrialId,
+                      transcript: { error: error instanceof Error ? error.message : String(error) },
+                      assertionResults: [{
+                        assertion: `${version} Execution`,
+                        passed: false,
+                        reason: error instanceof Error ? error.message : String(error)
+                      }],
+                      trialPassed: false,
+                      isError: true
+                    })),
+                2,
+                1000,
+                (nextAttempt, lastTrial) => {
+                  const reason = lastTrial.assertionResults[0]?.reason ?? 'infrastructure error';
+                  trialCtx.updateLog(`Retry ${nextAttempt}/2 — ${reason.substring(0, 50)}`);
+                }
+              ).then(trial => {
+                if (multi) {
+                  const reason = trial.assertionResults.find(r => !r.passed)?.reason;
+                  const passedCount = trial.assertionResults.filter(r => r.passed).length;
+                  const totalCount = trial.assertionResults.length;
+                  multi.markTrialComplete(subtaskId, trial.trialPassed, reason, trial.isError, passedCount, totalCount);
+                }
+                return trial;
+              }).finally(release);
+              variantTrialsPromises[version].push(p);
+            }
           }
 
-          // All trials for this prompt have acquired a slot — signal the next prompt.
+          // All slots for this prompt have acquired a slot — signal the next prompt.
           resolveBarrier();
 
-          const trials = await Promise.all(trialPromises);
+          const versionsTrials = await Promise.all(
+            Object.values(variantTrialsPromises).map(ps => Promise.all(ps))
+          );
+
+          const taskSkillTrials: Record<string, EvalTrial[]> = {};
+          const variantNames = Object.keys(variantTrialsPromises);
+          
+          let localAllPassed = true;
+          for (let vIdx = 0; vIdx < variantNames.length; vIdx++) {
+            const vName = variantNames[vIdx];
+            const vTrials = versionsTrials[vIdx];
+            taskSkillTrials[vName] = vTrials.map(t => ({ ...t, transcript: undefined as any }));
+            
+            if (vName === 'local') {
+              const passedCount = vTrials.filter(t => t.trialPassed).length;
+              if (passedCount === vTrials.length) {
+                tasksPassedCount++;
+              } else {
+                localAllPassed = false;
+              }
+            }
+          }
 
           const taskResult: TaskResult = {
             taskId: task.id,
             prompt: task.prompt,
-            baselineTrials: [], // Trigger doesn't have a baseline usually, but let's keep it empty
-            skillTrials: {
-              'local': trials.map(t => ({ ...t, transcript: undefined as any }))
-            }
+            baselineTrials: [],
+            skillTrials: taskSkillTrials
           };
           taskResults.push(taskResult);
 
-          const passedCount = trials.filter(t => t.trialPassed).length;
-          if (passedCount === trials.length) {
-            tasksPassedCount++;
-          } else if (!multi) {
-            const failureReason = trials.find(t => t.trialPassed === false)?.assertionResults.find(r => !r.passed)?.reason || 'Task failed evaluation';
+          if (!localAllPassed && !multi) {
+            const failureReason = taskSkillTrials['local'].find(t => t.trialPassed === false)?.assertionResults.find(r => !r.passed)?.reason || 'Task failed evaluation';
             throw new Error(failureReason);
           }
         }
@@ -159,26 +207,27 @@ export async function triggerCommand(
     await ui.run(tasks.length);
 
     // Compute aggregate metrics and build report
+    const allSkillVersions = taskResults.length > 0 ? Object.keys(taskResults[0].skillTrials) : ['local'];
     const scores: Record<string, string> = {};
     const passAtK: Record<string, number> = {};
     const assertionPassRate: Record<string, number> = {};
     const tokenStats: Record<string, any> = {};
     const durationStats: Record<string, any> = {};
 
-    const { passAtK: localPassAtK } = aggregatePassAtK(taskResults, numTrials, r => r.skillTrials['local']);
-    const percentage = Math.round(localPassAtK * 100);
+    for (const version of allSkillVersions) {
+      const { passAtK: vPassAtK } = aggregatePassAtK(taskResults, numTrials, r => r.skillTrials[version] || []);
+      const percentage = Math.round(vPassAtK * 100);
 
-    scores['local'] = `${percentage}%`;
-    passAtK['local'] = Math.round(localPassAtK * 1000) / 1000;
-    // Trigger uses trigger grader which is usually modeled as pass/fail for the whole task, 
-    // but aggregateAssertionPassRate works too.
-    const localAssertionRate = aggregateAssertionPassRate(taskResults, r => r.skillTrials['local']);
-    assertionPassRate['local'] = Math.round(localAssertionRate * 1000) / 1000;
+      scores[version] = `${percentage}%`;
+      passAtK[version] = Math.round(vPassAtK * 1000) / 1000;
+      const vAssertionRate = aggregateAssertionPassRate(taskResults, r => r.skillTrials[version] || []);
+      assertionPassRate[version] = Math.round(vAssertionRate * 1000) / 1000;
 
-    const wiTokens = aggregateTokenStats(taskResults.flatMap(r => r.skillTrials['local']));
-    if (wiTokens) tokenStats['local'] = wiTokens;
-    const wiDuration = aggregateDurationStats(taskResults.flatMap(r => r.skillTrials['local']));
-    if (wiDuration) durationStats['local'] = wiDuration;
+      const vTokens = aggregateTokenStats(taskResults.flatMap(r => r.skillTrials[version] || []));
+      if (vTokens) tokenStats[version] = vTokens;
+      const vDuration = aggregateDurationStats(taskResults.flatMap(r => r.skillTrials[version] || []));
+      if (vDuration) durationStats[version] = vDuration;
+    }
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
