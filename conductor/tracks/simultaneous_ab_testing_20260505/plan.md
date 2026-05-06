@@ -19,7 +19,7 @@
 - [x] Task: Enforce global concurrency limits across all skill variants using `AgentPool` to prevent rate-limiting. (4373081)
     - [x] Write Tests
     - [x] Implement
-- [ ] Task: Conductor - User Manual Verification 'N-Version Comparison & Concurrency Limits' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'N-Version Comparison & Concurrency Limits' (Protocol in workflow.md) (bb8b9e9)
 
 # Phase 3: Reporters Update & System Robustness
 *Goal: Complete the feature by updating all output formats (JSON/HTML), ensuring robust error handling (aborting on Git failures), and implementing post-run teardown cleanup.*
