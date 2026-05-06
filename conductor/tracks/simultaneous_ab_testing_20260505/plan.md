@@ -3,9 +3,9 @@
 - [x] Task: Refactor TaskResult and CLI commands to support the new skillTrials dictionary and parse the --compare-ref flag. (cc5a35e)
     - [x] Write Tests
     - [x] Implement
-- [ ] Task: Implement Two-Step Extraction (`git archive`) to isolate the historical reference.
-    - [ ] Write Tests
-    - [ ] Implement
+- [x] Task: Implement Two-Step Extraction (`git archive`) to isolate the historical reference. (67e32cd)
+    - [x] Write Tests
+    - [x] Implement
 - [ ] Task: Integrate the AgentRunner to evaluate the extracted ref and update `table-renderer.ts` to display local vs ref results.
     - [ ] Write Tests
     - [ ] Implement
