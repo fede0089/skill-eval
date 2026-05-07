@@ -42,8 +42,7 @@ function makeFunctionalReport(numTrials = 1): EvalSuiteReport {
       passedCount: 1, totalCount: 1, numTrials,
       scores: { 'baseline': '0%', 'local': '100%' },
       passAtK: { 'baseline': 0, 'local': 1 },
-      assertionPassRate: { 'baseline': 0, 'local': 1 },
-      skillUplift: '+100%'
+      assertionPassRate: { 'baseline': 0, 'local': 1 }
     },
     results: [{
       taskId: 1,

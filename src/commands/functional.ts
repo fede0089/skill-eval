@@ -287,9 +287,6 @@ export async function functionalCommand(
       if (wiDuration) durationStats[version] = wiDuration;
     }
 
-    const localPercentage = Math.round((assertionPassRate['local'] || 0) * 100);
-    const skillUplift = localPercentage - woPercentage;
-
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
       skill_name,
@@ -302,8 +299,7 @@ export async function functionalCommand(
         passAtK,
         assertionPassRate,
         tokenStats,
-        durationStats,
-        skillUplift: `${skillUplift > 0 ? '+' : ''}${skillUplift}%`
+        durationStats
       },
       results: taskResults
     };
@@ -312,8 +308,6 @@ export async function functionalCommand(
     Logger.write(`──────────────────────────────────────────────────\n`);
     renderFunctionalTable(report);
 
-    const upliftSign = skillUplift > 0 ? '+' : '';
-    Logger.write(`\n   Skill Uplift:            ${upliftSign}${skillUplift}%\n`);
     Logger.write('\n');
     new JsonReporter().generate(report, runDir);
     reporter.generate(report, runDir);

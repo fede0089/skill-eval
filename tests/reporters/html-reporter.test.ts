@@ -55,7 +55,6 @@ function makeFunctionalReport(): EvalSuiteReport {
       scores: { 'baseline': '60%', 'local': '80%' },
       passAtK: { 'baseline': 0.6, 'local': 0.8 },
       assertionPassRate: { 'baseline': 0.6, 'local': 0.8 },
-      skillUplift: '+20%',
     },
     results: [
       {
@@ -87,7 +86,7 @@ test('generateHtml produces valid HTML for a trigger report', () => {
   assert.ok(html.includes('gemini-cli'), 'should contain agent name');
 });
 
-test('generateHtml produces functional report with baseline and uplift data', () => {
+test('generateHtml produces functional report with baseline and local data', () => {
   const report = makeFunctionalReport();
   const html = generateHtml(report);
 
