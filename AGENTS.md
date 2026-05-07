@@ -10,14 +10,16 @@
 
 ## Project overview
 - A Node.js CLI tool built to evaluate Agent Skills locally using the Gemini CLI, measuring both triggering reliability and functional correctness through an LLM judge.
-- Both `trigger` and `functional` commands require `--workspace <path>` and `--skill <path>`, and accept `--trials <number>` (default: 3) and `--concurrency <number>` (default: 5).
+- Supports **Simultaneous A/B Testing**: compare local skill code against multiple historical Git references (`--compare-ref`) in a single run.
+- Both `trigger` and `functional` commands require `--workspace <path>` and `--skill <path>`, and accept `--trials <number>` (default: 3) and `--agents <number>` (default: 4).
 - Entrypoints for understanding the system:
   - `src/index.ts` - Main CLI entrypoint; defines `trigger` and `functional` commands.
   - `src/commands/trigger.ts` - Skill triggering evaluation logic.
   - `src/commands/functional.ts` - Functional evaluation and expectations logic.
-  - `src/core/evaluator.ts` - Core evaluation logic including functional judge prompts; `ModelBasedGrader` accepts an injected `AgentRunner`.
+  - `src/core/evaluator.ts` - Core evaluation logic including functional judge prompts.
   - `src/core/eval-runner.ts` - Orchestrates trial runs, parses NDJSON stream output, coordinates grading.
-  - `src/core/environment.ts` - Manages git worktree isolation and skill symlinks per evaluation.
+  - `src/core/environment.ts` - Manages git worktree isolation for concurrent trials.
+  - `src/utils/git.ts` - Manages ephemeral extraction of historical Git references for A/B testing.
   - `src/core/statistics.ts` - Implements `computePassAtK` and `aggregatePassAtK` metric computation.
   - `src/core/trial-utils.ts` - Shared helper: `padAbortedTrials` fills trial arrays to a consistent denominator.
   - `src/core/preflight.ts` - Pre-flight validation of agent binary and skill directory structure.

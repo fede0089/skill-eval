@@ -80,6 +80,7 @@ skill-eval functional --workspace <path> --skill <path> [options] [agent]
 | `--trials <number>` | no | `3` | Trials per task (for pass@k) |
 | `--timeout <seconds>` | no | none | Kill the agent after this many seconds |
 | `--eval-id <id>` | no | all | Run only the eval with this numeric ID |
+| `--compare-ref [refs...]` | no | — | Git references to compare against |
 | `-v, --debug` | no | `false` | Enable verbose debug logging |
 | `[agent]` | no | `gemini-cli` | Agent backend to use |
 
@@ -170,6 +171,18 @@ Results are saved to `.project-skill-evals/runs/<timestamp>/` with logs, raw eva
 3. Register it in `src/runners/registry.ts`:
    ```ts
    '<your-agent>': { Runner: YourRunner, binary: '<cli-binary-name>' },
+   ```
+
+The factory, preflight check, and CLI all pick it up automatically.
+
+> Implement `applyRunnerConfig(evalConfigBaseDir, worktreePath)` to copy `evalConfigBaseDir/<your-agent>/` into the appropriate config directory in the worktree (e.g. `.claude/` for a Claude runner). No-op silently if the directory doesn't exist.
+
+### Adding a new report format
+
+1. Create `src/reporters/<format>-reporter.ts` implementing `Reporter`.
+2. Export it and add a case in `createReporter()` in `src/reporters/index.ts`.
+3. Add the format string to `ReportFormat` in `src/types/index.ts`.
+er, binary: '<cli-binary-name>' },
    ```
 
 The factory, preflight check, and CLI all pick it up automatically.
