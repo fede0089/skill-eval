@@ -61,11 +61,11 @@ function makeFunctionalReport(): EvalSuiteReport {
         taskId: 1,
         prompt: 'Functional prompt',
         baselineTrials: [
-          { id: 1, transcript: {}, assertionResults: [{ assertion: 'Without Skill assertion', passed: false, reason: 'Not triggered' }], trialPassed: false },
+          { id: 1, transcript: {}, assertionResults: [{ assertion: 'Shared expectation', passed: false, reason: 'Not triggered' }], trialPassed: false },
         ],
         skillTrials: {
           'local': [
-            { id: 1, transcript: {}, assertionResults: [{ assertion: 'With Skill assertion', passed: true, reason: 'Passed' }], trialPassed: true },
+            { id: 1, transcript: {}, assertionResults: [{ assertion: 'Shared expectation', passed: true, reason: 'Passed' }], trialPassed: true },
           ],
         }
       },
@@ -94,8 +94,9 @@ test('generateHtml produces functional report with baseline and local data', () 
   assert.ok(html.includes('baseline'), 'should contain baseline label');
   assert.ok(html.includes('local'), 'should contain local label');
   assert.ok(html.includes('Functional prompt'), 'should contain task prompt');
-  assert.ok(html.includes('Without Skill assertion'), 'should contain without-skill assertion text');
-  assert.ok(html.includes('With Skill assertion'), 'should contain with-skill assertion text');
+  assert.ok(html.includes('Shared expectation'), 'should contain shared expectation text');
+  assert.ok(html.includes('Not triggered'), 'should contain baseline judge reason in drill-down');
+  assert.ok(html.includes('Passed'), 'should contain local judge reason in drill-down');
 });
 
 test('generateHtml handles empty results without throwing', () => {
@@ -114,11 +115,36 @@ test('generateHtml handles empty results without throwing', () => {
   assert.ok(html.includes('<!DOCTYPE html>'));
 });
 
-test('generateHtml renders failing assertion reason in output', () => {
-  const report = makeTriggerReport();
+test('generateHtml renders failing assertion text and judge reason in functional drill-down', () => {
+  const report: EvalSuiteReport = {
+    timestamp: '2026-01-01T00:00:00.000Z',
+    skill_name: 'func-skill',
+    agent: 'gemini-cli',
+    metrics: {
+      passedCount: 0,
+      totalCount: 1,
+      numTrials: 1,
+      scores: { 'baseline': '0%', 'local': '0%' },
+      passAtK: { 'baseline': 0, 'local': 0 },
+      assertionPassRate: { 'baseline': 0, 'local': 0 },
+    },
+    results: [{
+      taskId: 1,
+      prompt: 'A prompt',
+      baselineTrials: [
+        { id: 1, transcript: {}, assertionResults: [{ assertion: 'Check output', passed: false, reason: 'Missing field' }], trialPassed: false },
+      ],
+      skillTrials: {
+        'local': [
+          { id: 1, transcript: {}, assertionResults: [{ assertion: 'Check output', passed: false, reason: 'Missing field' }], trialPassed: false },
+        ],
+      }
+    }],
+  };
   const html = generateHtml(report);
-  assert.ok(html.includes('Missing field'), 'failing assertion reason should appear in output');
-  assert.ok(html.includes('Check output'), 'failing assertion text should appear');
+  assert.ok(html.includes('Check output'), 'failing assertion text should appear as row label');
+  assert.ok(html.includes('Missing field'), 'judge reason should appear in the drill-down');
+  assert.ok(html.includes('exp-detail-row'), 'drill-down rows should be rendered for functional evals');
 });
 
 test('generateHtml formats passAtK 0.667 as 67%', () => {
@@ -127,31 +153,46 @@ test('generateHtml formats passAtK 0.667 as 67%', () => {
   assert.ok(html.includes('67%'), 'pass@1 should be formatted as 67%');
 });
 
-test('generateHtml renders PARTIAL badge for trials where some but not all assertions pass', () => {
+test('generateHtml renders one row per expectation with per-variant pass-rate cells', () => {
   const report = makeTriggerReport({
     results: [{
       taskId: 1,
       prompt: 'Do something',
       baselineTrials: [],
       skillTrials: {
-        'local': [{
-          id: 1,
-          transcript: {},
-          assertionResults: [
-            { assertion: 'First check', passed: true, reason: 'ok' },
-            { assertion: 'Second check', passed: false, reason: 'missing' },
-          ],
-          trialPassed: false,
-        }]
+        'local': [
+          {
+            id: 1,
+            transcript: {},
+            assertionResults: [
+              { assertion: 'First check', passed: true, reason: 'ok' },
+              { assertion: 'Second check', passed: false, reason: 'missing' },
+            ],
+            trialPassed: false,
+          },
+          {
+            id: 2,
+            transcript: {},
+            assertionResults: [
+              { assertion: 'First check', passed: true, reason: 'ok' },
+              { assertion: 'Second check', passed: true, reason: 'ok' },
+            ],
+            trialPassed: true,
+          },
+        ]
       },
     }],
   });
   const html = generateHtml(report);
-  assert.ok(html.includes('PARTIAL 1/2'), 'partial badge should show passed/total counts');
-  assert.ok(html.includes('trial-partial'), 'trial-partial CSS class should be applied');
+  assert.ok(html.includes('First check'), 'expectation text should appear as row label');
+  assert.ok(html.includes('Second check'), 'expectation text should appear as row label');
+  assert.ok(html.includes('class="pass-cell green"'), 'fully passing expectation should get green pass-cell');
+  assert.ok(html.includes('class="pass-cell amber"'), 'partially passing expectation should get amber pass-cell');
+  assert.ok(html.includes('2 / 2'), 'fully passing expectation should show 2 / 2');
+  assert.ok(html.includes('1 / 2'), 'partially passing expectation should show 1 / 2');
 });
 
-test('generateHtml renders NOT PASSED badge when zero assertions pass', () => {
+test('generateHtml renders red 0% cell when no trials pass an expectation', () => {
   const report = makeTriggerReport({
     results: [{
       taskId: 1,
@@ -170,8 +211,8 @@ test('generateHtml renders NOT PASSED badge when zero assertions pass', () => {
     }],
   });
   const html = generateHtml(report);
-  assert.ok(html.includes('NOT PASSED'), 'full fail badge should still appear');
-  assert.ok(!html.includes('PARTIAL'), 'partial badge should NOT appear when 0 assertions pass');
+  assert.ok(html.includes('class="pass-cell red"'), 'failing expectation should get red pass-cell');
+  assert.ok(html.includes('0 / 1'), 'cell should show 0 / 1');
 });
 
 test('generateHtml escapes HTML special characters in prompt', () => {
