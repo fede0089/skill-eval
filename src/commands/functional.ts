@@ -62,7 +62,8 @@ export async function functionalCommand(
 
   // 1. Local Runner
   variantRunners.set('local', new EvalRunner({
-    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, debug, timeoutMs
+    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, debug, timeoutMs,
+    variant: 'local'
   }));
 
   // 2. Historical Runners
@@ -71,7 +72,7 @@ export async function functionalCommand(
     Logger.write(`   Extracting ref '${ref}'... `);
     git.extractSkillRef(skillPath, ref, refDir);
     Logger.write(chalk.green('Done\n'));
-    
+
     variantRunners.set(`ref:${ref}`, new EvalRunner({
       agent,
       workspace: refDir, // Run inside extracted repo
@@ -80,13 +81,15 @@ export async function functionalCommand(
       runDir,
       isBaseline: false,
       debug,
-      timeoutMs
+      timeoutMs,
+      variant: `ref:${ref}`
     }));
   }
 
   // 3. Baseline Runner
   const withoutSkillRunner = new EvalRunner({
-    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: true, debug, timeoutMs
+    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: true, debug, timeoutMs,
+    variant: 'baseline'
   });
 
   const taskResults: TaskResult[] = [];

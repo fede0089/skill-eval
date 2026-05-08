@@ -62,7 +62,8 @@ export async function triggerCommand(
 
   // 1. Local Runner
   variantRunners.set('local', new EvalRunner({
-    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, debug, timeoutMs
+    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, debug, timeoutMs,
+    variant: 'local'
   }));
 
   // 2. Historical Runners
@@ -71,7 +72,7 @@ export async function triggerCommand(
     Logger.write(`   Extracting ref '${ref}'... `);
     git.extractSkillRef(skillPath, ref, refDir);
     Logger.write(chalk.green('Done\n'));
-    
+
     variantRunners.set(`ref:${ref}`, new EvalRunner({
       agent,
       workspace: refDir,
@@ -80,7 +81,8 @@ export async function triggerCommand(
       runDir,
       isBaseline: false,
       debug,
-      timeoutMs
+      timeoutMs,
+      variant: `ref:${ref}`
     }));
   }
 

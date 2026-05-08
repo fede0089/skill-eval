@@ -500,3 +500,152 @@ test('EvalRunner.runFunctionalTask extracts tokenStats for without-skill trial',
   assert.strictEqual(result.tokenStats?.totalTokens, 5000);
 });
 
+// ── Variant-aware log file naming (A/B testing) ──────────────────────────────
+
+test('EvalRunner.runTriggerTask log filename includes variant slug (local)', async () => {
+  const agentRunnerMock = makeAgentRunnerMock();
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp/runs/abc', debug: true, variant: 'local'
+  });
+  stubWorktree();
+
+  await runner.runTriggerTask({ id: 7, prompt: 'test' }, 0, 2, { updateLog: () => {} } as any);
+
+  const logPath = agentRunnerMock.runPrompt.mock.calls[0].arguments[3] as string;
+  assert.strictEqual(logPath, '/tmp/runs/abc/task_7_local_trial_2.log');
+});
+
+test('EvalRunner.runTriggerTask log filename slugifies ref:<name>', async () => {
+  const agentRunnerMock = makeAgentRunnerMock();
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp/runs/abc', debug: true, variant: 'ref:main'
+  });
+  stubWorktree();
+
+  await runner.runTriggerTask({ id: 7, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
+
+  const logPath = agentRunnerMock.runPrompt.mock.calls[0].arguments[3] as string;
+  assert.strictEqual(logPath, '/tmp/runs/abc/task_7_ref-main_trial_1.log');
+});
+
+test('EvalRunner.runTriggerTask log filename slugifies ref with slash (feature/branch)', async () => {
+  const agentRunnerMock = makeAgentRunnerMock();
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp/runs/abc', debug: true, variant: 'ref:feature/my-branch'
+  });
+  stubWorktree();
+
+  await runner.runTriggerTask({ id: 1, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
+
+  const logPath = agentRunnerMock.runPrompt.mock.calls[0].arguments[3] as string;
+  assert.strictEqual(logPath, '/tmp/runs/abc/task_1_ref-feature-my-branch_trial_1.log');
+});
+
+test('EvalRunner.runFunctionalTask log filename includes variant slug for local', async () => {
+  const agentRunnerMock = makeAgentRunnerMock();
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-runs-'));
+  try {
+    const runner = new EvalRunner({
+      agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+      runDir, debug: true, isBaseline: false, variant: 'local'
+    });
+    stubWorktree({ stubExec: true });
+
+    await runner.runFunctionalTask({ id: 9, prompt: 'test', assertions: [] }, 0, 3, { updateLog: () => {} } as any);
+
+    const logPath = agentRunnerMock.runPrompt.mock.calls[0].arguments[3] as string;
+    assert.strictEqual(logPath, path.join(runDir, 'task_9_local_trial_3.log'));
+  } finally {
+    fs.rmSync(runDir, { recursive: true, force: true });
+  }
+});
+
+test('EvalRunner.runFunctionalTask log filename uses baseline variant for skill-disabled run', async () => {
+  const agentRunnerMock = makeAgentRunnerMock();
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-runs-'));
+  try {
+    const runner = new EvalRunner({
+      agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+      runDir, debug: true, isBaseline: true, variant: 'baseline'
+    });
+    stubWorktree({ stubExec: true });
+
+    await runner.runFunctionalTask({ id: 9, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
+
+    const logPath = agentRunnerMock.runPrompt.mock.calls[0].arguments[3] as string;
+    assert.strictEqual(logPath, path.join(runDir, 'task_9_baseline_trial_1.log'));
+  } finally {
+    fs.rmSync(runDir, { recursive: true, force: true });
+  }
+});
+
+test('EvalRunner.runFunctionalTask log filename slugifies ref:<name>', async () => {
+  const agentRunnerMock = makeAgentRunnerMock();
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-runs-'));
+  try {
+    const runner = new EvalRunner({
+      agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+      runDir, debug: true, isBaseline: false, variant: 'ref:v1.0'
+    });
+    stubWorktree({ stubExec: true });
+
+    await runner.runFunctionalTask({ id: 9, prompt: 'test', assertions: [] }, 0, 2, { updateLog: () => {} } as any);
+
+    const logPath = agentRunnerMock.runPrompt.mock.calls[0].arguments[3] as string;
+    assert.strictEqual(logPath, path.join(runDir, 'task_9_ref-v1.0_trial_2.log'));
+  } finally {
+    fs.rmSync(runDir, { recursive: true, force: true });
+  }
+});
+
+test('EvalRunner.runTriggerTask defaults to local variant when not provided (back-compat)', async () => {
+  const agentRunnerMock = makeAgentRunnerMock();
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp/runs/abc', debug: true,
+  });
+  stubWorktree();
+
+  await runner.runTriggerTask({ id: 1, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
+
+  const logPath = agentRunnerMock.runPrompt.mock.calls[0].arguments[3] as string;
+  assert.strictEqual(logPath, '/tmp/runs/abc/task_1_local_trial_1.log');
+});
+
+test('EvalRunner.runFunctionalTask defaults to baseline variant when isBaseline=true and variant not provided', async () => {
+  const agentRunnerMock = makeAgentRunnerMock();
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-runs-'));
+  try {
+    const runner = new EvalRunner({
+      agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+      runDir, debug: true, isBaseline: true,
+    });
+    stubWorktree({ stubExec: true });
+
+    await runner.runFunctionalTask({ id: 1, prompt: 'test', assertions: [] }, 0, 1, { updateLog: () => {} } as any);
+
+    const logPath = agentRunnerMock.runPrompt.mock.calls[0].arguments[3] as string;
+    assert.strictEqual(logPath, path.join(runDir, 'task_1_baseline_trial_1.log'));
+  } finally {
+    fs.rmSync(runDir, { recursive: true, force: true });
+  }
+});

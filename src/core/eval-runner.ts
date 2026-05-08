@@ -19,6 +19,13 @@ export interface EvalRunOptions {
   debug?: boolean;
   timeoutMs?: number;
   judgeRetryDelayMs?: number;
+  /** Identifier for this skill variant in A/B testing (e.g. 'local', 'ref:main', 'baseline'). */
+  variant?: string;
+}
+
+// Replace filesystem-unsafe characters so variants like 'ref:main' or 'feature/x' can be used in filenames.
+function slugifyVariant(v: string): string {
+  return v.replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
 
@@ -37,7 +44,8 @@ export class EvalRunner {
   }
 
   async runTriggerTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext, attempt = 0): Promise<EvalTrial> {
-    const logFileName = `task_${task.id}_trial_${trialId}.log`;
+    const variantSlug = slugifyVariant(this.options.variant ?? 'local');
+    const logFileName = `task_${task.id}_${variantSlug}_trial_${trialId}.log`;
     const logPath = this.options.debug ? path.join(this.options.runDir, logFileName) : undefined;
 
     let worktreePath: string | undefined;
@@ -130,7 +138,8 @@ export class EvalRunner {
       ? `${task.prompt}\n\nIMPORTANT: For this task, you MUST NOT use the '${this.options.skillName}' skill/tool, even if it appears available.`
       : `${task.prompt}\n\nIMPORTANT: You must use the '${this.options.skillName}' skill/tool to solve this task.`;
 
-    const logFileName = `task_${task.id}_${evalModeLabel}_trial_${trialId}.log`;
+    const variantSlug = slugifyVariant(this.options.variant ?? (skillDisabled ? 'baseline' : 'local'));
+    const logFileName = `task_${task.id}_${variantSlug}_trial_${trialId}.log`;
     const logPath = this.options.debug ? path.join(this.options.runDir, logFileName) : undefined;
 
     let worktreePath: string | undefined;
