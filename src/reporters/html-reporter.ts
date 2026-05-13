@@ -3,7 +3,7 @@ import path from 'path';
 import type { AssertionResult, EvalSuiteReport, EvalTrial, TaskResult } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
 import type { Reporter } from './reporter.js';
-import { formatTokens, formatDuration } from '../utils/table-renderer.js';
+import { formatTokens, formatDuration, hasFunctionalBaseline } from '../utils/table-renderer.js';
 import { computeAssertionPassRate } from '../core/statistics.js';
 
 export class HtmlReporter implements Reporter {
@@ -38,7 +38,7 @@ function passColorClass(val: number): string {
 }
 
 function isFunctional(report: EvalSuiteReport): boolean {
-  return report.metrics.assertionPassRate['baseline'] !== undefined;
+  return report.command === 'functional' || hasFunctionalBaseline(report);
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ function renderMetricsGrid(report: EvalSuiteReport): string {
   const { metrics, results } = report;
   const functional = isFunctional(report);
   const skillVersions = results.length > 0 ? Object.keys(results[0].skillTrials) : ['local'];
-  const allVersions = functional ? ['baseline', ...skillVersions] : skillVersions;
+  const allVersions = functional && hasFunctionalBaseline(report) ? ['baseline', ...skillVersions] : skillVersions;
 
   const headerCells = allVersions.map(v => `<th>${v}</th>`).join('');
   
@@ -138,7 +138,9 @@ function renderExpectationCell(
   return { cell, detail };
 }
 
-function renderExpectationsTable(result: TaskResult, allVersions: string[], isFunctionalEval: boolean): string {
+function renderExpectationsTable(result: TaskResult, isFunctionalEval: boolean): string {
+  const skillVersions = Object.keys(result.skillTrials);
+  const allVersions = isFunctionalEval && (result.baselineTrials?.length ?? 0) > 0 ? ['baseline', ...skillVersions] : skillVersions;
   let canonical: AssertionResult[] = [];
   for (const v of allVersions) {
     const trials = v === 'baseline' ? result.baselineTrials : result.skillTrials[v];
@@ -189,7 +191,7 @@ function avgTrialDuration(trials: EvalTrial[]): number | null {
 
 function renderTaskMiniGrid(result: TaskResult, isFunctionalEval: boolean): string {
   const skillVersions = Object.keys(result.skillTrials);
-  const allVersions = isFunctionalEval ? ['baseline', ...skillVersions] : skillVersions;
+  const allVersions = isFunctionalEval && (result.baselineTrials?.length ?? 0) > 0 ? ['baseline', ...skillVersions] : skillVersions;
 
   const headerCells = allVersions.map(v => `<th>${v}</th>`).join('');
 
@@ -235,12 +237,9 @@ function renderTaskMiniGrid(result: TaskResult, isFunctionalEval: boolean): stri
 }
 
 function renderTaskDetails(result: TaskResult, isFunctionalEval: boolean): string {
-  const skillVersions = Object.keys(result.skillTrials);
-  const allVersions = isFunctionalEval ? ['baseline', ...skillVersions] : skillVersions;
-
   const sections: string[] = [];
   sections.push(renderTaskMiniGrid(result, isFunctionalEval));
-  sections.push(renderExpectationsTable(result, allVersions, isFunctionalEval));
+  sections.push(renderExpectationsTable(result, isFunctionalEval));
 
   return `<div class="task-details" id="details-${result.taskId}">${sections.join('')}</div>`;
 }

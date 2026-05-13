@@ -17,3 +17,11 @@ test('functional command should have --agents flag', (t) => {
   const option = functionalCmd.options.find(o => o.long === '--agents');
   assert.ok(option, '--agents option not found on functional command');
 });
+
+test('functional command should have --compare-baseline flag', (t) => {
+  const functionalCmd = program.commands.find(c => c.name() === 'functional');
+  assert.ok(functionalCmd, 'functional command not found');
+
+  const option = functionalCmd.options.find(o => o.long === '--compare-baseline');
+  assert.ok(option, '--compare-baseline option not found on functional command');
+});

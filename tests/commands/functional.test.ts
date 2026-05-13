@@ -34,8 +34,8 @@ test('functionalCommand should handle tasks and trials', async (t) => {
   try {
     await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1);
 
-    // Verify baseline and target runs: 1 task × 1 trial × 2 passes = 2 calls
-    assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 2);
+    // Verify skill-only runs: 1 task × 1 trial = 1 call
+    assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 1);
   } finally {
     mock.reset();
   }
@@ -68,10 +68,42 @@ test('functionalCommand should run all trials in parallel (no early abort on err
   try {
     await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 3);
 
-    // without-skill: 3 trials (one throws at callCount=2) → 4 calls (3 original + 1 retry)
-    // with-skill:    3 trials (none throws, callCount≠2)  → 3 calls
-    // total: 7
-    assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 7);
+    // skill-only: 3 trials (one throws at callCount=2) → 4 calls (3 original + 1 retry)
+    assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 4);
+  } finally {
+    mock.reset();
+  }
+});
+
+test('functionalCommand should run baseline when compareBaseline is enabled', async (t) => {
+  mock.method(fs, 'mkdirSync', () => {});
+  mock.method(fs, 'writeFileSync', () => {});
+  mock.method(fs, 'readdirSync', () => ['evals.json']);
+  mock.method(fs, 'existsSync', () => true);
+
+  const injectedSuite = {
+    skill_name: 'mock-skill',
+    tasks: [{ id: 1, prompt: 'test prompt', expectations: ['is correct'] }]
+  };
+
+  mock.method(EvalEnvironment.prototype, 'setup', async () => {});
+  mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
+
+  const runnerMock = {
+    runFunctionalTask: mock.fn(async () => ({
+      id: 1,
+      transcript: { response: 'Mock response' },
+      assertionResults: [],
+      trialPassed: true
+    }))
+  };
+  mock.method(EvalRunner.prototype, 'runFunctionalTask', runnerMock.runFunctionalTask);
+
+  try {
+    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, undefined, undefined, undefined, [], true);
+
+    // 1 task × 1 trial × 2 modes (baseline + local) = 2 calls
+    assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 2);
   } finally {
     mock.reset();
   }

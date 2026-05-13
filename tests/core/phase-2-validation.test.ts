@@ -30,7 +30,7 @@ test('Phase 2: functionalCommand should handle N references', async (t) => {
   };
 
   try {
-    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 4, injectedSuite, 1, undefined, undefined, undefined, ['ref1', 'ref2']);
+    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 4, injectedSuite, 1, undefined, undefined, undefined, ['ref1', 'ref2'], true);
 
     // total calls: baseline (1) + local (1) + ref1 (1) + ref2 (1) = 4
     assert.strictEqual(runnerMock.mock.callCount(), 4);

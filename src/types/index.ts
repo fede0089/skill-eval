@@ -119,6 +119,7 @@ export interface AgentTranscript {
 
 export interface EvalSuiteReport {
   timestamp: string;
+  command?: 'trigger' | 'functional';
   skill_name: string;
   agent: string;
   metrics: {

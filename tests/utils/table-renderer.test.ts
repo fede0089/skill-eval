@@ -11,6 +11,7 @@ function makeTrial(passed: boolean, id = 1) {
 function makeTriggerReport(numTrials = 1, overrides: Partial<EvalSuiteReport> = {}): EvalSuiteReport {
   return {
     timestamp: '2026-01-01T00:00:00.000Z',
+    command: 'trigger',
     skill_name: 'test-skill',
     agent: 'gemini-cli',
     metrics: { 
@@ -33,21 +34,22 @@ function makeTriggerReport(numTrials = 1, overrides: Partial<EvalSuiteReport> = 
   };
 }
 
-function makeFunctionalReport(numTrials = 1): EvalSuiteReport {
+function makeFunctionalReport(numTrials = 1, withBaseline = true): EvalSuiteReport {
   return {
     timestamp: '2026-01-01T00:00:00.000Z',
+    command: 'functional',
     skill_name: 'test-skill',
     agent: 'gemini-cli',
     metrics: {
       passedCount: 1, totalCount: 1, numTrials,
-      scores: { 'baseline': '0%', 'local': '100%' },
-      passAtK: { 'baseline': 0, 'local': 1 },
-      assertionPassRate: { 'baseline': 0, 'local': 1 }
+      scores: withBaseline ? { 'baseline': '0%', 'local': '100%' } : { 'local': '100%' },
+      passAtK: withBaseline ? { 'baseline': 0, 'local': 1 } : { 'local': 1 },
+      assertionPassRate: withBaseline ? { 'baseline': 0, 'local': 1 } : { 'local': 1 }
     },
     results: [{
       taskId: 1,
       prompt: 'Generate a license',
-      baselineTrials: [makeTrial(false, 1)],
+      baselineTrials: withBaseline ? [makeTrial(false, 1)] : [],
       skillTrials: {
         'local': [makeTrial(true, 1)]
       }
@@ -116,6 +118,24 @@ test('renderFunctionalTable: uses pass@k columns for multi-trial reports', () =>
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
   assert.ok(rows[0].includes('baseline'), 'Header should include baseline for multi-trial');
   assert.ok(rows[0].includes('local'), 'Header should include local for multi-trial');
+
+  mock.reset();
+});
+
+test('renderFunctionalTable: omits baseline column when no baseline was run', () => {
+  const tableMock = mock.fn();
+  const writeMock = mock.fn();
+  mock.method(Logger, 'table', tableMock);
+  mock.method(Logger, 'write', writeMock);
+
+  renderFunctionalTable(makeFunctionalReport(1, false));
+
+  const rows: string[][] = tableMock.mock.calls[0].arguments[0];
+  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'local'], 'Header should only include skill columns');
+
+  const written = writeMock.mock.calls.map(c => c.arguments[0] as string).join('');
+  assert.ok(!written.includes('baseline Rate'), 'Should not include without-skill rate line');
+  assert.ok(written.includes('local Rate'), 'Should include with-skill rate line');
 
   mock.reset();
 });

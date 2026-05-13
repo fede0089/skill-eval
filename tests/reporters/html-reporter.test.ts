@@ -6,6 +6,7 @@ import type { EvalSuiteReport } from '../../src/types/index.js';
 function makeTriggerReport(overrides: Partial<EvalSuiteReport> = {}): EvalSuiteReport {
   return {
     timestamp: '2026-01-01T00:00:00.000Z',
+    command: 'trigger',
     skill_name: 'test-skill',
     agent: 'gemini-cli',
     metrics: {
@@ -46,6 +47,7 @@ function makeTriggerReport(overrides: Partial<EvalSuiteReport> = {}): EvalSuiteR
 function makeFunctionalReport(): EvalSuiteReport {
   return {
     timestamp: '2026-01-01T00:00:00.000Z',
+    command: 'functional',
     skill_name: 'func-skill',
     agent: 'gemini-cli',
     metrics: {
@@ -63,6 +65,35 @@ function makeFunctionalReport(): EvalSuiteReport {
         baselineTrials: [
           { id: 1, transcript: {}, assertionResults: [{ assertion: 'Shared expectation', passed: false, reason: 'Not triggered' }], trialPassed: false },
         ],
+        skillTrials: {
+          'local': [
+            { id: 1, transcript: {}, assertionResults: [{ assertion: 'Shared expectation', passed: true, reason: 'Passed' }], trialPassed: true },
+          ],
+        }
+      },
+    ],
+  };
+}
+
+function makeSkillOnlyFunctionalReport(): EvalSuiteReport {
+  return {
+    timestamp: '2026-01-01T00:00:00.000Z',
+    command: 'functional',
+    skill_name: 'func-skill',
+    agent: 'gemini-cli',
+    metrics: {
+      passedCount: 2,
+      totalCount: 3,
+      numTrials: 1,
+      scores: { 'local': '67%' },
+      passAtK: { 'local': 0.667 },
+      assertionPassRate: { 'local': 0.667 },
+    },
+    results: [
+      {
+        taskId: 1,
+        prompt: 'Skill only prompt',
+        baselineTrials: [],
         skillTrials: {
           'local': [
             { id: 1, transcript: {}, assertionResults: [{ assertion: 'Shared expectation', passed: true, reason: 'Passed' }], trialPassed: true },
@@ -97,6 +128,16 @@ test('generateHtml produces functional report with baseline and local data', () 
   assert.ok(html.includes('Shared expectation'), 'should contain shared expectation text');
   assert.ok(html.includes('Not triggered'), 'should contain baseline judge reason in drill-down');
   assert.ok(html.includes('Passed'), 'should contain local judge reason in drill-down');
+});
+
+test('generateHtml produces functional report without baseline as a single-column view', () => {
+  const report = makeSkillOnlyFunctionalReport();
+  const html = generateHtml(report);
+
+  assert.ok(html.includes('Functional'), 'should indicate Functional eval type');
+  assert.ok(html.includes('Skill only prompt'), 'should contain task prompt');
+  assert.ok(html.includes('local'), 'should contain local label');
+  assert.ok(!html.includes('baseline'), 'should not contain baseline label when not comparing');
 });
 
 test('generateHtml handles empty results without throwing', () => {

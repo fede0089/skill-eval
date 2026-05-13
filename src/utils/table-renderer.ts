@@ -47,6 +47,13 @@ export function formatTokens(n: number): string {
   return `${n}`;
 }
 
+export function hasFunctionalBaseline(report: EvalSuiteReport): boolean {
+  if (report.results.some(result => (result.baselineTrials?.length ?? 0) > 0)) {
+    return true;
+  }
+  return report.metrics.passAtK['baseline'] !== undefined || report.metrics.assertionPassRate['baseline'] !== undefined;
+}
+
 function formatTokenStatsLine(stats: AggregatedTokenStats): string {
   const total  = formatTokens(stats.avgTotal);
   const input  = formatTokens(stats.avgInput);
@@ -217,7 +224,8 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
 
   // Identify all versions present (baseline + skill versions)
   const skillVersions = results.length > 0 ? Object.keys(results[0].skillTrials) : ['local'];
-  const allVersions = ['baseline', ...skillVersions];
+  const hasBaseline = hasFunctionalBaseline(report);
+  const allVersions = hasBaseline ? ['baseline', ...skillVersions] : skillVersions;
 
   const header = ['ID', 'Prompt'];
   for (const version of allVersions) {
@@ -233,8 +241,10 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
 
     // Baseline
     const woTrials = result.baselineTrials || [];
-    if (woTrials.some(t => t.isError) && !woTrials.every(t => t.isError)) hasPartialErrors = true;
-    row.push(formatAssertionRate(woTrials));
+    if (hasBaseline) {
+      if (woTrials.some(t => t.isError) && !woTrials.every(t => t.isError)) hasPartialErrors = true;
+      row.push(formatAssertionRate(woTrials));
+    }
 
     // Skills
     for (const version of skillVersions) {

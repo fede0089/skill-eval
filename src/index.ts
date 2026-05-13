@@ -66,6 +66,7 @@ program
   .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .option('--compare-ref [refs...]', 'Compare against historical git references')
+  .option('--compare-baseline', 'Also run the no-skill baseline alongside the skill')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
@@ -74,7 +75,8 @@ program
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     const compareRefs = options.compareRef || [];
-    functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs).catch(errorHandler);
+    const compareBaseline = !!options.compareBaseline;
+    functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, compareBaseline).catch(errorHandler);
   });
 
 

@@ -233,6 +233,7 @@ export async function triggerCommand(
 
     const report: EvalSuiteReport = {
       timestamp: startTime.toISOString(),
+      command: 'trigger',
       skill_name,
       agent,
       metrics: {

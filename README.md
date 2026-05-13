@@ -6,11 +6,11 @@ A CLI tool for evaluating Agent Skills locally. Tests whether your skill trigger
 
 Skills are instructions that change how the agent behaves. But a single successful run isn't enough to trust one — agents are non-deterministic, and a good isolated result can be exactly that: an isolated case.
 
-Skill evals let you turn that intuition into evidence: run several comparable tasks with and without the skill, measure them against the same criteria, and validate whether the agent improves consistently against a baseline.
+Skill evals let you turn that intuition into evidence: run several comparable tasks with the skill, measure them against the same criteria, and optionally compare against a baseline or historical skill branches.
 
 ## How it works
 
-For each eval prompt, skill-eval spins up parallel agent processes — some with the skill installed, others without (the baseline). Each agent runs headlessly and produces a transcript. An LLM judge then grades each transcript against your expectations. Results are aggregated into **pass@k** metrics, giving you a clear measure of how much your skill actually improves the agent's behavior versus the unassisted baseline.
+For each eval prompt, skill-eval spins up parallel agent processes with the current skill installed by default. You can optionally add the no-skill baseline or historical skill branches for side-by-side comparison. Each agent runs headlessly and produces a transcript. An LLM judge then grades each transcript against your expectations. Results are aggregated into **pass@k** metrics, giving you a clear view of how the skill behaves in isolation or relative to comparison targets.
 
 ```
                   eval prompt
@@ -66,7 +66,7 @@ npm link        # makes `skill-eval` available globally
 # Checks that the skill is triggered (invoked) for each prompt
 skill-eval trigger --workspace <path> --skill <path> [options] [agent]
 
-# Checks that the skill produces correct output, measured against a baseline
+# Checks that the skill produces correct output (skill-only by default)
 skill-eval functional --workspace <path> --skill <path> [options] [agent]
 ```
 
@@ -81,6 +81,7 @@ skill-eval functional --workspace <path> --skill <path> [options] [agent]
 | `--timeout <seconds>` | no | none | Kill the agent after this many seconds |
 | `--eval-id <id>` | no | all | Run only the eval with this numeric ID |
 | `--compare-ref [refs...]` | no | — | Git references to compare against |
+| `--compare-baseline` | no | `false` | Also run the no-skill baseline alongside the skill |
 | `-v, --debug` | no | `false` | Enable verbose debug logging |
 | `[agent]` | no | `gemini-cli` | Agent backend to use |
 
