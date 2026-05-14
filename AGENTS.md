@@ -9,9 +9,11 @@
 - `npm run test:functional` - Run functional evaluation with the mock skill using the default runner.
 - `npm run test:trigger -- codex` - Run skill triggering evaluation with the mock skill using Codex.
 - `npm run test:functional -- codex` - Run functional evaluation with the mock skill using Codex.
+- `npm run test:trigger -- claude-code` - Run skill triggering evaluation with the mock skill using Claude Code.
+- `npm run test:functional -- claude-code` - Run functional evaluation with the mock skill using Claude Code.
 
 ## Project overview
-- A Node.js CLI tool built to evaluate Agent Skills locally using configurable agent runners such as Gemini CLI and Codex, measuring both triggering reliability and functional correctness through an LLM judge.
+- A Node.js CLI tool built to evaluate Agent Skills locally using configurable agent runners such as Gemini CLI, Codex, and Claude Code, measuring both triggering reliability and functional correctness through an LLM judge.
 - Supports **Simultaneous A/B Testing**: compare local skill code against multiple historical Git references (`--compare-ref`) in a single run.
 - Both `trigger` and `functional` commands require `--workspace <path>` and `--skill <path>`, and accept `--trials <number>` (default: 3) and `--agents <number>` (default: 4).
 - Entrypoints for understanding the system:
@@ -29,6 +31,7 @@
   - `src/runners/registry.ts` - **Single registration point** for agent runners; add new runners here.
   - `src/runners/gemini-cli/runner.ts` - Gemini CLI runner implementation.
   - `src/runners/codex/runner.ts` - Codex runner implementation.
+  - `src/runners/claude-code/runner.ts` - Claude Code runner implementation.
   - `src/reporters/index.ts` - Reporter factory; add new report formats here.
   - `src/utils/table-renderer.ts` - Shared `renderTriggerTable` / `renderFunctionalTable` used by both commands.
   - `src/utils/` - Shared utilities: eval-loader, exec, ndjson, ui, logger.
@@ -48,6 +51,7 @@
 │   │   ├── runner.interface.ts  # AgentRunner interface
 │   │   ├── gemini-cli/    # Gemini CLI runner implementation
 │   │   ├── codex/         # Codex runner implementation
+│   │   ├── claude-code/   # Claude Code runner implementation
 │   │   └── index.ts       # public re-exports
 │   ├── reporters/         # ← ADD NEW REPORT FORMATS HERE
 │   │   ├── reporter.ts    # Reporter interface
@@ -77,7 +81,7 @@
 - **Framework:** [Commander.js](https://www.npmjs.com/package/commander) - CLI framework (`package.json`)
 - **Testing:** [tsx](https://tsx.is/) for unit tests (`package.json`, `npm run test:unit`).
 - **Other notable libraries/tools:**
-  - [Gemini CLI](https://github.com/google/gemini-cli) and [Codex CLI](https://developers.openai.com/codex/cli) - supported runners for the agents being evaluated
+  - [Gemini CLI](https://github.com/google/gemini-cli), [Codex CLI](https://developers.openai.com/codex/cli), and [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) - supported runners for the agents being evaluated
   - [listr2](https://listr2.kilic.dev/) - task list UI renderer
   - [ora](https://github.com/sindresorhus/ora) - CLI spinner
   - [p-limit](https://github.com/sindresorhus/p-limit) - concurrency control for parallel evaluations

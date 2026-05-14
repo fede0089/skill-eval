@@ -37,7 +37,7 @@ For each eval prompt, skill-eval spins up parallel agent processes with the curr
 
 ## Installation
 
-**Requirements:** Node.js, and the agent CLI you want to evaluate (e.g. `gemini` or `codex`) installed and on `$PATH`.
+**Requirements:** Node.js, and the agent CLI you want to evaluate (e.g. `gemini`, `codex`, or `claude`) installed and on `$PATH`.
 
 ### Run without installing
 
@@ -91,6 +91,7 @@ Supported runners:
 
 - `gemini-cli` (default)
 - `codex`
+- `claude-code`
 
 ### Skill directory structure
 
@@ -102,8 +103,10 @@ my-skill/
     └── config/                     # runner configuration (optional but often needed)
         ├── gemini-cli/             # copied to <worktree>/.gemini/ before each trial
         │   └── settings.json
-        └── codex/                  # copied to <worktree>/.codex/ before each trial
-            └── config.toml
+        ├── codex/                  # copied to <worktree>/.codex/ before each trial
+        │   └── config.toml
+        └── claude-code/            # copied to <worktree>/.claude/ before each trial
+            └── settings.json
 ```
 
 All `.json` files in `evals/` are loaded and merged into a single suite — you can split them by feature or regression category.
@@ -141,13 +144,14 @@ All `.json` files in `evals/` are loaded and merged into a single suite — you 
 
 skill-eval runs the agent headlessly — stdin is closed, there is no terminal. If the agent encounters a tool that requires interactive approval, it will either fail immediately or hang until the trial timeout kills it.
 
-Each runner configures its own non-interactive mode. For example, Gemini CLI uses `--approval-mode auto_edit`, while Codex uses `codex exec --json --sandbox workspace-write -c approval_policy="never"`. If your skill needs to run shell commands, read environment variables, make network calls, or use any other tool category, refer to that runner's permission model.
+Each runner configures its own non-interactive mode. For example, Gemini CLI uses `--approval-mode auto_edit`, Codex uses `codex exec --json --sandbox workspace-write -c approval_policy="never"`, and Claude Code uses `claude -p --output-format stream-json --permission-mode bypassPermissions`. If your skill needs to run shell commands, read environment variables, make network calls, or use any other tool category, refer to that runner's permission model.
 
 **Solution:** place a config file inside your skill at `evals/config/<runner>/`. Before every trial, skill-eval automatically copies that directory into the agent's config location inside the isolated worktree:
 
 ```
-evals/config/gemini-cli/  →  <worktree>/.gemini/
-evals/config/codex/       →  <worktree>/.codex/
+evals/config/gemini-cli/   →  <worktree>/.gemini/
+evals/config/codex/        →  <worktree>/.codex/
+evals/config/claude-code/  →  <worktree>/.claude/
 ```
 
 Use this to ship both settings and policies alongside your evals. For Gemini CLI, for example, you can use `settings.json` to configure tool permissions and approval policies so that every tool your skill relies on runs without prompting:
@@ -170,8 +174,10 @@ This repo includes a `mock-skill/` directory — a complete, working example of 
 npm run test:unit        # run the unit test suite
 npm run test:trigger     # trigger evaluation against mock-skill
 npm run test:functional  # functional evaluation against mock-skill
-npm run test:trigger -- codex     # run trigger evals with Codex
-npm run test:functional -- codex  # run functional evals with Codex
+npm run test:trigger -- codex            # run trigger evals with Codex
+npm run test:functional -- codex         # run functional evals with Codex
+npm run test:trigger -- claude-code      # run trigger evals with Claude Code
+npm run test:functional -- claude-code   # run functional evals with Claude Code
 ```
 
 Results are saved to `.project-skill-evals/runs/<timestamp>/` with logs, raw eval JSONs, and an HTML report.
