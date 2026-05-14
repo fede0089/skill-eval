@@ -9,7 +9,10 @@ import { DEFAULT_AGENT } from './runners/registry.js';
 
 import * as path from 'path';
 import * as fs from 'fs';
+import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
+
+const pkg = createRequire(import.meta.url)('../package.json') as { version: string };
 
 export const program = new Command();
 
@@ -28,7 +31,7 @@ const errorHandler = (err: unknown) => {
 program
   .name('skill-eval')
   .description('CLI to evaluate agent skills triggering and functionality')
-  .version('1.0.0')
+  .version(pkg.version)
   .option('-v, --debug', 'Enable debug logging', false);
 
 program.on('option:debug', () => {
@@ -40,16 +43,16 @@ program
   .description('Evaluate triggering of an agent skill')
   .requiredOption('--workspace <path>', 'Path to the workspace/repo to evaluate against')
   .requiredOption('--skill <path>', 'Path to the skill directory')
-  .option('--agents <number>', 'Number of parallel agents')
-  .option('--trials <number>', 'Number of trials per task for pass@k calculation')
+  .option('--agents <number>', 'Number of parallel agents', '4')
+  .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
   .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .option('--compare-ref [refs...]', 'Compare against historical git references')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
-    const maxAgents = parseInt(options.agents, 10) || 4;
-    const numTrials = options.trials !== undefined ? (parseInt(options.trials, 10) || 3) : 3;
+    const maxAgents = parseInt(options.agents, 10);
+    const numTrials = parseInt(options.trials, 10);
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     const compareRefs = options.compareRef || [];
@@ -58,11 +61,11 @@ program
 
 program
   .command('functional [agent]')
-  .description('Evaluate functional correctness of an agent skill based on assertions')
+  .description('Evaluate functional correctness of an agent skill against expectations')
   .requiredOption('--workspace <path>', 'Path to the workspace/repo to evaluate against')
   .requiredOption('--skill <path>', 'Path to the skill directory')
-  .option('--agents <number>', 'Number of parallel agents')
-  .option('--trials <number>', 'Number of trials per task for pass@k calculation')
+  .option('--agents <number>', 'Number of parallel agents', '4')
+  .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
   .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .option('--compare-ref [refs...]', 'Compare against historical git references')
@@ -70,8 +73,8 @@ program
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
-    const maxAgents = parseInt(options.agents, 10) || 4;
-    const numTrials = options.trials !== undefined ? (parseInt(options.trials, 10) || 3) : 3;
+    const maxAgents = parseInt(options.agents, 10);
+    const numTrials = parseInt(options.trials, 10);
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     const compareRefs = options.compareRef || [];

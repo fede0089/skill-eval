@@ -20,7 +20,7 @@ For each eval prompt, skill-eval spins up parallel agent processes with the curr
                └───────┬───────┘
                        │
            ┌───────────┴───────────┐
-      ─ with skill ─          ─ baseline ─
+      ─ with skill ─        ─ baseline (opt) ─
       ┌──────┴──────┐         ┌─────┴──────┐
     agent 1      agent 2   agent 3      agent 4
       │              │         │             │
@@ -32,6 +32,8 @@ For each eval prompt, skill-eval spins up parallel agent processes with the curr
 ```
 
 > The `trigger` command only runs with-skill trials and checks whether the skill dispatch tool was actually invoked — no judge or baseline needed.
+>
+> The baseline branch is opt-in: enable it with `--compare-baseline` (no-skill control) or `--compare-ref <ref>` (historical skill versions).
 
 ## Installation
 
@@ -157,6 +159,7 @@ Refer to your runner's documentation for the full list of available settings and
 This repo includes a `mock-skill/` directory — a complete, working example of a license-generator skill with trigger and functional evals. Run it directly with:
 
 ```sh
+npm run test:unit        # run the unit test suite
 npm run test:trigger     # trigger evaluation against mock-skill
 npm run test:functional  # functional evaluation against mock-skill
 ```
@@ -181,17 +184,4 @@ The factory, preflight check, and CLI all pick it up automatically.
 ### Adding a new report format
 
 1. Create `src/reporters/<format>-reporter.ts` implementing `Reporter`.
-2. Export it and add a case in `createReporter()` in `src/reporters/index.ts`.
-3. Add the format string to `ReportFormat` in `src/types/index.ts`.
-er, binary: '<cli-binary-name>' },
-   ```
-
-The factory, preflight check, and CLI all pick it up automatically.
-
-> Implement `applyRunnerConfig(evalConfigBaseDir, worktreePath)` to copy `evalConfigBaseDir/<your-agent>/` into the appropriate config directory in the worktree (e.g. `.claude/` for a Claude runner). No-op silently if the directory doesn't exist.
-
-### Adding a new report format
-
-1. Create `src/reporters/<format>-reporter.ts` implementing `Reporter`.
-2. Export it and add a case in `createReporter()` in `src/reporters/index.ts`.
-3. Add the format string to `ReportFormat` in `src/types/index.ts`.
+2. Add a case for it in `createReporter()` in `src/reporters/index.ts`.

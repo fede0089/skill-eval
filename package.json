@@ -1,7 +1,7 @@
 {
   "name": "@fede0089/skill-eval",
   "version": "1.4.0",
-  "description": "CLI to evaluate agent skills triggering",
+  "description": "CLI to evaluate agent skills triggering and functionality",
   "main": "dist/index.js",
   "bin": {
     "skill-eval": "dist/index.js"
