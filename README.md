@@ -205,17 +205,13 @@ Refer to your runner's documentation for the full set of settings and policy key
 
 Each run writes to `.project-skill-evals/runs/<timestamp>/` and includes per-trial logs, the raw eval JSON, and a self-contained HTML report you can open in any browser. The report shows pass@k aggregates per eval, lets you expand each trial, and color-codes triggering vs. functional outcomes.
 
-A published sample report is available at [fede0089.github.io/skill-eval/sample-report.html](https://fede0089.github.io/skill-eval/sample-report.html). The checked-in source is [`docs/sample-report.html`](docs/sample-report.html), with the matching screenshot at [`docs/sample-report.png`](docs/sample-report.png).
-
-It was generated from the project root with:
+A published sample report is available at [fede0089.github.io/skill-eval/sample-report.html](https://fede0089.github.io/skill-eval/sample-report.html),generated from this project root with:
 
 ```sh
 skill-eval functional --workspace . --skill mock-skill --trials 2 --compare-baseline --debug claude-code
 ```
 
 ![Sample HTML report](docs/sample-report.png)
-
-To publish or refresh the GitHub Page, commit the files under `docs/`, then enable **Settings -> Pages -> Build and deployment -> Deploy from a branch** in GitHub and select the `main` branch with the `/docs` folder. GitHub will serve the report at `https://fede0089.github.io/skill-eval/sample-report.html`.
 
 ### Debug logs
 
