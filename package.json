@@ -18,8 +18,8 @@
     "prepare": "npm run build",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test:trigger": "npm run build && node ./dist/index.js trigger --workspace . --skill ./mock-skill --debug",
-    "test:functional": "npm run build && node ./dist/index.js functional --workspace . --skill ./mock-skill --debug",
+    "test:trigger": "npm run build && node ./scripts/run-mock-eval.mjs trigger",
+    "test:functional": "npm run build && node ./scripts/run-mock-eval.mjs functional",
     "test:unit": "tsx --test \"tests/**/*.test.ts\""
   },
   "type": "module",

@@ -1,4 +1,5 @@
 import { GeminiCliRunner } from './gemini-cli/index.js';
+import { CodexRunner } from './codex/index.js';
 import type { AgentRunner } from './runner.interface.js';
 
 // ---------------------------------------------------------------------------
@@ -18,6 +19,7 @@ interface RunnerEntry {
 
 export const RUNNER_REGISTRY: Record<string, RunnerEntry> = {
   'gemini-cli': { Runner: GeminiCliRunner, binary: 'gemini' },
+  codex: { Runner: CodexRunner, binary: 'codex' },
 };
 
 /** Default agent name used when none is specified on the CLI. */

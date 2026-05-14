@@ -47,10 +47,12 @@ export class EvalEnvironment {
    */
   public createWorktree(evalId: string): string {
     const worktreePath = path.resolve(this.workspace, '.project-skill-evals', 'worktrees', evalId);
+    const branchName = path.basename(worktreePath);
 
     // Ensure the path is clean before adding a worktree.
     // We try to remove it first in case a previous run crashed.
     executor.spawnSync('git', ['worktree', 'remove', '--force', worktreePath], { stdio: 'ignore', cwd: this.workspace });
+    executor.spawnSync('git', ['branch', '-D', branchName], { stdio: 'ignore', cwd: this.workspace });
 
     // If git worktree remove failed (e.g. path was never registered, or git
     // metadata is stale), fall back to a physical wipe and a metadata prune so

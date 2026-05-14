@@ -120,12 +120,12 @@ test('EvalEnvironment.createWorktree should recover from stale physical director
   t.mock.method(executor, 'spawnSync', (_cmd: string, args: string[]) => {
     spawnCallCount++;
     spawnArgs.push(args);
-    if (spawnCallCount === 3) {
+    if (spawnCallCount === 4) {
       // Simulate git worktree add: physical rm already happened, create fresh dir
       fs.mkdirSync(worktreePath, { recursive: true });
       return { status: 0 };
     }
-    return { status: spawnCallCount === 2 ? 0 : 128 };
+    return { status: spawnCallCount === 3 ? 0 : 128 };
   });
 
   const env = new EvalEnvironment({ workspace });
@@ -133,10 +133,11 @@ test('EvalEnvironment.createWorktree should recover from stale physical director
     const result = env.createWorktree(evalId);
 
     assert.strictEqual(result, worktreePath);
-    assert.strictEqual(spawnCallCount, 3, 'Expected remove → prune → add (3 spawnSync calls)');
+    assert.strictEqual(spawnCallCount, 4, 'Expected remove → branch delete → prune → add (4 spawnSync calls)');
     assert.ok(spawnArgs[0].includes('remove'), 'First call should be git worktree remove');
-    assert.ok(spawnArgs[1].includes('prune'),  'Second call should be git worktree prune');
-    assert.ok(spawnArgs[2].includes('add'),    'Third call should be git worktree add');
+    assert.deepStrictEqual(spawnArgs[1], ['branch', '-D', evalId], 'Second call should delete the stale branch');
+    assert.ok(spawnArgs[2].includes('prune'),  'Third call should be git worktree prune');
+    assert.ok(spawnArgs[3].includes('add'),    'Fourth call should be git worktree add');
     assert.ok(!fs.existsSync(path.join(worktreePath, 'leftover.txt')), 'Stale leftover.txt should have been removed before add');
     assert.ok(fs.existsSync(worktreePath), 'Worktree directory should exist after add');
   } finally {

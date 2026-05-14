@@ -22,6 +22,19 @@ test('preflight: throws ExecutionError when agent binary is not on PATH', () => 
   mock.reset();
 });
 
+test('preflight: uses registered binary name for codex agent', () => {
+  const execMock = mock.fn(() => Buffer.from('/usr/bin/codex'));
+  mock.method(executor, 'execSync', execMock);
+
+  assert.doesNotThrow(
+    () => preflight('codex', process.cwd(), './mock-skill'),
+    'Should not throw when codex binary exists and skill path is valid'
+  );
+  assert.strictEqual(execMock.mock.calls[0].arguments[0], 'which codex');
+
+  mock.reset();
+});
+
 test('preflight: throws ConfigError when skill path does not exist', () => {
   mock.method(executor, 'execSync', mock.fn(() => Buffer.from('/usr/bin/gemini')));
 

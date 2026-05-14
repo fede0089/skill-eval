@@ -5,11 +5,13 @@
 - `npm run build` - Build the project using `tsc`.
 - `npm start` - Run CLI directly without building.
 - `npm run test:unit` - Run the unit test suite using tsx.
-- `npm run test:trigger` - Run skill triggering evaluation with the mock skill.
-- `npm run test:functional` - Run functional evaluation with the mock skill.
+- `npm run test:trigger` - Run skill triggering evaluation with the mock skill using the default runner.
+- `npm run test:functional` - Run functional evaluation with the mock skill using the default runner.
+- `npm run test:trigger -- codex` - Run skill triggering evaluation with the mock skill using Codex.
+- `npm run test:functional -- codex` - Run functional evaluation with the mock skill using Codex.
 
 ## Project overview
-- A Node.js CLI tool built to evaluate Agent Skills locally using the Gemini CLI, measuring both triggering reliability and functional correctness through an LLM judge.
+- A Node.js CLI tool built to evaluate Agent Skills locally using configurable agent runners such as Gemini CLI and Codex, measuring both triggering reliability and functional correctness through an LLM judge.
 - Supports **Simultaneous A/B Testing**: compare local skill code against multiple historical Git references (`--compare-ref`) in a single run.
 - Both `trigger` and `functional` commands require `--workspace <path>` and `--skill <path>`, and accept `--trials <number>` (default: 3) and `--agents <number>` (default: 4).
 - Entrypoints for understanding the system:
@@ -26,6 +28,7 @@
   - `src/core/errors.ts` - Custom error types (AppError, ConfigError, ExecutionError, ValidationError).
   - `src/runners/registry.ts` - **Single registration point** for agent runners; add new runners here.
   - `src/runners/gemini-cli/runner.ts` - Gemini CLI runner implementation.
+  - `src/runners/codex/runner.ts` - Codex runner implementation.
   - `src/reporters/index.ts` - Reporter factory; add new report formats here.
   - `src/utils/table-renderer.ts` - Shared `renderTriggerTable` / `renderFunctionalTable` used by both commands.
   - `src/utils/` - Shared utilities: eval-loader, exec, ndjson, ui, logger.
@@ -44,6 +47,7 @@
 │   │   ├── registry.ts    # single registration point: runner class + binary name
 │   │   ├── runner.interface.ts  # AgentRunner interface
 │   │   ├── gemini-cli/    # Gemini CLI runner implementation
+│   │   ├── codex/         # Codex runner implementation
 │   │   └── index.ts       # public re-exports
 │   ├── reporters/         # ← ADD NEW REPORT FORMATS HERE
 │   │   ├── reporter.ts    # Reporter interface
@@ -73,7 +77,7 @@
 - **Framework:** [Commander.js](https://www.npmjs.com/package/commander) - CLI framework (`package.json`)
 - **Testing:** [tsx](https://tsx.is/) for unit tests (`package.json`, `npm run test:unit`).
 - **Other notable libraries/tools:**
-  - [Gemini CLI](https://github.com/google/gemini-cli) - runner for the agents being evaluated
+  - [Gemini CLI](https://github.com/google/gemini-cli) and [Codex CLI](https://developers.openai.com/codex/cli) - supported runners for the agents being evaluated
   - [listr2](https://listr2.kilic.dev/) - task list UI renderer
   - [ora](https://github.com/sindresorhus/ora) - CLI spinner
   - [p-limit](https://github.com/sindresorhus/p-limit) - concurrency control for parallel evaluations
@@ -86,7 +90,8 @@
 
 ## Testing instructions
 - Use `npm run test:unit` to run the full unit test suite.
-- Use `npm run test:trigger` or `npm run test:functional` to run integration evaluations against the mock skill.
+- Use `npm run test:trigger` or `npm run test:functional` to run integration evaluations against the mock skill with the default runner.
+- Pass a runner after `--`, for example `npm run test:trigger -- codex` or `npm run test:functional -- codex`.
 - To test a subset of tests, use `tsx --test "tests/path/to/test.test.ts"`.
 
 ## Security considerations
