@@ -2,11 +2,18 @@
 
 A CLI tool for evaluating Agent Skills locally. Tests whether your skill triggers reliably and produces the right output, using an LLM as the judge.
 
-## Why skill evals?
+## What you can test
 
-Skills are instructions that change how the agent behaves. But a single successful run isn't enough to trust one — agents are non-deterministic, and a good isolated result can be exactly that: an isolated case.
+skill-eval ships two commands, each targeting a different failure mode:
 
-Skill evals let you turn that intuition into evidence: run several comparable tasks with the skill, measure them against the same criteria, and optionally compare against a baseline or historical skill branches.
+- **Triggering** (`skill-eval trigger`) — checks whether the agent actually decides to invoke the skill in the right context. A skill that never gets triggered cannot help, no matter how good its instructions are.
+- **Functional correctness** (`skill-eval functional`) — checks whether the actions the agent takes while the skill is active match your expectations. An LLM judge grades each transcript against the expectation list you provide.
+
+## Why run skill evals
+
+- **Avoid regression** — it is very common that, while iterating to make a skill handle a new case, it stops solving cases it used to handle. Evals make every iteration measurable, so you can tell whether a change adds value without silently subtracting it elsewhere.
+- **Validate against a baseline** — sometimes an agent solves a task better using its general capabilities than using a specific skill (and even if it works today, model upgrades can shift that balance). Comparing against the no-skill baseline (`--compare-baseline`) or past skill versions (`--compare-ref`) tells you whether the skill is really pulling its weight.
+- **Statistical confidence** — LLMs are non-deterministic, so a single passing run is not evidence. Running the same expectations N times produces a pass rate (pass@k) that turns "it feels like it works" into a number you can defend.
 
 ## How it works
 
@@ -154,7 +161,24 @@ evals/config/codex/        →  <worktree>/.codex/
 evals/config/claude-code/  →  <worktree>/.claude/
 ```
 
-Use this to ship both settings and policies alongside your evals. For Gemini CLI, for example, you can use `settings.json` to configure tool permissions and approval policies so that every tool your skill relies on runs without prompting:
+Use this to ship both settings and policies alongside your evals. Anything inside `evals/config/<runner>/` is dropped verbatim into the runner's config directory, so you can use the runner's full configuration surface — not just `settings.json`.
+
+### Gemini CLI example
+
+Gemini CLI reads both `settings.json` and any `*.toml` rule files under `policies/`. Drop them inside `evals/config/gemini-cli/` and skill-eval will copy them into `<worktree>/.gemini/` before each trial:
+
+```
+my-skill/
+└── evals/
+    └── config/
+        └── gemini-cli/
+            ├── settings.json
+            └── policies/
+                ├── allow-activate-skill.toml
+                └── allow-tools.toml
+```
+
+`settings.json` holds general configuration (telemetry, model, etc.):
 
 ```json
 {
@@ -162,9 +186,39 @@ Use this to ship both settings and policies alongside your evals. For Gemini CLI
 }
 ```
 
-Refer to your runner's documentation for the full list of available settings and policy keys.
+Policies whitelist specific tools so they run without prompting. For example, to always allow the `activate_skill` dispatch tool in non-interactive mode:
+
+```toml
+# evals/config/gemini-cli/policies/allow-activate-skill.toml
+[[rule]]
+toolName    = "activate_skill"
+decision    = "allow"
+priority    = 100
+interactive = false
+```
+
+Refer to your runner's documentation for the full set of settings and policy keys (Codex uses `config.toml`, Claude Code uses `settings.json`).
 
 > This config only applies inside the temporary worktree created for each trial. Your real workspace config is never touched.
+
+## Reports
+
+Each run writes to `.project-skill-evals/runs/<timestamp>/` and includes per-trial logs, the raw eval JSON, and a self-contained HTML report you can open in any browser. The report shows pass@k aggregates per eval, lets you expand each trial, and color-codes triggering vs. functional outcomes.
+
+<!-- TODO: replace with real screenshot -->
+![HTML report — overview](docs/images/report-overview.png)
+
+<!-- TODO: replace with real screenshot -->
+![HTML report — trial detail](docs/images/report-trial.png)
+
+### Debug logs
+
+When a trial misbehaves, pass `-v` / `--debug` to capture the full transcripts to disk. Each trial writes a `task_<id>_<variant>_trial_<n>.log` file inside the run directory with two sections appended in order:
+
+- `# SECTION: <MODE> AGENT RUN` — the initial prompt sent to the agent and its raw streamed response.
+- `# SECTION: <MODE> JUDGE RUN` — the prompt sent to the LLM judge and its verdict (only present for `functional` runs; `trigger` is graded programmatically and produces no judge section).
+
+Without `--debug` these files are not written, so reach for the flag when you need to see exactly what the agent — or the judge — saw.
 
 ## Try it out
 
@@ -179,8 +233,6 @@ npm run test:functional -- codex         # run functional evals with Codex
 npm run test:trigger -- claude-code      # run trigger evals with Claude Code
 npm run test:functional -- claude-code   # run functional evals with Claude Code
 ```
-
-Results are saved to `.project-skill-evals/runs/<timestamp>/` with logs, raw eval JSONs, and an HTML report.
 
 ## Extending
 
