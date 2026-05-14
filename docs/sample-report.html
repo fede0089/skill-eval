@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skill Eval — license-generator</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; font-size: 14px; }
+a { color: #3b82f6; }
+
+/* Layout */
+.container { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+
+/* Header */
+.header { background: #1e293b; color: #f1f5f9; padding: 24px 28px; border-radius: 10px; margin-bottom: 24px; }
+.header h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+.header-meta { display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; color: #94a3b8; }
+.header-meta span b { color: #e2e8f0; }
+.status-bar { height: 4px; border-radius: 2px; margin-top: 16px; }
+.status-bar.green { background: #22c55e; }
+.status-bar.amber { background: #f59e0b; }
+.status-bar.red   { background: #ef4444; }
+
+/* Metrics Grid */
+.metrics-grid { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+.metrics-grid table { width: 100%; border-collapse: collapse; }
+.metrics-grid thead th { background: #f8fafc; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; padding: 10px 24px; text-align: right; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+.metrics-grid thead th:first-child { text-align: left; min-width: 120px; }
+.metrics-grid tbody td { padding: 14px 24px; border-bottom: 1px solid #f1f5f9; text-align: right; vertical-align: middle; }
+.metrics-grid tbody tr:last-child td { border-bottom: none; }
+.metrics-grid tbody td:first-child { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; white-space: nowrap; }
+.metric-val { font-size: 24px; font-weight: 700; line-height: 1; display: block; }
+.metric-sub { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+
+/* Metrics Grid — compact variant (inside task details) */
+.metrics-grid-sm { border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; margin-bottom: 14px; }
+.metrics-grid-sm table { width: 100%; border-collapse: collapse; }
+.metrics-grid-sm thead th { background: #f8fafc; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; padding: 6px 14px; text-align: right; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+.metrics-grid-sm thead th:first-child { text-align: left; }
+.metrics-grid-sm tbody td { padding: 8px 14px; border-bottom: 1px solid #f1f5f9; text-align: right; vertical-align: middle; }
+.metrics-grid-sm tbody tr:last-child td { border-bottom: none; }
+.metrics-grid-sm tbody td:first-child { text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; white-space: nowrap; }
+.metric-val-sm { font-size: 15px; font-weight: 700; line-height: 1; display: block; }
+
+/* Color utilities */
+.green { color: #16a34a; }
+.amber { color: #d97706; }
+.red   { color: #dc2626; }
+
+/* Section */
+.section { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+.section-title { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; padding: 12px 16px; border-bottom: 1px solid #f1f5f9; }
+
+/* Table */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #f8fafc; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+.prompt-cell { max-width: 480px; word-break: break-word; color: #334155; }
+
+/* Details */
+.details-btn { background: none; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; padding: 2px 8px; font-size: 11px; color: #64748b; transition: background 0.15s; }
+.details-btn:hover { background: #f1f5f9; }
+.details-btn.open { color: #3b82f6; border-color: #3b82f6; }
+.details-row > td { padding: 0; background: #f8fafc; }
+.task-details { display: none; padding: 12px 16px; }
+.task-details.visible { display: block; }
+
+/* Expectations × Variants table */
+.expectations-table-wrap { border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; background: #fff; }
+.expectations-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.expectations-table thead th { background: #f1f5f9; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #475569; padding: 10px 14px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+.expectations-table thead th.exp-col { width: auto; }
+.expectations-table thead th.variant-col { width: 110px; text-align: center; }
+.expectations-table tbody td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 13px; }
+.expectations-table tbody tr.exp-row:last-of-type > td { border-bottom: none; }
+.exp-text { color: #1e293b; line-height: 1.4; word-break: break-word; }
+
+.pass-cell { text-align: center; border-left: 1px solid #f1f5f9; }
+.pass-cell[data-detail] { cursor: pointer; user-select: none; transition: background 0.12s; }
+.pass-cell[data-detail]:hover { background: #f1f5f9; }
+.pass-cell.open { background: #e0f2fe; }
+.pass-cell .rate { display: block; font-size: 13px; font-weight: 700; line-height: 1.1; }
+.pass-cell .frac { display: block; font-size: 10px; font-weight: 600; color: #94a3b8; margin-top: 2px; letter-spacing: 0.03em; }
+.pass-cell.green .rate { color: #16a34a; }
+.pass-cell.amber .rate { color: #d97706; }
+.pass-cell.red   .rate { color: #dc2626; }
+
+.exp-detail-row { display: none; }
+.exp-detail-row.visible { display: table-row; }
+.exp-detail-row > td { padding: 0; background: #f8fafc; border-bottom: 1px solid #f1f5f9; }
+.exp-detail-inner { padding: 12px 14px 14px; border-left: 3px solid #3b82f6; }
+.exp-detail-header { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin-bottom: 8px; }
+.exp-detail-header .variant-pill { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 1px 7px; border-radius: 4px; margin-left: 4px; font-weight: 700; }
+.exp-trial-line { display: flex; gap: 8px; padding: 6px 0; border-top: 1px dashed #e2e8f0; }
+.exp-trial-line:first-of-type { border-top: none; }
+.exp-trial-icon { flex-shrink: 0; font-size: 13px; font-weight: 700; line-height: 1.4; width: 16px; }
+.exp-trial-icon.pass { color: #16a34a; }
+.exp-trial-icon.fail { color: #dc2626; }
+.exp-trial-body { flex: 1; min-width: 0; font-size: 12px; color: #334155; line-height: 1.45; }
+.exp-trial-body .trial-label { font-weight: 700; color: #475569; margin-right: 4px; }
+.exp-trial-body .trial-reason { color: #64748b; }
+
+.muted { color: #94a3b8; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>license-generator</h1>
+    <div class="header-meta">
+      <span><b>Agent</b> claude-code</span>
+      <span><b>Type</b> Functional</span>
+      <span><b>Date</b> 5/14/2026, 7:46:40 PM</span>
+    </div>
+    <div class="status-bar green"></div>
+  </div>
+
+  <!-- Metrics Grid -->
+  <div class="metrics-grid">
+  <table>
+    <thead>
+      <tr><th></th><th>baseline</th><th>local</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+    <td>Success Rate</td>
+    <td><span class="metric-val green">83%</span></td><td><span class="metric-val green">100%</span></td>
+  </tr>
+      <tr>
+    <td>Tokens (avg)</td>
+    <td><span class="metric-val">2K</span><div class="metric-sub">avg total</div></td><td><span class="metric-val">1K</span><div class="metric-sub">avg total</div></td>
+  </tr>
+      <tr>
+    <td>Time (avg)</td>
+    <td><span class="metric-val">30s</span></td><td><span class="metric-val">25s</span></td>
+  </tr>
+    </tbody>
+  </table>
+</div>
+
+  <!-- Eval Results Table -->
+  <div class="section">
+    <div class="section-title">Eval results</div>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>Prompt</th><th>Details</th></tr></thead><tbody><tr><td>3</td><td class="prompt-cell">Generate a license file for John Doe.</td><td><button class="details-btn" data-target="details-3">▶</button></td></tr><tr class="details-row"><td colspan="3"><div class="task-details" id="details-3"><div class="metrics-grid-sm">
+  <table>
+    <thead>
+      <tr><th></th><th>baseline</th><th>local</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+    <td>Success Rate</td>
+    <td><span class="metric-val-sm amber">50%</span></td><td><span class="metric-val-sm green">100%</span></td>
+  </tr>
+      <tr>
+    <td>Tokens (avg)</td>
+    <td><span class="metric-val-sm">2K</span></td><td><span class="metric-val-sm">1K</span></td>
+  </tr>
+      <tr>
+    <td>Time (avg)</td>
+    <td><span class="metric-val-sm">39s</span></td><td><span class="metric-val-sm">25s</span></td>
+  </tr>
+    </tbody>
+  </table>
+</div><div class="expectations-table-wrap">
+  <table class="expectations-table">
+    <thead><tr><th class="exp-col">Expectation</th><th class="variant-col">baseline</th><th class="variant-col">local</th></tr></thead>
+    <tbody><tr class="exp-row"><td class="exp-text">A file named LICENSE was created in the working directory</td><td class="pass-cell amber" data-detail="exp-detail-3-0-baseline"><span class="rate">50%</span><span class="frac">1 / 2</span></td><td class="pass-cell green" data-detail="exp-detail-3-0-local"><span class="rate">100%</span><span class="frac">2 / 2</span></td></tr><tr class="exp-detail-row" id="exp-detail-3-0-baseline"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">baseline</span></div><div class="exp-trial-line"><div class="exp-trial-icon fail">✗</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">The agent created a file named &#39;LICENSE-john-doe&#39; rather than &#39;LICENSE&#39;. A pre-existing &#39;LICENSE&#39; file (for Federico Mete) exists but was not created by this agent in response to the prompt; the agent intentionally avoided overwriting it. The assertion requires a file named exactly &#39;LICENSE&#39; to have been created for John Doe, which did not happen.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">The LICENSE file exists in the working directory. While it was modified (not created from scratch), the diff shows it was updated to reflect the new license content for John Doe, satisfying the intent of the assertion.</span></div></div></div></td></tr><tr class="exp-detail-row" id="exp-detail-3-0-local"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">local</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">The LICENSE file exists in the working directory. While the diff shows a modification rather than a new file creation, the file is present and contains the expected license content.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">The LICENSE file exists in the working directory and was modified to reflect the new copyright holder, satisfying the intent of the assertion.</span></div></div></div></td></tr><tr class="exp-row"><td class="exp-text">The LICENSE file contains &#39;John Doe&#39;</td><td class="pass-cell amber" data-detail="exp-detail-3-1-baseline"><span class="rate">50%</span><span class="frac">1 / 2</span></td><td class="pass-cell green" data-detail="exp-detail-3-1-local"><span class="rate">100%</span><span class="frac">2 / 2</span></td></tr><tr class="exp-detail-row" id="exp-detail-3-1-baseline"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">baseline</span></div><div class="exp-trial-line"><div class="exp-trial-icon fail">✗</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">The existing &#39;LICENSE&#39; file contains &#39;Federico Mete&#39;, not &#39;John Doe&#39;. The agent wrote &#39;John Doe&#39; content into &#39;LICENSE-john-doe&#39; instead of the LICENSE file.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 3 of the LICENSE file reads &#39;Copyright (c) 2026 John Doe&#39;, confirming the name is present.</span></div></div></div></td></tr><tr class="exp-detail-row" id="exp-detail-3-1-local"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">local</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">Line 3 of the LICENSE file contains &#39;Copyright (c) 2026 John Doe&#39;, confirming the presence of &#39;John Doe&#39;.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 3 of the LICENSE file reads &#39;Copyright (c) 2026 John Doe&#39;, confirming the presence of &#39;John Doe&#39;.</span></div></div></div></td></tr><tr class="exp-row"><td class="exp-text">The LICENSE file contains the current year (2026) since no year was specified in the prompt</td><td class="pass-cell amber" data-detail="exp-detail-3-2-baseline"><span class="rate">50%</span><span class="frac">1 / 2</span></td><td class="pass-cell green" data-detail="exp-detail-3-2-local"><span class="rate">100%</span><span class="frac">2 / 2</span></td></tr><tr class="exp-detail-row" id="exp-detail-3-2-baseline"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">baseline</span></div><div class="exp-trial-line"><div class="exp-trial-icon fail">✗</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">While the &#39;LICENSE&#39; file does contain &#39;2026&#39;, it is for Federico Mete and was pre-existing, not generated for John Doe per the prompt. The license generated for John Doe was written to &#39;LICENSE-john-doe&#39;, not &#39;LICENSE&#39;.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 3 of the LICENSE file shows the year 2026, which matches the current year.</span></div></div></div></td></tr><tr class="exp-detail-row" id="exp-detail-3-2-local"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">local</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">Line 3 of the LICENSE file contains &#39;2026&#39;, which is the current year.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 3 of the LICENSE file contains &#39;2026&#39;, which matches the current year.</span></div></div></div></td></tr></tbody>
+  </table>
+</div></div></td></tr><tr><td>1</td><td class="prompt-cell">Create an MIT license for Globex Corporation, year 2023.</td><td><button class="details-btn" data-target="details-1">▶</button></td></tr><tr class="details-row"><td colspan="3"><div class="task-details" id="details-1"><div class="metrics-grid-sm">
+  <table>
+    <thead>
+      <tr><th></th><th>baseline</th><th>local</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+    <td>Success Rate</td>
+    <td><span class="metric-val-sm green">100%</span></td><td><span class="metric-val-sm green">100%</span></td>
+  </tr>
+      <tr>
+    <td>Tokens (avg)</td>
+    <td><span class="metric-val-sm">1K</span></td><td><span class="metric-val-sm">1K</span></td>
+  </tr>
+      <tr>
+    <td>Time (avg)</td>
+    <td><span class="metric-val-sm">26s</span></td><td><span class="metric-val-sm">26s</span></td>
+  </tr>
+    </tbody>
+  </table>
+</div><div class="expectations-table-wrap">
+  <table class="expectations-table">
+    <thead><tr><th class="exp-col">Expectation</th><th class="variant-col">baseline</th><th class="variant-col">local</th></tr></thead>
+    <tbody><tr class="exp-row"><td class="exp-text">A file named LICENSE was created in the working directory</td><td class="pass-cell green" data-detail="exp-detail-1-0-baseline"><span class="rate">100%</span><span class="frac">2 / 2</span></td><td class="pass-cell green" data-detail="exp-detail-1-0-local"><span class="rate">100%</span><span class="frac">2 / 2</span></td></tr><tr class="exp-detail-row" id="exp-detail-1-0-baseline"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">baseline</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">The LICENSE file exists in the working directory. Although it was modified rather than newly created (it pre-existed), the file is present and contains valid MIT license content for the requested entity.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">The LICENSE file exists in the working directory. While the diff shows it was modified rather than newly created, the file is present and contains the requested MIT license content.</span></div></div></div></td></tr><tr class="exp-detail-row" id="exp-detail-1-0-local"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">local</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">The LICENSE file exists in the working directory. While the diff shows it as modified rather than newly created, the file is present and contains the required MIT license content for the requested entity.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">The LICENSE file exists in the working directory. While the diff shows it was modified rather than newly created, the file is present and contains the expected MIT license content for the specified entity.</span></div></div></div></td></tr><tr class="exp-row"><td class="exp-text">The LICENSE file contains the line &#39;MIT License&#39;</td><td class="pass-cell green" data-detail="exp-detail-1-1-baseline"><span class="rate">100%</span><span class="frac">2 / 2</span></td><td class="pass-cell green" data-detail="exp-detail-1-1-local"><span class="rate">100%</span><span class="frac">2 / 2</span></td></tr><tr class="exp-detail-row" id="exp-detail-1-1-baseline"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">baseline</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">Line 1 of the LICENSE file is exactly &#39;MIT License&#39;.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 1 of the LICENSE file contains exactly &#39;MIT License&#39;.</span></div></div></div></td></tr><tr class="exp-detail-row" id="exp-detail-1-1-local"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">local</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">Line 1 of the LICENSE file contains exactly &#39;MIT License&#39;.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 1 of the LICENSE file contains exactly &#39;MIT License&#39;.</span></div></div></div></td></tr><tr class="exp-row"><td class="exp-text">The LICENSE file contains &#39;Copyright (c) 2023 Globex Corporation&#39;</td><td class="pass-cell green" data-detail="exp-detail-1-2-baseline"><span class="rate">100%</span><span class="frac">2 / 2</span></td><td class="pass-cell green" data-detail="exp-detail-1-2-local"><span class="rate">100%</span><span class="frac">2 / 2</span></td></tr><tr class="exp-detail-row" id="exp-detail-1-2-baseline"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">baseline</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">Line 3 of the LICENSE file contains exactly &#39;Copyright (c) 2023 Globex Corporation&#39;, matching the diff and verified by reading the file.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 3 of the LICENSE file contains exactly &#39;Copyright (c) 2023 Globex Corporation&#39;.</span></div></div></div></td></tr><tr class="exp-detail-row" id="exp-detail-1-2-local"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">local</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">Line 3 of the LICENSE file contains exactly &#39;Copyright (c) 2023 Globex Corporation&#39;.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 3 of the LICENSE file contains exactly &#39;Copyright (c) 2023 Globex Corporation&#39;.</span></div></div></div></td></tr></tbody>
+  </table>
+</div></div></td></tr><tr><td>2</td><td class="prompt-cell">Add a license to this project. The owner is Initech Ltd, 2025.</td><td><button class="details-btn" data-target="details-2">▶</button></td></tr><tr class="details-row"><td colspan="3"><div class="task-details" id="details-2"><div class="metrics-grid-sm">
+  <table>
+    <thead>
+      <tr><th></th><th>baseline</th><th>local</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+    <td>Success Rate</td>
+    <td><span class="metric-val-sm green">100%</span></td><td><span class="metric-val-sm green">100%</span></td>
+  </tr>
+      <tr>
+    <td>Tokens (avg)</td>
+    <td><span class="metric-val-sm">1K</span></td><td><span class="metric-val-sm">1K</span></td>
+  </tr>
+      <tr>
+    <td>Time (avg)</td>
+    <td><span class="metric-val-sm">24s</span></td><td><span class="metric-val-sm">23s</span></td>
+  </tr>
+    </tbody>
+  </table>
+</div><div class="expectations-table-wrap">
+  <table class="expectations-table">
+    <thead><tr><th class="exp-col">Expectation</th><th class="variant-col">baseline</th><th class="variant-col">local</th></tr></thead>
+    <tbody><tr class="exp-row"><td class="exp-text">A file named LICENSE was created in the working directory</td><td class="pass-cell green" data-detail="exp-detail-2-0-baseline"><span class="rate">100%</span><span class="frac">2 / 2</span></td><td class="pass-cell green" data-detail="exp-detail-2-0-local"><span class="rate">100%</span><span class="frac">2 / 2</span></td></tr><tr class="exp-detail-row" id="exp-detail-2-0-baseline"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">baseline</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">The LICENSE file exists in the working directory. While it was modified rather than newly created (it pre-existed), the file is present and contains the required license content as requested.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">A LICENSE file exists in the working directory. While it pre-existed and was modified rather than newly created, the file is present and satisfies the assertion that a LICENSE file exists.</span></div></div></div></td></tr><tr class="exp-detail-row" id="exp-detail-2-0-local"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">local</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">The LICENSE file exists in the working directory. While it was modified rather than newly created (per the diff), the file is present and contains the required license content.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">A file named LICENSE exists in the working directory. While the diff indicates the file was modified rather than newly created, the assertion&#39;s intent (the presence of a LICENSE file) is satisfied.</span></div></div></div></td></tr><tr class="exp-row"><td class="exp-text">The LICENSE file contains the line &#39;MIT License&#39;</td><td class="pass-cell green" data-detail="exp-detail-2-1-baseline"><span class="rate">100%</span><span class="frac">2 / 2</span></td><td class="pass-cell green" data-detail="exp-detail-2-1-local"><span class="rate">100%</span><span class="frac">2 / 2</span></td></tr><tr class="exp-detail-row" id="exp-detail-2-1-baseline"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">baseline</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">Verified by reading the file: line 1 contains &#39;MIT License&#39;.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 1 of the LICENSE file contains exactly &#39;MIT License&#39;.</span></div></div></div></td></tr><tr class="exp-detail-row" id="exp-detail-2-1-local"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">local</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">Line 1 of the LICENSE file is exactly &#39;MIT License&#39;.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 1 of the LICENSE file is exactly &#39;MIT License&#39;.</span></div></div></div></td></tr><tr class="exp-row"><td class="exp-text">The LICENSE file contains &#39;Copyright (c) 2025 Initech Ltd&#39;</td><td class="pass-cell green" data-detail="exp-detail-2-2-baseline"><span class="rate">100%</span><span class="frac">2 / 2</span></td><td class="pass-cell green" data-detail="exp-detail-2-2-local"><span class="rate">100%</span><span class="frac">2 / 2</span></td></tr><tr class="exp-detail-row" id="exp-detail-2-2-baseline"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">baseline</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">Verified by reading the file: line 3 contains exactly &#39;Copyright (c) 2025 Initech Ltd&#39;.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 3 of the LICENSE file contains exactly &#39;Copyright (c) 2025 Initech Ltd&#39;, matching the assertion.</span></div></div></div></td></tr><tr class="exp-detail-row" id="exp-detail-2-2-local"><td colspan="3"><div class="exp-detail-inner"><div class="exp-detail-header">Judge per trial · <span class="variant-pill">local</span></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 1</span><span class="trial-reason">Line 3 of the LICENSE file contains exactly &#39;Copyright (c) 2025 Initech Ltd&#39;.</span></div></div><div class="exp-trial-line"><div class="exp-trial-icon pass">✓</div><div class="exp-trial-body"><span class="trial-label">Trial 2</span><span class="trial-reason">Line 3 of the LICENSE file contains exactly &#39;Copyright (c) 2025 Initech Ltd&#39;.</span></div></div></div></td></tr></tbody>
+  </table>
+</div></div></td></tr></tbody></table></div>
+  </div>
+
+</div>
+<script>
+(function () {
+  document.querySelectorAll('.details-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const target = document.getElementById(btn.getAttribute('data-target'));
+      if (!target) return;
+      const isOpen = target.classList.contains('visible');
+      target.classList.toggle('visible', !isOpen);
+      btn.classList.toggle('open', !isOpen);
+      btn.textContent = isOpen ? '▶' : '▼';
+    });
+  });
+
+  document.querySelectorAll('.pass-cell[data-detail]').forEach(function (cell) {
+    cell.addEventListener('click', function () {
+      const detailRow = document.getElementById(cell.getAttribute('data-detail'));
+      if (!detailRow) return;
+      const isOpen = detailRow.classList.contains('visible');
+      detailRow.classList.toggle('visible', !isOpen);
+      cell.classList.toggle('open', !isOpen);
+    });
+  });
+}());
+</script>
+</body>
+</html>
