@@ -1,0 +1,31 @@
+tests/runners/gemini-cli/runner.test.ts
+  s_f60a84fdf02bfb::t_eba93d790297ca 125-156
+tests/runners/claude-code/runner.test.ts
+  s_f60a84fdf02bfb::t_1330d155391af3 55,59,62,69-78
+src/runners/gemini-cli/runner.ts
+  s_f60a84fdf02bfb::t_e7ecd01ed91918 242,247-248,250
+src/runners/codex/runner.ts
+  s_f60a84fdf02bfb::t_6647868fcfa5a2 354,357-358,360,374
+src/runners/claude-code/runner.ts
+  s_f60a84fdf02bfb::t_fdcabdcbfcce24 295,298-299,301
+tests/runners/codex/runner.test.ts
+  s_f60a84fdf02bfb::t_819dff3dc33f50 52,56,59,69-78
+src/runners/runner.interface.ts
+  s_f60a84fdf02bfb::t_136eb7d09637a7 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ef68580b36f57e70bdd8d6ebd598d35d6ea5c1ab",
+  "prompts": {},
+  "sessions": {
+    "s_f60a84fdf02bfb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f711a-a1dd-7e21-bbd7-f1865f9de840",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
