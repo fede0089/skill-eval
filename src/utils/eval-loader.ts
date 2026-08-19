@@ -4,21 +4,41 @@ import { EvalSuite, EvalTask } from '../types/index.js';
 import { ConfigError } from '../core/errors.js';
 
 /**
+ * Normalizes an --eval-file value to the bare file name used inside the evals directory.
+ * Accepts 'edge-cases', 'edge-cases.json' and 'path/to/evals/edge-cases.json' alike.
+ */
+function normalizeEvalFileName(evalFile: string): string {
+  const base = path.basename(evalFile.trim());
+  return base.endsWith('.json') ? base : `${base}.json`;
+}
+
+/**
  * Loads and merges all JSON evaluation files from a skill's evals directory.
  * Aligned with Anthropic's recommendation to split evals by capability/regression.
  * Supports legacy 'tasks' and 'assertions' internally while maintaining 'evals' and 'expectations' in files.
+ * When 'evalFile' is given, only that file is loaded instead of the whole suite.
  */
-export function loadEvalSuite(skillPath: string): EvalSuite {
+export function loadEvalSuite(skillPath: string, evalFile?: string): EvalSuite {
   const evalsDir = path.resolve(skillPath, 'evals');
 
   if (!fs.existsSync(evalsDir)) {
     throw new ConfigError(`Could not find evals directory at ${evalsDir}`);
   }
 
-  const files = fs.readdirSync(evalsDir).filter(file => file.endsWith('.json'));
+  let files = fs.readdirSync(evalsDir).filter(file => file.endsWith('.json'));
 
   if (files.length === 0) {
     throw new ConfigError(`No JSON evaluation files found in ${evalsDir}`);
+  }
+
+  if (evalFile !== undefined) {
+    const wanted = normalizeEvalFileName(evalFile);
+    if (!files.includes(wanted)) {
+      throw new ConfigError(
+        `Eval file '${wanted}' not found in ${evalsDir}. Available: ${[...files].sort().join(', ')}.`
+      );
+    }
+    files = [wanted];
   }
 
   let mergedSkillName = '';
@@ -73,7 +93,8 @@ export function loadEvalSuite(skillPath: string): EvalSuite {
   }
 
   if (mergedTasks.length === 0) {
-    throw new ConfigError(`No evaluations found in any of the JSON files in ${evalsDir}`);
+    const scope = evalFile !== undefined ? `${files[0]} in ${evalsDir}` : `any of the JSON files in ${evalsDir}`;
+    throw new ConfigError(`No evaluations found in ${scope}`);
   }
 
   return {

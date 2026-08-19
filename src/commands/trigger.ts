@@ -26,10 +26,11 @@ export async function triggerCommand(
   reporter: Reporter = new JsonReporter(),
   timeoutMs?: number,
   evalId?: number,
-  compareRefs: string[] = []
+  compareRefs: string[] = [],
+  evalFile?: string
 ): Promise<void> {
   if (!injectedSuite) preflight(agent, workspace, skillPath);
-  const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
+  const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath, evalFile);
 
   if (evalId !== undefined) {
     suite.tasks = suite.tasks.filter(t => t.id === evalId);
@@ -100,7 +101,7 @@ export async function triggerCommand(
   const subtaskLabels = skillVersions.flatMap(v => Array.from({ length: numTrials }, (_, i) => `${v} ${i + 1}`));
 
   try {
-    renderRunHeader({ command: 'trigger', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId });
+    renderRunHeader({ command: 'trigger', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId, evalFile });
     Logger.write(`--- Trigger Pass ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
 

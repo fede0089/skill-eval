@@ -88,6 +88,7 @@ export interface RunHeaderConfig {
   timeoutMs?: number;
   runDir: string;
   evalId?: number;
+  evalFile?: string;
 }
 
 const BOX_INNER = 56; // visible chars between │ and │ (one space padding each side)
@@ -112,7 +113,7 @@ function boxLabel(key: string, value: string): string {
  * Always shown regardless of debug mode.
  */
 export function renderRunHeader(config: RunHeaderConfig): void {
-  const { command, skillName, agent, workspace, tasks, trials, maxAgents, timeoutMs, runDir, evalId } = config;
+  const { command, skillName, agent, workspace, tasks, trials, maxAgents, timeoutMs, runDir, evalId, evalFile } = config;
 
   let timeoutStr = 'None';
   if (timeoutMs && timeoutMs > 0) {
@@ -129,7 +130,10 @@ export function renderRunHeader(config: RunHeaderConfig): void {
   const top = chalk.gray('┌─ ') + chalk.bold(titleLabel) + ' ' + chalk.gray(dashes + '┐');
   const bottom = chalk.gray('└' + '─'.repeat(BOX_INNER + 2) + '┘');
 
-  const commandPart = evalId !== undefined ? `${command}  ·  eval #${evalId}` : command;
+  const filterParts: string[] = [];
+  if (evalFile !== undefined) filterParts.push(evalFile);
+  if (evalId !== undefined) filterParts.push(`eval #${evalId}`);
+  const commandPart = [command, ...filterParts].join('  ·  ');
   const title = chalk.bold.cyan(skillName) + chalk.gray(`  ·  ${commandPart}`);
   const runLine = `${tasks} task${tasks !== 1 ? 's' : ''}  ·  ${trials} trial${trials !== 1 ? 's' : ''}  ·  agents ${maxAgents}`;
 

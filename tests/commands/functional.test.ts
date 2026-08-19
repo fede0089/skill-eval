@@ -172,3 +172,30 @@ test('functionalCommand should reject --eval-id targeting a trigger-only eval', 
     mock.reset();
   }
 });
+
+test('functionalCommand should reject a suite left empty by trigger-only evals', async () => {
+  mock.method(fs, 'mkdirSync', () => {});
+  mock.method(fs, 'writeFileSync', () => {});
+  mock.method(fs, 'readdirSync', () => ['negative-triggers.json']);
+  mock.method(fs, 'existsSync', () => true);
+
+  const injectedSuite = {
+    skill_name: 'mock-skill',
+    tasks: [
+      { id: 10, prompt: 'negative prompt', should_trigger: false },
+      { id: 11, prompt: 'another negative prompt', should_trigger: false }
+    ]
+  };
+
+  mock.method(EvalEnvironment.prototype, 'setup', async () => {});
+  mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
+
+  try {
+    await assert.rejects(
+      () => functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1),
+      (err: Error) => err instanceof ConfigError && err.message.includes('No evals left to run')
+    );
+  } finally {
+    mock.reset();
+  }
+});

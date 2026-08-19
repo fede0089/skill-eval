@@ -29,10 +29,11 @@ export async function functionalCommand(
   timeoutMs?: number,
   evalId?: number,
   compareRefs: string[] = [],
-  compareBaseline = false
+  compareBaseline = false,
+  evalFile?: string
 ): Promise<void> {
   if (!injectedSuite) preflight(agent, workspace, skillPath);
-  const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
+  const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath, evalFile);
 
   // Negative evals (should_trigger: false) only make sense for the trigger command:
   // this pass instructs the agent that it MUST use the skill, which contradicts them.
@@ -42,6 +43,11 @@ export async function functionalCommand(
       throw new ConfigError(`Eval #${evalId} is trigger-only (should_trigger: false) and cannot run under 'functional'.`);
     }
     suite.tasks = suite.tasks.filter(t => t.should_trigger !== false);
+    if (suite.tasks.length === 0) {
+      throw new ConfigError(
+        `No evals left to run: all ${triggerOnly.length} eval(s) in scope are trigger-only (should_trigger: false).`
+      );
+    }
     Logger.write(chalk.dim(`   Skipping ${triggerOnly.length} trigger-only eval(s)\n`));
   }
 
@@ -125,7 +131,7 @@ export async function functionalCommand(
     : skillVersions.flatMap(v => Array.from({ length: numTrials }, (_, i) => `${v} ${i + 1}`));
 
   try {
-    renderRunHeader({ command: 'functional', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId });
+    renderRunHeader({ command: 'functional', skillName: skill_name, agent, workspace, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId, evalFile });
     Logger.write(`──────────────────────────────────────────────────\n`);
 
     for (let i = 0; i < tasks.length; i++) {

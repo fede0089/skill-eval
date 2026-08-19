@@ -89,6 +89,7 @@ skill-eval functional --workspace <path> --skill <path> [options] [agent]
 | `--trials <number>` | no | `3` | Trials per task (for pass@k) |
 | `--timeout <seconds>` | no | none | Kill the agent after this many seconds |
 | `--eval-id <id>` | no | all | Run only the eval with this numeric ID |
+| `--eval-file <name>` | no | all | Run only the evals from this file in `evals/` (e.g. `edge-cases.json`) |
 | `--compare-ref [refs...]` | no | — | Git references to compare against |
 | `--compare-baseline` | no | `false` | Also run the no-skill baseline alongside the skill |
 | `-v, --debug` | no | `false` | Enable verbose debug logging |
@@ -117,6 +118,8 @@ my-skill/
 ```
 
 All `.json` files in `evals/` are loaded and merged into a single suite — you can split them by feature or regression category.
+
+Use `--eval-file <name>` to run just one of them while iterating (the `.json` extension is optional), and combine it with `--eval-id <id>` to narrow down to a single eval inside that file.
 
 **Trigger eval** — `id` must be a unique integer across all eval files:
 ```json
@@ -250,6 +253,9 @@ npm run test:trigger -- codex            # run trigger evals with Codex
 npm run test:functional -- codex         # run functional evals with Codex
 npm run test:trigger -- claude-code      # run trigger evals with Claude Code
 npm run test:functional -- claude-code   # run functional evals with Claude Code
+
+npm run test:trigger -- --eval-file negative-triggers.json   # only the negative-trigger evals
+npm run test:trigger -- --eval-file edge-cases --eval-id 3   # a single eval inside one file
 ```
 
 ## Extending

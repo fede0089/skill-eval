@@ -47,6 +47,7 @@ program
   .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
   .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
+  .option('--eval-file <name>', 'Run only the evals from this file in evals/ (e.g. edge-cases.json)')
   .option('--compare-ref [refs...]', 'Compare against historical git references')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
@@ -56,7 +57,7 @@ program
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     const compareRefs = options.compareRef || [];
-    triggerCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs).catch(errorHandler);
+    triggerCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, options.evalFile).catch(errorHandler);
   });
 
 program
@@ -68,6 +69,7 @@ program
   .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
   .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
+  .option('--eval-file <name>', 'Run only the evals from this file in evals/ (e.g. edge-cases.json)')
   .option('--compare-ref [refs...]', 'Compare against historical git references')
   .option('--compare-baseline', 'Also run the no-skill baseline alongside the skill')
   .action((agent, options) => {
@@ -79,7 +81,7 @@ program
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     const compareRefs = options.compareRef || [];
     const compareBaseline = !!options.compareBaseline;
-    functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, compareBaseline).catch(errorHandler);
+    functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, compareBaseline, options.evalFile).catch(errorHandler);
   });
 
 

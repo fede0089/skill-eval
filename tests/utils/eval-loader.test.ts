@@ -156,6 +156,87 @@ describe('EvalLoader', () => {
       return err instanceof ConfigError && err.message.includes('Skill name mismatch');
     });
   });
+
+  it('should load only the requested eval file', () => {
+    const skillPath = path.join(tempDir, 'skill');
+    const evalsDir = path.join(skillPath, 'evals');
+    fs.mkdirSync(evalsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(evalsDir, 'license.json'), JSON.stringify({
+      skill_name: 'test-skill',
+      evals: [{ id: 1, prompt: 'prompt1' }]
+    }));
+    fs.writeFileSync(path.join(evalsDir, 'edge-cases.json'), JSON.stringify({
+      skill_name: 'test-skill',
+      evals: [{ id: 2, prompt: 'prompt2' }, { id: 3, prompt: 'prompt3' }]
+    }));
+
+    const result = loadEvalSuite(skillPath, 'edge-cases.json');
+    assert.strictEqual(result.skill_name, 'test-skill');
+    assert.deepStrictEqual(result.tasks.map(t => t.id), [2, 3]);
+  });
+
+  it('should resolve the eval file with or without extension, and from a path', () => {
+    const skillPath = path.join(tempDir, 'skill');
+    const evalsDir = path.join(skillPath, 'evals');
+    fs.mkdirSync(evalsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(evalsDir, 'a.json'), JSON.stringify({
+      skill_name: 'test-skill',
+      evals: [{ id: 1, prompt: 'prompt1' }]
+    }));
+    fs.writeFileSync(path.join(evalsDir, 'edge-cases.json'), JSON.stringify({
+      skill_name: 'test-skill',
+      evals: [{ id: 2, prompt: 'prompt2' }]
+    }));
+
+    for (const name of ['edge-cases', 'edge-cases.json', path.join(evalsDir, 'edge-cases.json')]) {
+      const result = loadEvalSuite(skillPath, name);
+      assert.deepStrictEqual(result.tasks.map(t => t.id), [2], `failed for '${name}'`);
+    }
+  });
+
+  it('should throw ConfigError listing available files when the eval file is missing', () => {
+    const skillPath = path.join(tempDir, 'skill');
+    const evalsDir = path.join(skillPath, 'evals');
+    fs.mkdirSync(evalsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(evalsDir, 'a.json'), JSON.stringify({
+      skill_name: 'test-skill',
+      evals: [{ id: 1, prompt: 'prompt1' }]
+    }));
+    fs.writeFileSync(path.join(evalsDir, 'b.json'), JSON.stringify({
+      skill_name: 'test-skill',
+      evals: [{ id: 2, prompt: 'prompt2' }]
+    }));
+
+    assert.throws(() => {
+      loadEvalSuite(skillPath, 'missing.json');
+    }, (err) => {
+      return err instanceof ConfigError
+        && err.message.includes("missing.json")
+        && err.message.includes('a.json, b.json');
+    });
+  });
+
+  it('should ignore files that were filtered out when checking skill name consistency', () => {
+    const skillPath = path.join(tempDir, 'skill');
+    const evalsDir = path.join(skillPath, 'evals');
+    fs.mkdirSync(evalsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(evalsDir, 'a.json'), JSON.stringify({
+      skill_name: 'skill1',
+      evals: [{ id: 1, prompt: 'prompt1' }]
+    }));
+    fs.writeFileSync(path.join(evalsDir, 'b.json'), JSON.stringify({
+      skill_name: 'skill2',
+      evals: [{ id: 2, prompt: 'prompt2' }]
+    }));
+
+    const result = loadEvalSuite(skillPath, 'b.json');
+    assert.strictEqual(result.skill_name, 'skill2');
+    assert.deepStrictEqual(result.tasks.map(t => t.id), [2]);
+  });
 });
 
 // Helper for afterEach since node:test doesn't have it natively in some versions
