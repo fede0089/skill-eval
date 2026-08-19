@@ -1,0 +1,25 @@
+scripts/run-mock-eval.mjs
+  s_64c573c212a269::t_4eaeafa37e3f43 3,5,7-15,17-27,29-30,33-58
+README.md
+  s_64c573c212a269::t_a20c3963e7dbd3 93
+src/index.ts
+  s_64c573c212a269::t_8c1c28d650d74e 6,31-41,70,93
+tests/scripts/run-mock-eval.test.ts
+  s_64c573c212a269::t_c4a9fb81f31192 1-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "726f9323f6884f78e703821fbc8cbb794e6665ff",
+  "prompts": {},
+  "sessions": {
+    "s_64c573c212a269": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2970bef-5294-417f-a88b-23d459000398",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
