@@ -4,6 +4,10 @@ import { Logger } from '../../src/utils/logger.js';
 import { renderTriggerTable, renderFunctionalTable } from '../../src/utils/table-renderer.js';
 import type { EvalSuiteReport } from '../../src/types/index.js';
 
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
 function makeTrial(passed: boolean, id = 1) {
   return { id, transcript: {}, assertionResults: [], trialPassed: passed };
 }
@@ -85,6 +89,30 @@ test('renderTriggerTable: uses pass@k columns for multi-trial reports', () => {
 
   const rows: string[][] = tableMock.mock.calls[0].arguments[0];
   assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'local Trials', 'local Rate'], 'Header should have success rate column');
+
+  mock.reset();
+});
+
+test('renderTriggerTable: adds an Expect column only when the suite has negative evals', () => {
+  const tableMock = mock.fn();
+  mock.method(Logger, 'table', tableMock);
+  mock.method(Logger, 'write', mock.fn());
+
+  const report = makeTriggerReport(1);
+  report.results.push({
+    taskId: 2,
+    prompt: 'Something unrelated',
+    baselineTrials: [],
+    skillTrials: { 'local': [makeTrial(true, 1)] },
+    shouldTrigger: false
+  });
+
+  renderTriggerTable(report);
+
+  const rows: string[][] = tableMock.mock.calls[0].arguments[0];
+  assert.deepStrictEqual(rows[0], ['ID', 'Prompt', 'Expect', 'local Rate']);
+  assert.ok(stripAnsi(rows[1][2]) === 'trigger', `Expected 'trigger' marker, got: ${rows[1][2]}`);
+  assert.ok(stripAnsi(rows[2][2]) === 'no-trigger', `Expected 'no-trigger' marker, got: ${rows[2][2]}`);
 
   mock.reset();
 });

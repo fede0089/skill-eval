@@ -140,6 +140,78 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
   assert.strictEqual(result.trialPassed, true);
 });
 
+// ── Negative trigger evals (should_trigger: false) ──────────────────────────
+
+test('EvalRunner.runTriggerTask negative eval passes when the skill does not activate', async () => {
+  const cleanNdjson = JSON.stringify({ type: 'message', role: 'assistant', content: 'Paris' });
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: cleanNdjson })));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false
+  });
+
+  stubWorktree();
+
+  const result = await runner.runTriggerTask({ id: 30, prompt: 'capital of France?', should_trigger: false }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.trialPassed, true);
+  assert.strictEqual(result.isError, undefined);
+  assert.strictEqual(result.assertionResults[0].assertion, 'Skill was not triggered');
+  assert.strictEqual(result.assertionResults[0].passed, true);
+});
+
+test('EvalRunner.runTriggerTask negative eval fails on an attempted activation that never succeeded', async () => {
+  // No successful tool_result: gradeTrigger would say "not triggered", but the skill did fire.
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: makeSkillActivationNdjson() })));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false
+  });
+
+  stubWorktree();
+
+  const result = await runner.runTriggerTask({ id: 31, prompt: 'capital of France?', should_trigger: false }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.trialPassed, false);
+  assert.strictEqual(result.isError, undefined);
+  assert.strictEqual(result.assertionResults[0].assertion, 'Skill was not triggered');
+  assert.ok(result.assertionResults[0].reason.includes('Skill activation detected'), `Got: ${result.assertionResults[0].reason}`);
+});
+
+test('EvalRunner.runTriggerTask negative eval reports isError when no events are parsable', async () => {
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: 'plain text without any events' })));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false
+  });
+
+  stubWorktree();
+
+  const result = await runner.runTriggerTask({ id: 32, prompt: 'capital of France?', should_trigger: false }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.isError, true, 'An unverifiable transcript must not count as a pass');
+  assert.strictEqual(result.trialPassed, false);
+});
+
+test('EvalRunner.runTriggerTask positive eval still requires a successful activation', async () => {
+  mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: makeSkillActivationNdjson('tool-9', true) })));
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp', isBaseline: false
+  });
+
+  stubWorktree();
+
+  const result = await runner.runTriggerTask({ id: 33, prompt: 'make a license' }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.trialPassed, true);
+  assert.strictEqual(result.assertionResults[0].assertion, 'Skill was triggered');
+});
+
 // ── Retry workspace isolation ────────────────────────────────────────────────
 
 test('EvalRunner.runTriggerTask with stream-json error result sets isError:true', async () => {

@@ -76,3 +76,42 @@ test('triggerCommand should run all trials in parallel (no early abort on error)
     mock.reset();
   }
 });
+
+test('triggerCommand should propagate should_trigger polarity to the report', async () => {
+  mock.method(fs, 'mkdirSync', () => {});
+  mock.method(fs, 'readdirSync', () => ['evals.json']);
+  mock.method(fs, 'existsSync', () => true);
+
+  const written: string[] = [];
+  mock.method(fs, 'writeFileSync', (_p: string, content: string) => { written.push(content); });
+
+  const injectedSuite = {
+    skill_name: 'mock-skill',
+    tasks: [
+      { id: 1, prompt: 'positive prompt' },
+      { id: 2, prompt: 'negative prompt', should_trigger: false }
+    ]
+  };
+
+  mock.method(EvalEnvironment.prototype, 'setup', async () => {});
+  mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
+  mock.method(EvalRunner.prototype, 'runTriggerTask', mock.fn(async () => ({
+    id: 1,
+    transcript: { response: 'Mock response' },
+    assertionResults: [],
+    trialPassed: true
+  })));
+
+  try {
+    await triggerCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1);
+
+    const summary = written.map(c => { try { return JSON.parse(c); } catch { return null; } })
+      .find(r => r && r.command === 'trigger');
+    assert.ok(summary, 'Expected a trigger summary to be written');
+    const byId = Object.fromEntries(summary.results.map((r: any) => [r.taskId, r.shouldTrigger]));
+    assert.strictEqual(byId[1], true);
+    assert.strictEqual(byId[2], false);
+  } finally {
+    mock.reset();
+  }
+});

@@ -256,9 +256,11 @@ function renderTaskTable(report: EvalSuiteReport): string {
 
   const rows = results.map(result => {
     const prompt = escapeHtml(result.prompt);
+    // Negative trigger evals assert the opposite outcome — flag them so the row is not misread.
+    const badge = result.shouldTrigger === false ? '<span class="badge-neg">no-trigger</span>' : '';
     const detailsBtn = `<button class="details-btn" data-target="details-${result.taskId}">▶</button>`;
     const detailsRow = `<tr class="details-row"><td colspan="3">${renderTaskDetails(result, functional)}</td></tr>`;
-    return `<tr><td>${result.taskId}</td><td class="prompt-cell">${prompt}</td><td>${detailsBtn}</td></tr>${detailsRow}`;
+    return `<tr><td>${result.taskId}</td><td class="prompt-cell">${badge}${prompt}</td><td>${detailsBtn}</td></tr>${detailsRow}`;
   }).join('');
 
   return `<div class="table-wrap"><table><thead>${headerRow}</thead><tbody>${rows}</tbody></table></div>`;
@@ -337,6 +339,7 @@ th { background: #f8fafc; font-size: 11px; font-weight: 600; text-transform: upp
 td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
 tr:last-child td { border-bottom: none; }
 .prompt-cell { max-width: 480px; word-break: break-word; color: #334155; }
+.badge-neg { display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: 10px; background: #e0f2fe; color: #0369a1; font-size: 11px; font-weight: 600; vertical-align: 1px; }
 
 /* Details */
 .details-btn { background: none; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; padding: 2px 8px; font-size: 11px; color: #64748b; transition: background 0.15s; }

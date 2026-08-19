@@ -75,6 +75,10 @@ function eventSignalsSkill(event: UnknownRecord, skillName: string): boolean {
   const item = getEventItem(event);
   const itemType = String(item?.type ?? '').toLowerCase();
 
+  // Assistant prose is not a tool call: an agent merely naming the skill (often to say it is
+  // not needed) must not be reported as an activation. Real activations arrive as skill items.
+  if (['agent_message', 'assistant_message', 'message'].includes(itemType)) return false;
+
   return (
     serialized.includes(normalizedSkill) &&
     (

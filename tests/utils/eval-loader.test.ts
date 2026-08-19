@@ -25,6 +25,43 @@ describe('EvalLoader', () => {
     });
   });
 
+  it('should map should_trigger and leave it undefined when absent', () => {
+    const skillPath = path.join(tempDir, 'skill');
+    const evalsDir = path.join(skillPath, 'evals');
+    fs.mkdirSync(evalsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(evalsDir, 'evals.json'), JSON.stringify({
+      skill_name: 'test-skill',
+      evals: [
+        { id: 1, prompt: 'positive' },
+        { id: 2, prompt: 'negative', should_trigger: false },
+        { id: 3, prompt: 'explicit positive', should_trigger: true }
+      ]
+    }));
+
+    const result = loadEvalSuite(skillPath);
+    assert.strictEqual(result.tasks[0].should_trigger, undefined);
+    assert.strictEqual(result.tasks[1].should_trigger, false);
+    assert.strictEqual(result.tasks[2].should_trigger, true);
+  });
+
+  it('should throw ConfigError if should_trigger is not a boolean', () => {
+    const skillPath = path.join(tempDir, 'skill');
+    const evalsDir = path.join(skillPath, 'evals');
+    fs.mkdirSync(evalsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(evalsDir, 'evals.json'), JSON.stringify({
+      skill_name: 'test-skill',
+      evals: [{ id: 1, prompt: 'p', should_trigger: 'false' }]
+    }));
+
+    assert.throws(() => {
+      loadEvalSuite(skillPath);
+    }, (err) => {
+      return err instanceof ConfigError && err.message.includes("Invalid 'should_trigger' for eval 1");
+    });
+  });
+
   it('should throw ConfigError if no JSON files found', () => {
     const skillPath = path.join(tempDir, 'skill');
     fs.mkdirSync(path.join(skillPath, 'evals'), { recursive: true });

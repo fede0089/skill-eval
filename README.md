@@ -6,7 +6,7 @@ A CLI tool for evaluating Agent Skills locally. Tests whether your skill trigger
 
 skill-eval ships two commands, each targeting a different failure mode:
 
-- **Triggering** (`skill-eval trigger`) — checks whether the agent actually decides to invoke the skill in the right context. A skill that never gets triggered cannot help, no matter how good its instructions are.
+- **Triggering** (`skill-eval trigger`) — checks whether the agent actually decides to invoke the skill in the right context, and leaves it alone in the wrong one. A skill that never gets triggered cannot help, no matter how good its instructions are; one that triggers everywhere gets in the way.
 - **Functional correctness** (`skill-eval functional`) — checks whether the actions the agent takes while the skill is active match your expectations. An LLM judge grades each transcript against the expectation list you provide.
 
 ## Why run skill evals
@@ -38,7 +38,7 @@ For each eval prompt, skill-eval spins up parallel agent processes with the curr
                      pass@k
 ```
 
-> The `trigger` command only runs with-skill trials and checks whether the skill dispatch tool was actually invoked — no judge or baseline needed.
+> The `trigger` command only runs with-skill trials and checks whether the skill dispatch tool was actually invoked — no judge or baseline needed. Evals marked `should_trigger: false` assert the opposite: that it was *not* invoked.
 >
 > The baseline branch is opt-in: enable it with `--compare-baseline` (no-skill control) or `--compare-ref <ref>` (historical skill versions).
 
@@ -127,6 +127,22 @@ All `.json` files in `evals/` are loaded and merged into a single suite — you 
   ]
 }
 ```
+
+**Negative trigger eval** — add `should_trigger: false` to assert the skill must *not* fire:
+```json
+{
+  "skill_name": "my-skill",
+  "evals": [
+    { "id": 2, "prompt": "Something my skill has no business handling", "should_trigger": false }
+  ]
+}
+```
+
+Positive evals measure **under-triggering** (the skill never fires when it should). Negative evals measure the opposite failure, **over-triggering** — the one you introduce when you widen a skill's `description` to catch more cases and silently lose precision. Both kinds live in the same suite and feed a single success rate, so a change that improves one at the expense of the other shows up immediately.
+
+A negative eval fails if the agent *attempts* to activate the skill at all, even if the activation itself errors out. These evals are trigger-only: `skill-eval functional` skips them, since that command instructs the agent to use the skill.
+
+> Trigger detection for Codex is heuristic (it infers activations from the event stream), so negative evals are most reliable on `claude-code` and `gemini-cli`.
 
 **Functional eval** — add `expectations` for the LLM judge to evaluate:
 ```json
@@ -224,7 +240,7 @@ Without `--debug` these files are not written, so reach for the flag when you ne
 
 ## Try it out
 
-This repo includes a `mock-skill/` directory — a complete, working example of a license-generator skill with trigger and functional evals. Run it directly with:
+This repo includes a `mock-skill/` directory — a complete, working example of a license-generator skill with positive trigger, negative trigger, and functional evals. Run it directly with:
 
 ```sh
 npm run test:unit        # run the unit test suite

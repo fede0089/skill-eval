@@ -90,22 +90,59 @@ export class EvalRunner {
       ? parseTokenStats(transcript.response || '') ?? undefined
       : undefined;
 
-    let triggered = false;
+    // Negative evals (should_trigger: false) assert the opposite: the skill must NOT activate.
+    const shouldTrigger = task.should_trigger !== false;
+    const assertionLabel = shouldTrigger ? 'Skill was triggered' : 'Skill was not triggered';
+
+    let trialPassed = false;
     const assertionResults: AssertionResult[] = [];
 
     if (transcript && !transcript.error) {
       uiCtx.updateLog('Grading…');
-      triggered = this.triggerGrader.gradeTrigger(transcript);
-      assertionResults.push({
-        assertion: 'Skill was triggered',
-        passed: triggered,
-        reason: triggered ? 'Detected skill activation in transcript' : 'No skill activation detected in transcript',
-        graderType: 'programmatic'
-      });
+
+      if (shouldTrigger) {
+        const triggered = this.triggerGrader.gradeTrigger(transcript);
+        trialPassed = triggered;
+        assertionResults.push({
+          assertion: assertionLabel,
+          passed: triggered,
+          reason: triggered ? 'Detected skill activation in transcript' : 'No skill activation detected in transcript',
+          graderType: 'programmatic'
+        });
+      } else if (!this.triggerGrader.hasParsableEvents(transcript)) {
+        // Without any parsable events the absence of an activation proves nothing —
+        // report it as an infrastructure error instead of a vacuous pass.
+        const reason = 'No parsable agent events — cannot verify that the skill did not trigger';
+        assertionResults.push({
+          assertion: assertionLabel,
+          passed: false,
+          reason,
+          graderType: 'programmatic'
+        });
+        return {
+          id: trialId,
+          transcript,
+          assertionResults,
+          trialPassed: false,
+          isError: true,
+          tokenStats,
+          durationMs
+        };
+      } else {
+        // Any activation attempt counts, even one that failed: the skill still fired.
+        const triggered = this.triggerGrader.detectSkillAttempt(transcript);
+        trialPassed = !triggered;
+        assertionResults.push({
+          assertion: assertionLabel,
+          passed: !triggered,
+          reason: triggered ? 'Skill activation detected in transcript' : 'No skill activation detected in transcript',
+          graderType: 'programmatic'
+        });
+      }
     } else {
       const errorMsg = transcript?.error || 'Error: No transcript was produced';
       assertionResults.push({
-        assertion: 'Skill was triggered',
+        assertion: assertionLabel,
         passed: false,
         reason: errorMsg,
         graderType: 'programmatic'
@@ -125,7 +162,7 @@ export class EvalRunner {
       id: trialId,
       transcript: transcript || { error: 'No transcript produced' },
       assertionResults: assertionResults,
-      trialPassed: triggered,
+      trialPassed,
       tokenStats,
       durationMs
     };

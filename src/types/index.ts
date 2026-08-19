@@ -6,6 +6,8 @@ export interface EvalTask {
   expected_output?: string;
   assertions?: string[];
   files?: string[];
+  /** Whether the skill is expected to activate for this prompt. Defaults to true. */
+  should_trigger?: boolean;
 }
 
 export interface AssertionResult {
@@ -58,6 +60,8 @@ export interface TaskResult {
   prompt: string;
   baselineTrials: EvalTrial[];
   skillTrials: Record<string, EvalTrial[]>;
+  /** Expected trigger polarity for this eval (trigger runs only). Absent = positive. */
+  shouldTrigger?: boolean;
 }
 
 export interface EvalSuite {

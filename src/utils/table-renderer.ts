@@ -156,7 +156,11 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
   // Identify all skill versions present in the results
   const skillVersions = results.length > 0 ? Object.keys(results[0].skillTrials) : ['local'];
 
+  // Only surface the polarity column when the suite actually contains negative evals.
+  const hasNegativeEvals = results.some(r => r.shouldTrigger === false);
+
   const header = ['ID', 'Prompt'];
+  if (hasNegativeEvals) header.push('Expect');
   if (numTrials > 1) {
     for (const version of skillVersions) {
       header.push(`${version} Trials`, `${version} Rate`);
@@ -173,6 +177,9 @@ export function renderTriggerTable(report: EvalSuiteReport): void {
   for (const result of results) {
     const promptSnippet = result.prompt.substring(0, 40) + (result.prompt.length > 40 ? '...' : '');
     const row = [result.taskId.toString(), promptSnippet];
+    if (hasNegativeEvals) {
+      row.push(result.shouldTrigger === false ? chalk.cyan('no-trigger') : chalk.dim('trigger'));
+    }
 
     for (const version of skillVersions) {
       const trials = result.skillTrials[version] || [];

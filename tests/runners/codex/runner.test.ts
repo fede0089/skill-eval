@@ -113,6 +113,17 @@ test('normalizeCodexJsonl maps Codex messages, skill events, errors, and token u
   assert.ok(normalized.includes('"status":"success"'), 'Should synthesize successful skill result');
 });
 
+test('normalizeCodexJsonl does not synthesize an activation from an agent message naming the skill', () => {
+  const codexJsonl = [
+    JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'The license-generator skill is not needed here.' } }),
+    JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1, cached_input_tokens: 0 } }),
+  ].join('\n');
+
+  const normalized = normalizeCodexJsonl(codexJsonl, 'license-generator');
+
+  assert.ok(!normalized.includes('"tool_name":"activate_skill"'), `Prose must not count as an activation: ${normalized}`);
+});
+
 test('CodexRunner.applyRunnerConfig copies codex eval config into .codex', () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-config-'));
   const configBase = path.join(tempDir, 'evals', 'config');

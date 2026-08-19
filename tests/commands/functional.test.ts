@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { functionalCommand } from '../../src/commands/functional.js';
 import { EvalEnvironment } from '../../src/core/environment.js';
 import { EvalRunner } from '../../src/core/eval-runner.js';
+import { ConfigError } from '../../src/core/errors.js';
 
 test('functionalCommand should handle tasks and trials', async (t) => {
   // Mock fs and path dependencies
@@ -104,6 +105,69 @@ test('functionalCommand should run baseline when compareBaseline is enabled', as
 
     // 1 task × 1 trial × 2 modes (baseline + local) = 2 calls
     assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 2);
+  } finally {
+    mock.reset();
+  }
+});
+
+test('functionalCommand should skip trigger-only evals (should_trigger: false)', async () => {
+  mock.method(fs, 'mkdirSync', () => {});
+  mock.method(fs, 'writeFileSync', () => {});
+  mock.method(fs, 'readdirSync', () => ['evals.json']);
+  mock.method(fs, 'existsSync', () => true);
+
+  const injectedSuite = {
+    skill_name: 'mock-skill',
+    tasks: [
+      { id: 1, prompt: 'functional prompt', assertions: ['is correct'] },
+      { id: 2, prompt: 'negative prompt', should_trigger: false }
+    ]
+  };
+
+  mock.method(EvalEnvironment.prototype, 'setup', async () => {});
+  mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
+
+  const runFunctionalTask = mock.fn(async () => ({
+    id: 1,
+    transcript: { response: 'Mock response' },
+    assertionResults: [],
+    trialPassed: true
+  }));
+  mock.method(EvalRunner.prototype, 'runFunctionalTask', runFunctionalTask);
+
+  try {
+    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1);
+
+    assert.strictEqual(runFunctionalTask.mock.callCount(), 1, 'Only the functional eval should run');
+    const taskRun = runFunctionalTask.mock.calls[0].arguments[0] as { id: number };
+    assert.strictEqual(taskRun.id, 1);
+  } finally {
+    mock.reset();
+  }
+});
+
+test('functionalCommand should reject --eval-id targeting a trigger-only eval', async () => {
+  mock.method(fs, 'mkdirSync', () => {});
+  mock.method(fs, 'writeFileSync', () => {});
+  mock.method(fs, 'readdirSync', () => ['evals.json']);
+  mock.method(fs, 'existsSync', () => true);
+
+  const injectedSuite = {
+    skill_name: 'mock-skill',
+    tasks: [
+      { id: 1, prompt: 'functional prompt', assertions: ['is correct'] },
+      { id: 2, prompt: 'negative prompt', should_trigger: false }
+    ]
+  };
+
+  mock.method(EvalEnvironment.prototype, 'setup', async () => {});
+  mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
+
+  try {
+    await assert.rejects(
+      () => functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, undefined, undefined, 2),
+      (err: Error) => err instanceof ConfigError && err.message.includes('Eval #2 is trigger-only')
+    );
   } finally {
     mock.reset();
   }

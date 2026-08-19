@@ -194,7 +194,8 @@ export async function triggerCommand(
             taskId: task.id,
             prompt: task.prompt,
             baselineTrials: [],
-            skillTrials: taskSkillTrials
+            skillTrials: taskSkillTrials,
+            shouldTrigger: task.should_trigger !== false
           };
           taskResults.push(taskResult);
 

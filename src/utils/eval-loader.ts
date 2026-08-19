@@ -56,12 +56,16 @@ export function loadEvalSuite(skillPath: string): EvalSuite {
       if (e.id === undefined || typeof e.id !== 'number') {
         throw new ConfigError(`Invalid task ID in ${file}. ID must be a number.`);
       }
+      if (e.should_trigger !== undefined && typeof e.should_trigger !== 'boolean') {
+        throw new ConfigError(`Invalid 'should_trigger' for eval ${e.id} in ${file}. Must be a boolean.`);
+      }
       return {
         id: e.id,
         prompt: e.prompt,
         expected_output: e.expected_output,
         assertions: e.expectations || e.assertions,
-        files: e.files
+        files: e.files,
+        should_trigger: e.should_trigger
       };
     });
 

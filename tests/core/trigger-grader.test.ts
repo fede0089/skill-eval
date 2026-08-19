@@ -90,3 +90,36 @@ test('TriggerGrader.gradeTrigger should handle JSON with deeply nested braces in
 
   assert.strictEqual(grader.gradeTrigger(transcript), true);
 });
+
+test('TriggerGrader.detectSkillAttempt should pass when activation is attempted but never succeeds', () => {
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
+  const transcript: AgentTranscript = {
+    response: 'mock response',
+    raw_output: JSON.stringify({ type: 'tool_use', tool_id: '1', tool_name: 'activate_skill', parameters: { name: 'mock-skill' } }) + '\n' +
+                JSON.stringify({ type: 'tool_result', tool_id: '1', status: 'error' })
+  };
+
+  assert.strictEqual(grader.gradeTrigger(transcript), false);
+  assert.strictEqual(grader.detectSkillAttempt(transcript), true);
+});
+
+test('TriggerGrader.detectSkillAttempt should not match the skill name mentioned in plain prose', () => {
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
+  const transcript: AgentTranscript = {
+    response: 'mock response',
+    raw_output: JSON.stringify({ type: 'message', role: 'assistant', content: 'The mock-skill skill is not needed here.' })
+  };
+
+  assert.strictEqual(grader.detectSkillAttempt(transcript), false);
+});
+
+test('TriggerGrader.hasParsableEvents should reflect whether any NDJSON event was parsed', () => {
+  const grader = new TriggerGrader('mock-skill', 'activate_skill');
+
+  assert.strictEqual(grader.hasParsableEvents({ raw_output: '' }), false);
+  assert.strictEqual(grader.hasParsableEvents({ raw_output: 'plain text, no events' }), false);
+  assert.strictEqual(
+    grader.hasParsableEvents({ raw_output: JSON.stringify({ type: 'message', role: 'assistant', content: 'hi' }) }),
+    true
+  );
+});

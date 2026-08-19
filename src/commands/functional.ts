@@ -9,6 +9,7 @@ import { EvalRunner } from '../core/eval-runner.js';
 import { AgentPool } from '../core/agent-pool.js';
 import { aggregatePassAtK, aggregateAssertionPassRate, aggregateTokenStats, aggregateDurationStats } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
+import { ConfigError } from '../core/errors.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderFunctionalTable, renderRunHeader } from '../utils/table-renderer.js';
 import type { Reporter } from '../reporters/index.js';
@@ -32,6 +33,17 @@ export async function functionalCommand(
 ): Promise<void> {
   if (!injectedSuite) preflight(agent, workspace, skillPath);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath);
+
+  // Negative evals (should_trigger: false) only make sense for the trigger command:
+  // this pass instructs the agent that it MUST use the skill, which contradicts them.
+  const triggerOnly = suite.tasks.filter(t => t.should_trigger === false);
+  if (triggerOnly.length > 0) {
+    if (evalId !== undefined && triggerOnly.some(t => t.id === evalId)) {
+      throw new ConfigError(`Eval #${evalId} is trigger-only (should_trigger: false) and cannot run under 'functional'.`);
+    }
+    suite.tasks = suite.tasks.filter(t => t.should_trigger !== false);
+    Logger.write(chalk.dim(`   Skipping ${triggerOnly.length} trigger-only eval(s)\n`));
+  }
 
   if (evalId !== undefined) {
     suite.tasks = suite.tasks.filter(t => t.id === evalId);

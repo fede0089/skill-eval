@@ -107,9 +107,19 @@ export class TriggerGrader {
   }
 
   /**
+   * Whether the transcript produced any parsable NDJSON events.
+   * Negative trigger evals rely on the absence of an activation event, so a transcript
+   * with no events at all cannot prove anything and must not be graded as a pass.
+   */
+  hasParsableEvents(transcript: AgentTranscript): boolean {
+    return parseNdjsonEvents(transcript.raw_output || '').length > 0;
+  }
+
+  /**
    * Checks whether the skill was attempted (any tool_use event for activate_skill matching the skill name).
    * Unlike gradeTrigger, does NOT require a successful tool_result — any attempt counts.
-   * Used to detect invalid baseline runs where the agent tried to invoke the restricted skill.
+   * Used to detect invalid baseline runs where the agent tried to invoke the restricted skill,
+   * and to grade negative trigger evals (an attempted activation still counts as a trigger).
    */
   detectSkillAttempt(transcript: AgentTranscript): boolean {
     const rawOutput = transcript.raw_output || '';
