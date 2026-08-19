@@ -90,7 +90,7 @@ skill-eval functional --workspace <path> --skill <path> [options] [agent]
 | `--timeout <seconds>` | no | none | Kill the agent after this many seconds |
 | `--eval-id <id>` | no | all | Run only the eval with this numeric ID |
 | `--eval-file <name>` | no | all | Run only the evals from this file in `evals/` (e.g. `edge-cases.json`) |
-| `--compare-ref [refs...]` | no | — | Git references to compare against |
+| `--compare-ref [refs...]` | no | — | Git references to compare against (variadic — put `[agent]` before it, not after) |
 | `--compare-baseline` | no | `false` | Also run the no-skill baseline alongside the skill |
 | `-v, --debug` | no | `false` | Enable verbose debug logging |
 | `[agent]` | no | `gemini-cli` | Agent backend to use |

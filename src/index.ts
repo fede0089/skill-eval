@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import { triggerCommand } from './commands/trigger.js';
 import { functionalCommand } from './commands/functional.js';
 import { Logger } from './utils/logger.js';
-import { AppError } from './core/errors.js';
+import { AppError, ConfigError } from './core/errors.js';
 import { HtmlReporter } from './reporters/index.js';
 import { DEFAULT_AGENT } from './runners/registry.js';
 
@@ -26,6 +26,17 @@ const errorHandler = (err: unknown) => {
     Logger.error(`An unknown error occurred: ${String(err)}`);
   }
   process.exit(1);
+};
+
+/**
+ * A variadic option used without values (`--compare-ref` on its own) is parsed as
+ * `true` by commander; reject it instead of iterating over a boolean.
+ */
+const parseCompareRefs = (value: unknown): string[] => {
+  if (value === undefined) return [];
+  if (Array.isArray(value)) return value as string[];
+  errorHandler(new ConfigError('--compare-ref requires at least one git reference (e.g. --compare-ref HEAD~1).'));
+  return [];
 };
 
 program
@@ -56,7 +67,7 @@ program
     const numTrials = parseInt(options.trials, 10);
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
-    const compareRefs = options.compareRef || [];
+    const compareRefs = parseCompareRefs(options.compareRef);
     triggerCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, options.evalFile).catch(errorHandler);
   });
 
@@ -79,7 +90,7 @@ program
     const numTrials = parseInt(options.trials, 10);
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
-    const compareRefs = options.compareRef || [];
+    const compareRefs = parseCompareRefs(options.compareRef);
     const compareBaseline = !!options.compareBaseline;
     functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, compareBaseline, options.evalFile).catch(errorHandler);
   });
