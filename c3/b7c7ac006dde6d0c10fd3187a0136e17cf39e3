@@ -1,0 +1,58 @@
+tests/core/trigger-grader.test.ts
+  s_12e8839c256ffa::t_01146afe3cb2ce 93-125
+src/reporters/html-reporter.ts
+  s_12e8839c256ffa::t_c71350b7a90978 259-260,263,342
+src/runners/codex/runner.ts
+  s_12e8839c256ffa::t_8692c224436a05 78-81
+src/types/index.ts
+  s_12e8839c256ffa::t_cdcc5ed1463d19 9-10,63-64
+tests/utils/eval-loader.test.ts
+  s_12e8839c256ffa::t_ad0d1026a4c0e0 28-64
+tests/commands/functional.test.ts
+  s_12e8839c256ffa::t_e02a063eea686c 7,112-174
+tests/utils/table-renderer.test.ts
+  s_12e8839c256ffa::t_c0c262ed55fc8b 7-10,96-115
+  s_12e8839c256ffa::t_d4c7f03b8aefb5 116-119
+tests/runners/codex/runner.test.ts
+  s_12e8839c256ffa::t_1a4b4d337cc29d 116-126
+tests/commands/trigger.test.ts
+  s_12e8839c256ffa::t_6fb90c2a38efa6 79-117
+src/core/eval-runner.ts
+  s_12e8839c256ffa::t_e24c5c4c7e4e70 93-97,102-141,145,165
+src/utils/table-renderer.ts
+  s_12e8839c256ffa::t_c1e1583d248b4d 159-161,163,180-182
+src/commands/functional.ts
+  s_12e8839c256ffa::t_5345ee7eeab04d 12,37-46
+  s_12e8839c256ffa::t_e17154d9019e53 47
+README.md
+  s_12e8839c256ffa::t_8080678fcbf446 9,41,243
+  s_12e8839c256ffa::t_88ecc23c5e95ee 131-146
+src/utils/eval-loader.ts
+  s_12e8839c256ffa::t_20de4879b496e3 59-61,67-68
+src/core/evaluator.ts
+  s_12e8839c256ffa::t_2bc61aea2ae976 110-117
+  s_12e8839c256ffa::t_b251c5b708fd9e 121-122
+  s_12e8839c256ffa::t_a050ba28e67433 109
+mock-skill/evals/negative-triggers.json
+  s_12e8839c256ffa::t_b92dccea706c59 1-15
+tests/core/eval-runner.test.ts
+  s_12e8839c256ffa::t_22c26296b4b8e5 143-214
+src/commands/trigger.ts
+  s_12e8839c256ffa::t_a57eb36b85d6cf 197-198
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c3b7c7ac006dde6d0c10fd3187a0136e17cf39e3",
+  "prompts": {},
+  "sessions": {
+    "s_12e8839c256ffa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9b61be0c-ad7a-4ace-9a5a-eab69c5067f0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
