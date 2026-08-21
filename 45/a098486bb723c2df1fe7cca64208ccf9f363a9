@@ -1,0 +1,21 @@
+package-lock.json
+  s_d0c00add41c4dd::t_4f0c4f5481af10 3,9
+package.json
+  s_d0c00add41c4dd::t_c3755e9903fff6 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "45a098486bb723c2df1fe7cca64208ccf9f363a9",
+  "prompts": {},
+  "sessions": {
+    "s_d0c00add41c4dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f9b1cdee-115b-446f-a339-6d78effcda1b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
