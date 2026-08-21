@@ -65,6 +65,24 @@ export function parseStreamResult(output: string): { error: string } | { respons
 }
 
 /**
+ * Counts tool invocations and reads the terminal status from a stream-json blob.
+ * Both are needed to tell a legitimate short answer apart from an agent that
+ * stopped early or degenerated: a trial with tool calls and a 'success' status
+ * that still produced two characters of text is a very different failure from
+ * one that never started.
+ * Returns toolCalls: 0 and an undefined status when the blob carries no events.
+ */
+export function parseStreamStats(output: string): { toolCalls: number; status?: string } {
+  let toolCalls = 0;
+  let status: string | undefined;
+  for (const event of parseNdjsonEvents(output)) {
+    if (event.type === 'tool_use') toolCalls += 1;
+    else if (event.type === 'result') status = event.status;
+  }
+  return { toolCalls, status };
+}
+
+/**
  * Extracts token consumption stats from a Gemini CLI stream-json stdout blob.
  * Looks for a result event with a stats.total_tokens field.
  * Returns null if no such event is found or stats are absent.

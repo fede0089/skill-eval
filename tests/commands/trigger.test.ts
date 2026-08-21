@@ -82,8 +82,7 @@ test('triggerCommand should propagate should_trigger polarity to the report', as
   mock.method(fs, 'readdirSync', () => ['evals.json']);
   mock.method(fs, 'existsSync', () => true);
 
-  const written: string[] = [];
-  mock.method(fs, 'writeFileSync', (_p: string, content: string) => { written.push(content); });
+  mock.method(fs, 'writeFileSync', () => {});
 
   const injectedSuite = {
     skill_name: 'mock-skill',
@@ -102,13 +101,15 @@ test('triggerCommand should propagate should_trigger polarity to the report', as
     trialPassed: true
   })));
 
-  try {
-    await triggerCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1);
+  let captured: any;
+  const capturingReporter = { generate: (report: any) => { captured = report; } };
 
-    const summary = written.map(c => { try { return JSON.parse(c); } catch { return null; } })
-      .find(r => r && r.command === 'trigger');
-    assert.ok(summary, 'Expected a trigger summary to be written');
-    const byId = Object.fromEntries(summary.results.map((r: any) => [r.taskId, r.shouldTrigger]));
+  try {
+    await triggerCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, capturingReporter);
+
+    assert.ok(captured, 'Expected the reporter to receive a report');
+    assert.strictEqual(captured.command, 'trigger');
+    const byId = Object.fromEntries(captured.results.map((r: any) => [r.taskId, r.shouldTrigger]));
     assert.strictEqual(byId[1], true);
     assert.strictEqual(byId[2], false);
   } finally {

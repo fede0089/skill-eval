@@ -43,7 +43,7 @@ program
   .name('skill-eval')
   .description('CLI to evaluate agent skills triggering and functionality')
   .version(pkg.version)
-  .option('-v, --debug', 'Enable debug logging', false);
+  .option('-v, --debug', 'Print verbose logs to the console (trial transcripts are always saved)', false);
 
 program.on('option:debug', () => {
   process.env.DEBUG = 'true';

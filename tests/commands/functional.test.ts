@@ -199,3 +199,47 @@ test('functionalCommand should reject a suite left empty by trigger-only evals',
     mock.reset();
   }
 });
+
+test('functionalCommand drops the transcript but keeps the trial summary in the report', async () => {
+  mock.method(fs, 'mkdirSync', () => {});
+  mock.method(fs, 'writeFileSync', () => {});
+  mock.method(fs, 'readdirSync', () => ['evals.json']);
+  mock.method(fs, 'existsSync', () => true);
+  mock.method(EvalEnvironment.prototype, 'setup', async () => {});
+  mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
+
+  const injectedSuite = {
+    skill_name: 'mock-skill',
+    tasks: [{ id: 1, prompt: 'test prompt', assertions: ['is correct'] }]
+  };
+
+  const summary = {
+    output: 'Rituclease',
+    outputLen: 10,
+    toolCalls: 10,
+    stopStatus: 'success',
+    logFile: 'task_1_local_trial_1.log'
+  };
+
+  mock.method(EvalRunner.prototype, 'runFunctionalTask', async () => ({
+    id: 1,
+    // Stand-in for the megabytes of raw NDJSON a real trial carries.
+    transcript: { response: 'x'.repeat(10_000), raw_output: 'x'.repeat(10_000) },
+    assertionResults: [{ assertion: 'is correct', passed: false, reason: 'no' }],
+    trialPassed: false,
+    summary
+  }));
+
+  let captured: any;
+  const capturingReporter = { generate: (report: any) => { captured = report; } };
+
+  try {
+    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, capturingReporter);
+
+    const trial = captured.results[0].skillTrials['local'][0];
+    assert.strictEqual(trial.transcript, undefined, 'the raw transcript must not reach the report');
+    assert.deepStrictEqual(trial.summary, summary, 'the summary is the evidence the report shows');
+  } finally {
+    mock.reset();
+  }
+});

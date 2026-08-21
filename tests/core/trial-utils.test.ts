@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { isTrialError, withRetry, padAbortedTrials } from '../../src/core/trial-utils.js';
+import { isTrialError, withRetry, padAbortedTrials, buildTrialSummary, MAX_SUMMARY_OUTPUT } from '../../src/core/trial-utils.js';
 import type { EvalTrial } from '../../src/types/index.js';
 
 function makeTrial(overrides: Partial<EvalTrial> = {}): EvalTrial {
@@ -130,4 +130,63 @@ test('padAbortedTrials does not pad when already at targetCount', () => {
   const trials = [makeTrial({ id: 1 }), makeTrial({ id: 2 })];
   const result = padAbortedTrials(trials, 2, 'Runner Execution');
   assert.strictEqual(result.length, 2);
+});
+
+// ── buildTrialSummary ────────────────────────────────────────────────────────
+
+function streamOf(text: string, opts: { toolCalls?: number; status?: string } = {}): string {
+  const lines: string[] = [];
+  for (let i = 0; i < (opts.toolCalls ?? 0); i++) {
+    lines.push(JSON.stringify({ type: 'tool_use', tool_name: 'read_file', tool_id: `t${i}` }));
+  }
+  lines.push(JSON.stringify({ type: 'message', role: 'assistant', content: text }));
+  lines.push(JSON.stringify({ type: 'result', status: opts.status ?? 'success' }));
+  return lines.join('\n');
+}
+
+test('buildTrialSummary extracts the final text, tool calls and stop status', () => {
+  const summary = buildTrialSummary(streamOf('The plan is X', { toolCalls: 3 }), 'task_2_local_trial_1.log');
+
+  assert.strictEqual(summary.output, 'The plan is X');
+  assert.strictEqual(summary.outputLen, 13);
+  assert.strictEqual(summary.toolCalls, 3);
+  assert.strictEqual(summary.stopStatus, 'success');
+  assert.strictEqual(summary.logFile, 'task_2_local_trial_1.log');
+});
+
+test('buildTrialSummary keeps a degenerate answer verbatim', () => {
+  // Real case from a run: the agent burned 231K tokens and 10 tool calls to emit one word.
+  const summary = buildTrialSummary(streamOf('Rituclease', { toolCalls: 10 }), 'log');
+
+  assert.strictEqual(summary.output, 'Rituclease');
+  assert.strictEqual(summary.outputLen, 10);
+  assert.strictEqual(summary.toolCalls, 10);
+  assert.strictEqual(summary.stopStatus, 'success', 'the runner reported success — nothing flags this but the text');
+});
+
+test('buildTrialSummary truncates the output but reports the real length', () => {
+  const long = 'x'.repeat(MAX_SUMMARY_OUTPUT + 500);
+  const summary = buildTrialSummary(streamOf(long), 'log');
+
+  assert.strictEqual(summary.output.length, MAX_SUMMARY_OUTPUT);
+  assert.strictEqual(summary.outputLen, MAX_SUMMARY_OUTPUT + 500);
+});
+
+test('buildTrialSummary on an errored stream yields an empty output', () => {
+  const stream = JSON.stringify({ type: 'result', status: 'error', error: { message: 'quota exceeded' } });
+  const summary = buildTrialSummary(stream, 'log');
+
+  assert.strictEqual(summary.output, '');
+  assert.strictEqual(summary.outputLen, 0);
+  assert.strictEqual(summary.stopStatus, 'error');
+});
+
+test('buildTrialSummary on an empty stream still records the log pointer', () => {
+  const summary = buildTrialSummary('', 'task_9_baseline_trial_3.log');
+
+  assert.strictEqual(summary.output, '');
+  assert.strictEqual(summary.outputLen, 0);
+  assert.strictEqual(summary.toolCalls, 0);
+  assert.strictEqual(summary.stopStatus, undefined);
+  assert.strictEqual(summary.logFile, 'task_9_baseline_trial_3.log');
 });

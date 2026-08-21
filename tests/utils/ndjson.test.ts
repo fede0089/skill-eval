@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { parseNdjsonEvents, parseStreamResult, parseTokenStats } from '../../src/utils/ndjson.js';
+import { parseNdjsonEvents, parseStreamResult, parseStreamStats, parseTokenStats } from '../../src/utils/ndjson.js';
 
 test('parseNdjsonEvents: parses a single JSON object', () => {
   const output = JSON.stringify({ type: 'result', status: 'success' });
@@ -221,4 +221,35 @@ describe('parseTokenStats', () => {
     );
     assert.strictEqual(parseTokenStats(input), null);
   });
+});
+
+// ── parseStreamStats ─────────────────────────────────────────────────────────
+
+test('parseStreamStats counts tool_use events and reads the result status', () => {
+  const stream = [
+    JSON.stringify({ type: 'tool_use', tool_name: 'read_file', tool_id: 'a' }),
+    JSON.stringify({ type: 'tool_result', tool_id: 'a', status: 'success' }),
+    JSON.stringify({ type: 'tool_use', tool_name: 'run_shell_command', tool_id: 'b' }),
+    JSON.stringify({ type: 'message', role: 'assistant', content: 'done' }),
+    JSON.stringify({ type: 'result', status: 'success' }),
+  ].join('\n');
+
+  assert.deepStrictEqual(parseStreamStats(stream), { toolCalls: 2, status: 'success' });
+});
+
+test('parseStreamStats reports an error status', () => {
+  const stream = JSON.stringify({ type: 'result', status: 'error', error: { message: 'quota' } });
+  assert.deepStrictEqual(parseStreamStats(stream), { toolCalls: 0, status: 'error' });
+});
+
+test('parseStreamStats on an empty stream returns no calls and no status', () => {
+  assert.deepStrictEqual(parseStreamStats(''), { toolCalls: 0, status: undefined });
+});
+
+test('parseStreamStats keeps the last result status when several are present', () => {
+  const stream = [
+    JSON.stringify({ type: 'result', status: 'error' }),
+    JSON.stringify({ type: 'result', status: 'success' }),
+  ].join('\n');
+  assert.strictEqual(parseStreamStats(stream).status, 'success');
 });

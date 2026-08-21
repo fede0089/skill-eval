@@ -1,11 +1,12 @@
 import { AggregatedTokenStats, AggregatedDurationStats, EvalTrial, TaskResult } from '../types/index.js';
+import { isCounted } from './trial-utils.js';
 
 /**
- * Computes the fraction of individual assertions that passed across all non-error trials.
- * Returns 0 if there are no non-error trials or no assertions.
+ * Computes the fraction of individual assertions that passed across all counted trials.
+ * Returns 0 if there are no counted trials or no assertions.
  */
 export function computeAssertionPassRate(trials: EvalTrial[]): number {
-  const relevant = trials.filter(t => !t.isError);
+  const relevant = trials.filter(isCounted);
   if (relevant.length === 0) return 0;
   const total = relevant.reduce((s, t) => s + t.assertionResults.length, 0);
   if (total === 0) return 0;
@@ -25,13 +26,15 @@ export function aggregateAssertionPassRate(
 }
 
 /**
- * Computes the pass rate (pass@1) for a set of trials.
- * Returns the fraction of trials that passed: c / n.
+ * Computes the pass rate (pass@1) for a set of trials: c / n over counted trials.
+ * Infrastructure errors leave the denominator rather than counting as failures,
+ * matching computeAssertionPassRate — see isCounted().
+ * Returns 0 when no trial counted.
  */
 export function computePassAtK(trials: EvalTrial[], _k = 1): number {
-  const n = trials.length;
-  if (n === 0) return 0;
-  return trials.filter(t => t.trialPassed).length / n;
+  const relevant = trials.filter(isCounted);
+  if (relevant.length === 0) return 0;
+  return relevant.filter(t => t.trialPassed).length / relevant.length;
 }
 
 /**

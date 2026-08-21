@@ -5,6 +5,7 @@ import { EvalEnvironment } from './environment.js';
 import { RunnerFactory, AgentRunner } from '../runners/index.js';
 import { AgentTranscript, EvalTask, EvalTrial, AssertionResult } from '../types/index.js';
 import { TriggerGrader, ModelBasedGrader } from './evaluator.js';
+import { buildTrialSummary } from './trial-utils.js';
 import { EvalTaskContext } from '../utils/ui.js';
 import { parseNdjsonEvents, parseStreamResult, parseTokenStats } from '../utils/ndjson.js';
 import { Logger } from '../utils/logger.js';
@@ -16,7 +17,6 @@ export interface EvalRunOptions {
   skillName: string;
   runDir: string;
   isBaseline?: boolean;
-  debug?: boolean;
   timeoutMs?: number;
   judgeRetryDelayMs?: number;
   /** Identifier for this skill variant in A/B testing (e.g. 'local', 'ref:main', 'baseline'). */
@@ -46,7 +46,7 @@ export class EvalRunner {
   async runTriggerTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext, attempt = 0): Promise<EvalTrial> {
     const variantSlug = slugifyVariant(this.options.variant ?? 'local');
     const logFileName = `task_${task.id}_${variantSlug}_trial_${trialId}.log`;
-    const logPath = this.options.debug ? path.join(this.options.runDir, logFileName) : undefined;
+    const logPath = path.join(this.options.runDir, logFileName);
 
     let worktreePath: string | undefined;
     let transcript: AgentTranscript | null = null;
@@ -90,6 +90,9 @@ export class EvalRunner {
       ? parseTokenStats(transcript.response || '') ?? undefined
       : undefined;
 
+    // Compact evidence for the report. The full stream stays in the trial log.
+    const summary = buildTrialSummary(transcript?.response || '', logFileName);
+
     // Negative evals (should_trigger: false) assert the opposite: the skill must NOT activate.
     const shouldTrigger = task.should_trigger !== false;
     const assertionLabel = shouldTrigger ? 'Skill was triggered' : 'Skill was not triggered';
@@ -126,7 +129,8 @@ export class EvalRunner {
           trialPassed: false,
           isError: true,
           tokenStats,
-          durationMs
+          durationMs,
+          summary
         };
       } else {
         // Any activation attempt counts, even one that failed: the skill still fired.
@@ -154,7 +158,8 @@ export class EvalRunner {
         trialPassed: false,
         isError: true,
         tokenStats,
-        durationMs
+        durationMs,
+        summary
       };
     }
 
@@ -164,7 +169,8 @@ export class EvalRunner {
       assertionResults: assertionResults,
       trialPassed,
       tokenStats,
-      durationMs
+      durationMs,
+      summary
     };
   }
 
@@ -177,7 +183,7 @@ export class EvalRunner {
 
     const variantSlug = slugifyVariant(this.options.variant ?? (skillDisabled ? 'baseline' : 'local'));
     const logFileName = `task_${task.id}_${variantSlug}_trial_${trialId}.log`;
-    const logPath = this.options.debug ? path.join(this.options.runDir, logFileName) : undefined;
+    const logPath = path.join(this.options.runDir, logFileName);
 
     let worktreePath: string | undefined;
     let assertionResults: AssertionResult[] = [];
@@ -221,6 +227,9 @@ export class EvalRunner {
         ? parseTokenStats(transcript.response || '') ?? undefined
         : undefined;
 
+      // Compact evidence for the report. The full stream stays in the trial log.
+      const summary = buildTrialSummary(transcript?.response || '', logFileName);
+
       if (transcript && !transcript.error) {
         if (skillDisabled && this.triggerGrader.detectSkillAttempt(transcript)) {
           return {
@@ -234,7 +243,8 @@ export class EvalRunner {
             }],
             trialPassed: false,
             tokenStats,
-            durationMs
+            durationMs,
+            summary
           };
         }
         if (!skillDisabled && !this.triggerGrader.gradeTrigger(transcript)) {
@@ -249,7 +259,8 @@ export class EvalRunner {
             }],
             trialPassed: false,
             tokenStats,
-            durationMs
+            durationMs,
+            summary
           };
         }
 
@@ -314,7 +325,8 @@ export class EvalRunner {
               })),
               trialPassed: false,
               tokenStats,
-              durationMs
+              durationMs,
+              summary
             };
           }
 
@@ -329,7 +341,8 @@ export class EvalRunner {
           assertionResults: assertionResults,
           trialPassed,
           tokenStats,
-          durationMs
+          durationMs,
+          summary
         };
       } else {
         const errorMsg = transcript?.error || 'Error: No transcript was produced';
@@ -349,7 +362,8 @@ export class EvalRunner {
           trialPassed: false,
           isError: true,
           tokenStats,
-          durationMs
+          durationMs,
+          summary
         };
       }
     } catch (e) {
@@ -362,13 +376,16 @@ export class EvalRunner {
           graderType: 'model-based' as const
         }));
       }
-      // isError return — finally still runs cleanup
+      // isError return — finally still runs cleanup.
+      // The agent crashed before a summary could be built, but the log may hold
+      // a partial stream, so keep the pointer to it.
       return {
         id: trialId,
         transcript: { error: errorMsg },
         assertionResults,
         trialPassed: false,
-        isError: true
+        isError: true,
+        summary: buildTrialSummary('', logFileName)
       };
     } finally {
       if (worktreePath) {

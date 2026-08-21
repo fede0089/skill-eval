@@ -11,7 +11,7 @@ import { aggregatePassAtK, aggregateAssertionPassRate, aggregateTokenStats, aggr
 import { preflight } from '../core/preflight.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderTriggerTable, renderRunHeader } from '../utils/table-renderer.js';
-import { JsonReporter } from '../reporters/index.js';
+import { HtmlReporter } from '../reporters/index.js';
 import chalk from 'chalk';
 import { git } from '../utils/git.js';
 import type { Reporter } from '../reporters/index.js';
@@ -23,7 +23,7 @@ export async function triggerCommand(
   maxAgents: number = 4,
   injectedSuite?: EvalSuite,
   numTrials: number = 3,
-  reporter: Reporter = new JsonReporter(),
+  reporter: Reporter = new HtmlReporter(),
   timeoutMs?: number,
   evalId?: number,
   compareRefs: string[] = [],
@@ -51,8 +51,7 @@ export async function triggerCommand(
   process.once('SIGINT', cleanup);
   process.once('SIGTERM', cleanup);
 
-  // Setup Artifacts Directory (Always create, even if not in debug mode, for 'show' command)
-  const debug = !!process.env.DEBUG;
+  // Every run gets its own directory: trial logs and the report always land here.
   const startTime = new Date();
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
   const runDir = path.resolve(workspace, '.project-skill-evals', 'runs', timestamp);
@@ -63,7 +62,7 @@ export async function triggerCommand(
 
   // 1. Local Runner
   variantRunners.set('local', new EvalRunner({
-    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, debug, timeoutMs,
+    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, timeoutMs,
     variant: 'local'
   }));
 
@@ -81,7 +80,6 @@ export async function triggerCommand(
       skillName: skill_name,
       runDir,
       isBaseline: false,
-      debug,
       timeoutMs,
       variant: `ref:${ref}`
     }));
@@ -255,7 +253,6 @@ export async function triggerCommand(
     Logger.write(`──────────────────────────────────────────────────\n`);
     renderTriggerTable(report);
     Logger.write('\n\n');
-    new JsonReporter().generate(report, runDir);
     reporter.generate(report, runDir);
 
   } finally {

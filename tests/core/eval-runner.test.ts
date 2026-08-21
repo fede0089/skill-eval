@@ -580,7 +580,7 @@ test('EvalRunner.runTriggerTask log filename includes variant slug (local)', asy
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
-    runDir: '/tmp/runs/abc', debug: true, variant: 'local'
+    runDir: '/tmp/runs/abc', variant: 'local'
   });
   stubWorktree();
 
@@ -596,7 +596,7 @@ test('EvalRunner.runTriggerTask log filename slugifies ref:<name>', async () => 
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
-    runDir: '/tmp/runs/abc', debug: true, variant: 'ref:main'
+    runDir: '/tmp/runs/abc', variant: 'ref:main'
   });
   stubWorktree();
 
@@ -612,7 +612,7 @@ test('EvalRunner.runTriggerTask log filename slugifies ref with slash (feature/b
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
-    runDir: '/tmp/runs/abc', debug: true, variant: 'ref:feature/my-branch'
+    runDir: '/tmp/runs/abc', variant: 'ref:feature/my-branch'
   });
   stubWorktree();
 
@@ -630,7 +630,7 @@ test('EvalRunner.runFunctionalTask log filename includes variant slug for local'
   try {
     const runner = new EvalRunner({
       agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
-      runDir, debug: true, isBaseline: false, variant: 'local'
+      runDir, isBaseline: false, variant: 'local'
     });
     stubWorktree({ stubExec: true });
 
@@ -651,7 +651,7 @@ test('EvalRunner.runFunctionalTask log filename uses baseline variant for skill-
   try {
     const runner = new EvalRunner({
       agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
-      runDir, debug: true, isBaseline: true, variant: 'baseline'
+      runDir, isBaseline: true, variant: 'baseline'
     });
     stubWorktree({ stubExec: true });
 
@@ -672,7 +672,7 @@ test('EvalRunner.runFunctionalTask log filename slugifies ref:<name>', async () 
   try {
     const runner = new EvalRunner({
       agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
-      runDir, debug: true, isBaseline: false, variant: 'ref:v1.0'
+      runDir, isBaseline: false, variant: 'ref:v1.0'
     });
     stubWorktree({ stubExec: true });
 
@@ -691,7 +691,7 @@ test('EvalRunner.runTriggerTask defaults to local variant when not provided (bac
 
   const runner = new EvalRunner({
     agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
-    runDir: '/tmp/runs/abc', debug: true,
+    runDir: '/tmp/runs/abc',
   });
   stubWorktree();
 
@@ -709,7 +709,7 @@ test('EvalRunner.runFunctionalTask defaults to baseline variant when isBaseline=
   try {
     const runner = new EvalRunner({
       agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
-      runDir, debug: true, isBaseline: true,
+      runDir, isBaseline: true,
     });
     stubWorktree({ stubExec: true });
 
@@ -720,4 +720,73 @@ test('EvalRunner.runFunctionalTask defaults to baseline variant when isBaseline=
   } finally {
     fs.rmSync(runDir, { recursive: true, force: true });
   }
+});
+
+// ── Trial logs and summary (always on, no DEBUG gate) ───────────────────────
+
+test('EvalRunner writes a trial log even when DEBUG is unset', async () => {
+  const previousDebug = process.env.DEBUG;
+  delete process.env.DEBUG;
+
+  const agentRunnerMock = makeAgentRunnerMock();
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp/runs/abc', variant: 'local'
+  });
+  stubWorktree();
+
+  try {
+    await runner.runTriggerTask({ id: 4, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
+
+    const logPath = agentRunnerMock.runPrompt.mock.calls[0].arguments[3] as string;
+    assert.strictEqual(logPath, '/tmp/runs/abc/task_4_local_trial_1.log');
+  } finally {
+    if (previousDebug === undefined) delete process.env.DEBUG;
+    else process.env.DEBUG = previousDebug;
+  }
+});
+
+test('EvalRunner.runTriggerTask attaches a summary built from the agent stream', async () => {
+  const stream = [
+    JSON.stringify({ type: 'tool_use', tool_name: 'activate_skill', tool_id: 's1', parameters: { name: 'mock-skill' } }),
+    JSON.stringify({ type: 'tool_result', tool_id: 's1', status: 'success' }),
+    JSON.stringify({ type: 'message', role: 'assistant', content: 'Here is the plan' }),
+    JSON.stringify({ type: 'result', status: 'success' }),
+  ].join('\n');
+
+  const agentRunnerMock = makeAgentRunnerMock(async () => ({ response: stream, raw_output: '' }));
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp/runs/abc', variant: 'local'
+  });
+  stubWorktree();
+
+  const trial = await runner.runTriggerTask({ id: 5, prompt: 'test' }, 0, 2, { updateLog: () => {} } as any);
+
+  assert.strictEqual(trial.summary?.output, 'Here is the plan');
+  assert.strictEqual(trial.summary?.outputLen, 16);
+  assert.strictEqual(trial.summary?.toolCalls, 1);
+  assert.strictEqual(trial.summary?.stopStatus, 'success');
+  assert.strictEqual(trial.summary?.logFile, 'task_5_local_trial_2.log');
+});
+
+test('EvalRunner attaches a summary with the log pointer even when the agent errors', async () => {
+  const agentRunnerMock = makeAgentRunnerMock(async () => ({ error: 'Process timeout exceeded' }));
+  mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+
+  const runner = new EvalRunner({
+    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    runDir: '/tmp/runs/abc', variant: 'local'
+  });
+  stubWorktree();
+
+  const trial = await runner.runTriggerTask({ id: 6, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(trial.isError, true);
+  assert.strictEqual(trial.summary?.output, '');
+  assert.strictEqual(trial.summary?.logFile, 'task_6_local_trial_1.log');
 });

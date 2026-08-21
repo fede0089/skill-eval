@@ -48,7 +48,6 @@ if (isMain) {
     runner,
     '--workspace', '.',
     '--skill', './mock-skill',
-    '--debug',
     ...extraArgs,
   ], {
     stdio: 'inherit',

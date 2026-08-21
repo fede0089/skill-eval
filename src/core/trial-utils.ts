@@ -1,4 +1,31 @@
-import { EvalTrial } from '../types/index.js';
+import { EvalTrial, TrialSummary } from '../types/index.js';
+import { parseStreamResult, parseStreamStats } from '../utils/ndjson.js';
+
+/**
+ * Cap on the agent text carried into the report. The full text always stays in
+ * the trial log, which the report links to; this bound keeps a run with dozens
+ * of trials from producing a multi-megabyte HTML file.
+ */
+export const MAX_SUMMARY_OUTPUT = 4000;
+
+/**
+ * Builds the compact record the report shows for a trial.
+ * `rawStream` is the agent's raw NDJSON stdout; an empty or unparsable stream
+ * yields an empty output, which is itself the signal that the agent produced
+ * nothing usable.
+ */
+export function buildTrialSummary(rawStream: string, logFile: string): TrialSummary {
+  const parsed = parseStreamResult(rawStream);
+  const text = parsed && 'response' in parsed ? parsed.response : '';
+  const { toolCalls, status } = parseStreamStats(rawStream);
+  return {
+    output: text.slice(0, MAX_SUMMARY_OUTPUT),
+    outputLen: text.length,
+    toolCalls,
+    stopStatus: status,
+    logFile,
+  };
+}
 
 /**
  * Returns true when a trial represents an infrastructure failure (timeout, blocked
@@ -7,6 +34,22 @@ import { EvalTrial } from '../types/index.js';
  */
 export function isTrialError(trial: EvalTrial): boolean {
   return trial.isError === true;
+}
+
+/**
+ * Whether a trial contributes to metrics.
+ *
+ * Infrastructure errors (timeout, blocked interactive prompt, runner crash)
+ * never reached a verdict, so they leave the denominator entirely instead of
+ * counting as failures: a harness timeout says nothing about the skill. The
+ * report shows the effective n alongside every rate so an incomplete run is
+ * still visible as one.
+ *
+ * The report applies the same rule to trials a reviewer excluded. Exclusions
+ * are made after the run, against the report, so they are not visible here.
+ */
+export function isCounted(trial: EvalTrial): boolean {
+  return !trial.isError;
 }
 
 /**
@@ -40,7 +83,11 @@ export async function withRetry(
 
 /**
  * Pads the trials array up to targetCount when a trial loop aborts early.
- * Ensures that pass@k calculations always reflect the full requested trial count.
+ *
+ * The padding records that N trials were requested but never ran, so the report
+ * can show "n=2/5" instead of silently presenting a two-trial measurement as if
+ * it were the full run. It does not push the rates down: padded entries are
+ * infrastructure errors, and isCounted() keeps those out of every denominator.
  *
  * @param trials     Trials collected so far (may be shorter than targetCount).
  * @param targetCount The requested number of trials (numTrials).

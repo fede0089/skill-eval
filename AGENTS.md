@@ -21,18 +21,20 @@
   - `src/commands/trigger.ts` - Skill triggering evaluation logic.
   - `src/commands/functional.ts` - Functional evaluation and expectations logic.
   - `src/core/evaluator.ts` - Core evaluation logic including functional judge prompts.
+  - `src/core/anomalies.ts` - Cohort-relative signals that flag trials which may not be legitimate attempts.
   - `src/core/eval-runner.ts` - Orchestrates trial runs, parses NDJSON stream output, coordinates grading.
   - `src/core/environment.ts` - Manages git worktree isolation for concurrent trials.
   - `src/utils/git.ts` - Manages ephemeral extraction of historical Git references for A/B testing.
   - `src/core/statistics.ts` - Implements `computePassAtK` and `aggregatePassAtK` metric computation.
-  - `src/core/trial-utils.ts` - Shared helper: `padAbortedTrials` fills trial arrays to a consistent denominator.
+  - `src/core/trial-utils.ts` - Shared helpers: `isCounted` (which trials reach the metrics), `buildTrialSummary` (the evidence the report shows), `padAbortedTrials`, `withRetry`.
   - `src/core/preflight.ts` - Pre-flight validation of agent binary and skill directory structure.
   - `src/core/errors.ts` - Custom error types (AppError, ConfigError, ExecutionError, ValidationError).
   - `src/runners/registry.ts` - **Single registration point** for agent runners; add new runners here.
   - `src/runners/gemini-cli/runner.ts` - Gemini CLI runner implementation.
   - `src/runners/codex/runner.ts` - Codex runner implementation.
   - `src/runners/claude-code/runner.ts` - Claude Code runner implementation.
-  - `src/reporters/index.ts` - Reporter factory; add new report formats here.
+  - `src/reporters/html-reporter.ts` - Builds the run data blob and the self-contained report; the page computes its own figures and supports excluding trials.
+  - `src/reporters/index.ts` - Reporter re-exports; add new report formats here.
   - `src/utils/table-renderer.ts` - Shared `renderTriggerTable` / `renderFunctionalTable` used by both commands.
   - `src/utils/` - Shared utilities: eval-loader, exec, ndjson, ui, logger.
   - `src/types/index.ts` - Shared TypeScript types including the `NdjsonEvent` discriminated union.
@@ -55,15 +57,15 @@
 │   │   └── index.ts       # public re-exports
 │   ├── reporters/         # ← ADD NEW REPORT FORMATS HERE
 │   │   ├── reporter.ts    # Reporter interface
-│   │   ├── html-reporter.ts
-│   │   ├── json-reporter.ts
-│   │   └── index.ts       # createReporter() factory + re-exports
+│   │   ├── html-reporter.ts  # run data blob + client-computed, reviewable report
+│   │   └── index.ts       # re-exports
 │   ├── core/              # core evaluation logic
 │   │   ├── evaluator.ts   # LLM judge prompts and grading (ModelBasedGrader)
 │   │   ├── eval-runner.ts # trial orchestration and NDJSON stream parsing
 │   │   ├── environment.ts # git worktree isolation and skill symlinks
 │   │   ├── statistics.ts  # pass@k metric computation (computePassAtK, aggregatePassAtK)
-│   │   ├── trial-utils.ts # shared trial padding helper (padAbortedTrials)
+│   │   ├── anomalies.ts   # cohort-relative anomaly signals surfaced in the report
+│   │   ├── trial-utils.ts # isCounted, buildTrialSummary, padAbortedTrials, withRetry
 │   │   ├── preflight.ts   # agent binary + skill path validation before trials
 │   │   └── errors.ts      # custom error types
 │   ├── utils/             # shared utilities (eval-loader, exec, ndjson, ui, logger, table-renderer)

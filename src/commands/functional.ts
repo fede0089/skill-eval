@@ -13,7 +13,7 @@ import { ConfigError } from '../core/errors.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderFunctionalTable, renderRunHeader } from '../utils/table-renderer.js';
 import type { Reporter } from '../reporters/index.js';
-import { JsonReporter } from '../reporters/index.js';
+import { HtmlReporter } from '../reporters/index.js';
 
 import chalk from 'chalk';
 import { git } from '../utils/git.js';
@@ -25,7 +25,7 @@ export async function functionalCommand(
   maxAgents: number = 4,
   injectedSuite?: EvalSuite,
   numTrials: number = 3,
-  reporter: Reporter = new JsonReporter(),
+  reporter: Reporter = new HtmlReporter(),
   timeoutMs?: number,
   evalId?: number,
   compareRefs: string[] = [],
@@ -69,8 +69,7 @@ export async function functionalCommand(
   process.once('SIGINT', cleanup);
   process.once('SIGTERM', cleanup);
 
-  // Setup Artifacts Directory (Always create, even if not in debug mode, for 'show' command)
-  const debug = !!process.env.DEBUG;
+  // Every run gets its own directory: trial logs and the report always land here.
   const startTime = new Date();
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
   const runDir = path.resolve(workspace, '.project-skill-evals', 'runs', timestamp);
@@ -81,7 +80,7 @@ export async function functionalCommand(
 
   // 1. Local Runner
   variantRunners.set('local', new EvalRunner({
-    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, debug, timeoutMs,
+    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, timeoutMs,
     variant: 'local'
   }));
 
@@ -99,7 +98,6 @@ export async function functionalCommand(
       skillName: skill_name,
       runDir,
       isBaseline: false,
-      debug,
       timeoutMs,
       variant: `ref:${ref}`
     }));
@@ -107,7 +105,7 @@ export async function functionalCommand(
 
   // 3. Baseline Runner
   const withoutSkillRunner = compareBaseline ? new EvalRunner({
-    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: true, debug, timeoutMs,
+    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: true, timeoutMs,
     variant: 'baseline'
   }) : undefined;
 
@@ -339,7 +337,6 @@ export async function functionalCommand(
     renderFunctionalTable(report);
 
     Logger.write('\n');
-    new JsonReporter().generate(report, runDir);
     reporter.generate(report, runDir);
 
   } finally {

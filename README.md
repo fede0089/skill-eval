@@ -92,7 +92,7 @@ skill-eval functional --workspace <path> --skill <path> [options] [agent]
 | `--eval-file <name>` | no | all | Run only the evals from this file in `evals/` (e.g. `edge-cases.json`) |
 | `--compare-ref [refs...]` | no | — | Git references to compare against (variadic — put `[agent]` before it, not after) |
 | `--compare-baseline` | no | `false` | Also run the no-skill baseline alongside the skill |
-| `-v, --debug` | no | `false` | Enable verbose debug logging |
+| `-v, --debug` | no | `false` | Print verbose logs to the console (trial transcripts are always saved) |
 | `[agent]` | no | `gemini-cli` | Agent backend to use |
 
 Supported runners:
@@ -222,24 +222,55 @@ Refer to your runner's documentation for the full set of settings and policy key
 
 ## Reports
 
-Each run writes to `.project-skill-evals/runs/<timestamp>/` and includes per-trial logs, the raw eval JSON, and a self-contained HTML report you can open in any browser. The report shows pass@k aggregates per eval, lets you expand each trial, and color-codes triggering vs. functional outcomes.
+Each run writes to `.project-skill-evals/runs/<timestamp>/`: one log per trial and a self-contained HTML report you can open in any browser.
+
+Expanding an eval gives you three sections:
+
+- **Summary** — success rate, average tokens and average time, per variant.
+- **Trials** — one row per trial, with its score, anomaly flags, cost and an exclude control. Expanding a row shows the agent's final output, its stats and a link to the full transcript.
+- **Expectations** — one row per expectation, with per-variant pass rates. Clicking a cell shows the judge's verdict for every trial.
+
+The report carries the full run data and computes every figure in the browser, so excluding a trial updates all of them at once.
 
 A published sample report is available at [fede0089.github.io/skill-eval/sample-report.html](https://fede0089.github.io/skill-eval/sample-report.html), generated from this project root with:
 
 ```sh
-skill-eval functional --workspace . --skill mock-skill --trials 2 --compare-baseline --debug claude-code
+skill-eval functional --workspace . --skill mock-skill --trials 2 --compare-baseline claude-code
 ```
 
 ![Sample HTML report](docs/sample-report.png)
 
-### Debug logs
+### Trial transcripts
 
-When a trial misbehaves, pass `-v` / `--debug` to capture the full transcripts to disk. Each trial writes a `task_<id>_<variant>_trial_<n>.log` file inside the run directory with two sections appended in order:
+Every trial writes a `task_<id>_<variant>_trial_<n>.log` file inside the run directory, with two sections appended in order:
 
 - `# SECTION: <MODE> AGENT RUN` — the initial prompt sent to the agent and its raw streamed response.
 - `# SECTION: <MODE> JUDGE RUN` — the prompt sent to the LLM judge and its verdict (only present for `functional` runs; `trigger` is graded programmatically and produces no judge section).
 
-Without `--debug` these files are not written, so reach for the flag when you need to see exactly what the agent — or the judge — saw.
+These are always written, and the report links to each one from its trial row, so you can go from a suspicious number to exactly what the agent — or the judge — saw. `-v` / `--debug` is unrelated: it only makes the console output verbose.
+
+## Excluding trials
+
+Agents are non-deterministic, and a trial sometimes fails for reasons that have nothing to do with the skill: the model degenerates into a single word, stops before answering, or trips over the environment. Those trials drag the score down and, worse, compress the very difference an A/B run exists to measure.
+
+The report flags the likely ones and lets you drop them. Each flag compares a trial against its own cohort — the sibling trials of the same eval and variant — rather than against a fixed threshold:
+
+| Flag | Meaning |
+|------|---------|
+| `degenerate-output` | The final output is a fraction of the cohort's median length |
+| `zero-assertions` | Nothing passed, while the cohort median is well above zero |
+| `premature-stop` | The run ended without a success status, or produced no output |
+| `resource-outlier` | Token spend far above the cohort median |
+
+Flags never exclude anything on their own — no threshold can reliably separate "the skill failed" from "the model went off the rails this time", so the call is yours. Open a trial row, read what the agent actually produced, and press **Exclude**; the reason is pre-filled from the strongest flag and can be changed, along with a free-text note.
+
+Excluding recomputes every figure in the report, under a few rules that keep the result honest:
+
+- **The raw number stays visible.** Every adjusted rate is shown next to the unadjusted one and the effective sample size (`raw 36% · n=3/5`). Below three usable trials the figure is marked low-confidence.
+- **Unbalanced exclusions raise a warning.** Dropping more trials from one variant than another moves the delta you are measuring, so the report says so.
+- **The exclusion rate is itself a result.** If four of ten trials degenerated, that is a finding about the model or the prompt, not noise to sweep away — so it is shown at the top.
+
+Exclusions are kept in the browser for that run. **Download reviewed copy** writes a `report-reviewed.html` with them baked in, for sharing or committing alongside the run.
 
 ## Try it out
 

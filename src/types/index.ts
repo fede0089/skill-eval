@@ -42,6 +42,24 @@ export interface AggregatedDurationStats {
   trialCount: number;
 }
 
+/**
+ * Compact, always-persisted record of what the agent actually produced.
+ * The full transcript is megabytes of NDJSON and is dropped before reporting;
+ * this survives into the report so a reviewer can see the evidence a trial
+ * rests on without opening the log.
+ */
+export interface TrialSummary {
+  /** Final assistant text, truncated to MAX_SUMMARY_OUTPUT characters. */
+  output: string;
+  /** Length of the untruncated text, so the report can say how much was cut. */
+  outputLen: number;
+  toolCalls: number;
+  /** Status carried by the agent's result event ('success', 'error', ...). */
+  stopStatus?: string;
+  /** Log filename, relative to the run directory, holding the full transcript. */
+  logFile: string;
+}
+
 export interface EvalTrial {
   id: number;
   transcript: AgentTranscript;
@@ -50,6 +68,7 @@ export interface EvalTrial {
   isError?: boolean;
   tokenStats?: TrialTokenStats;
   durationMs?: number;
+  summary?: TrialSummary;
 }
 
 /**
