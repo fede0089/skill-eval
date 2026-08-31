@@ -1,0 +1,21 @@
+src/commands/trigger.ts
+  s_b8e3a755fdcc8f::t_f51434155b8c98 85-89
+src/commands/functional.ts
+  s_b8e3a755fdcc8f::t_f51434155b8c98 103-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "2c437f59bba714543579280347079e21f731432c",
+  "prompts": {},
+  "sessions": {
+    "s_b8e3a755fdcc8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "048027a5-3875-4505-a092-b4b3f6435147",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
