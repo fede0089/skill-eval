@@ -317,9 +317,41 @@ test('EvalRunner.runTriggerTask uses unique worktree name per retry attempt', as
   await runner.runTriggerTask({ id: 7, prompt: 'test' }, 0, 3, { updateLog: () => {} } as any, 1);
   const firstRetryWorktreeId = createWorktreeMock.mock.calls[1].arguments[0] as string;
 
-  assert.strictEqual(firstAttemptWorktreeId, 'task-7-trial-3', 'First attempt uses base name');
-  assert.strictEqual(firstRetryWorktreeId, 'task-7-trial-3-r1', 'First retry uses -r1 suffix');
+  assert.strictEqual(firstAttemptWorktreeId, 'task-7-local-trial-3', 'First attempt uses base name');
+  assert.strictEqual(firstRetryWorktreeId, 'task-7-local-trial-3-r1', 'First retry uses -r1 suffix');
   assert.notStrictEqual(firstAttemptWorktreeId, firstRetryWorktreeId, 'Retry must use a different worktree name');
+});
+
+test('EvalRunner.runTriggerTask gives each variant its own worktree name', async () => {
+  mock.method(RunnerFactory, 'create', () => ({
+    skillDispatchToolName: 'activate_skill',
+    runPrompt: mock.fn(async () => ({ response: 'ok', raw_output: '' })),
+    linkSkill: mock.fn(async () => {}),
+    applyRunnerConfig: mock.fn(() => {}),
+  }));
+
+  const createWorktreeMock = mock.fn(() => '/tmp/worktree');
+  mock.method(EvalEnvironment.prototype, 'createWorktree', createWorktreeMock);
+  mock.method(EvalEnvironment.prototype, 'removeWorktree', mock.fn(() => {}));
+
+  // Both variants share one artifacts root, so the same task and trial must not
+  // resolve to the same worktree directory or the same temporary branch.
+  for (const variant of ['local', 'ref:main']) {
+    const runner = new EvalRunner({
+      agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+      runDir: '/tmp', artifactsDir: '/tmp/artifacts', isBaseline: false, variant
+    });
+    await runner.runTriggerTask({ id: 7, prompt: 'test' }, 0, 3, { updateLog: () => {} } as any, 0);
+  }
+
+  const localId = createWorktreeMock.mock.calls[0].arguments[0] as string;
+  const refId = createWorktreeMock.mock.calls[1].arguments[0] as string;
+
+  assert.strictEqual(localId, 'task-7-local-trial-3');
+  assert.strictEqual(refId, 'task-7-ref-main-trial-3');
+  assert.notStrictEqual(localId, refId, 'Variants must not collide on the same worktree name');
+
+  mock.reset();
 });
 
 test('withRetry passes attempt number 0, 1, 2 to fn and stops on success', async () => {

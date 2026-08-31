@@ -37,6 +37,16 @@ export class EvalRunner {
   private triggerGrader: TriggerGrader;
   private functionalGrader: ModelBasedGrader;
 
+  /**
+   * Worktree ids carry the variant because every variant now shares one artifacts
+   * root: without it 'local' and 'ref:main' would race for the same directory and
+   * the same temporary branch while running in parallel.
+   */
+  private worktreeIdFor(taskId: number, variantSlug: string, trialId: number, attempt: number): string {
+    const base = `task-${taskId}-${variantSlug}-trial-${trialId}`;
+    return attempt > 0 ? `${base}-r${attempt}` : base;
+  }
+
   constructor(private options: EvalRunOptions) {
     this.env = new EvalEnvironment({ workspace: options.workspace, artifactsDir: options.artifactsDir });
     this.runner = RunnerFactory.create(options.agent);
@@ -54,12 +64,9 @@ export class EvalRunner {
     let transcript: AgentTranscript | null = null;
     let durationMs: number | undefined;
 
-    const worktreeId = attempt > 0 ? `task-${task.id}-trial-${trialId}-r${attempt}` : `task-${task.id}-trial-${trialId}`;
+    const worktreeId = this.worktreeIdFor(task.id, variantSlug, trialId, attempt);
     if (attempt > 0) {
-      const prevId = attempt === 1
-        ? `task-${task.id}-trial-${trialId}`
-        : `task-${task.id}-trial-${trialId}-r${attempt - 1}`;
-      this.env.removeWorktree(this.env.worktreePathFor(prevId));
+      this.env.removeWorktree(this.env.worktreePathFor(this.worktreeIdFor(task.id, variantSlug, trialId, attempt - 1)));
     }
     try {
       uiCtx.updateLog('Setting up…');
@@ -193,12 +200,9 @@ export class EvalRunner {
     let transcript: AgentTranscript | null = null;
     let durationMs: number | undefined;
 
-    const worktreeId = attempt > 0 ? `task-${task.id}-${evalModeLabel}-trial-${trialId}-r${attempt}` : `task-${task.id}-${evalModeLabel}-trial-${trialId}`;
+    const worktreeId = this.worktreeIdFor(task.id, variantSlug, trialId, attempt);
     if (attempt > 0) {
-      const prevId = attempt === 1
-        ? `task-${task.id}-${evalModeLabel}-trial-${trialId}`
-        : `task-${task.id}-${evalModeLabel}-trial-${trialId}-r${attempt - 1}`;
-      this.env.removeWorktree(this.env.worktreePathFor(prevId));
+      this.env.removeWorktree(this.env.worktreePathFor(this.worktreeIdFor(task.id, variantSlug, trialId, attempt - 1)));
     }
     try {
       uiCtx.updateLog('Setting up…');
