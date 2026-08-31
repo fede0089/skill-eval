@@ -1,0 +1,35 @@
+src/commands/trigger.ts
+  s_b8e3a755fdcc8f::t_7b0627643ac55a 12,26,52,63,66,72,89
+  s_b8e3a755fdcc8f::t_1fb1b326c43fd2 31-32,47-49
+  s_b8e3a755fdcc8f::t_5bc1f023dc6d82 50
+src/core/eval-runner.ts
+  s_b8e3a755fdcc8f::t_1a19f233d3b583 19-20,41,62,201
+src/commands/functional.ts
+  s_b8e3a755fdcc8f::t_7b0627643ac55a 12,28,70,81,84,90,107,116
+  s_b8e3a755fdcc8f::t_1fb1b326c43fd2 34-35,66-68
+  s_b8e3a755fdcc8f::t_8ed30ebd9d0182 69
+tests/core/environment.test.ts
+  s_b8e3a755fdcc8f::t_1bcf11133db7f7 4,11-20,22-37,41,58,73-74,77-78,81,89,106-108,110,117,125-129,134,136,155,169,174-175,177,184,189-223
+  s_b8e3a755fdcc8f::t_26544bf32ac3ed 224
+src/core/environment.ts
+  s_b8e3a755fdcc8f::t_429014ec8ea443 8,10-11,16,20-25,57
+  s_b8e3a755fdcc8f::t_7c8a3e3423b678 33,42
+tests/core/eval-runner.test.ts
+  s_b8e3a755fdcc8f::t_810955fb2f92fa 44,68,84,100,116,132,151,170,188,204,223,240,261,284,307,370,405,451,481,506,525,546,564,583,599,615,694,736,764,783
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "4c7f6f4fada04effa643856834954386d6e26080",
+  "prompts": {},
+  "sessions": {
+    "s_b8e3a755fdcc8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "048027a5-3875-4505-a092-b4b3f6435147",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
