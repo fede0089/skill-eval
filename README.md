@@ -41,6 +41,8 @@ For each eval prompt, skill-eval spins up parallel agent processes with the curr
 > The `trigger` command only runs with-skill trials and checks whether the skill dispatch tool was actually invoked — no judge or baseline needed. Evals marked `should_trigger: false` assert the opposite: that it was *not* invoked.
 >
 > The baseline branch is opt-in: enable it with `--compare-baseline` (no-skill control) or `--compare-ref <ref>` (historical skill versions).
+>
+> Each `--compare-ref` version is extracted under the artifacts root, outside the workspace, and removed when the run ends. Every variant's trials are still cut from the workspace repository — the extracted copy contributes only the skill implementation.
 
 ## Installation
 
@@ -225,7 +227,7 @@ Refer to your runner's documentation for the full set of settings and policy key
 
 Each run writes to `~/.skill-eval/<skill>/runs/<timestamp>/`: one log per trial and a self-contained HTML report you can open in any browser. The command prints the resolved location in its header and links the report when it finishes.
 
-Nothing lands inside the workspace under evaluation or inside the skill — the isolated trial worktrees included. That is deliberate: the evaluated agent explores the workspace, and reports or transcripts from earlier runs sitting there would contaminate the measurement it is producing. `--output <path>` moves the root somewhere else, and a path that resolves inside either one is rejected before the first trial starts.
+Nothing lands inside the workspace under evaluation or inside the skill — the isolated trial worktrees and the extracted copies of historical refs included. That is deliberate: the evaluated agent explores the workspace, and reports or transcripts from earlier runs sitting there would contaminate the measurement it is producing. `--output <path>` moves the root somewhere else, and a path that resolves inside either one is rejected before the first trial starts.
 
 Expanding an eval gives you three sections:
 
