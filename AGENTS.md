@@ -15,7 +15,7 @@
 ## Project overview
 - A Node.js CLI tool built to evaluate Agent Skills locally using configurable agent runners such as Gemini CLI, Codex, and Claude Code, measuring both triggering reliability and functional correctness through an LLM judge.
 - Supports **Simultaneous A/B Testing**: compare local skill code against multiple historical Git references (`--compare-ref`) in a single run.
-- Both `trigger` and `functional` commands require `--workspace <path>` and `--skill <path>`, and accept `--trials <number>` (default: 3) and `--agents <number>` (default: 4).
+- Both `trigger` and `functional` commands require `--workspace <path>` and `--skill <path>`, and accept `--trials <number>` (default: 5), `--agents <number>` (default: 4) and `--output <path>` (default: `~/.skill-eval`, always outside the workspace and the skill).
 - Entrypoints for understanding the system:
   - `src/index.ts` - Main CLI entrypoint; defines `trigger` and `functional` commands.
   - `src/commands/trigger.ts` - Skill triggering evaluation logic.

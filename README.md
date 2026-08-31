@@ -86,12 +86,13 @@ skill-eval functional --workspace <path> --skill <path> [options] [agent]
 | `--workspace <path>` | yes | — | Path to the repo the agent will run in |
 | `--skill <path>` | yes | — | Path to the skill directory |
 | `--agents <number>` | no | `4` | Number of parallel agent processes |
-| `--trials <number>` | no | `3` | Trials per task (for pass@k) |
+| `--trials <number>` | no | `5` | Trials per task (for pass@k) |
 | `--timeout <seconds>` | no | none | Kill the agent after this many seconds |
 | `--eval-id <id>` | no | all | Run only the eval with this numeric ID |
 | `--eval-file <name>` | no | all | Run only the evals from this file in `evals/` (e.g. `edge-cases.json`) |
 | `--compare-ref [refs...]` | no | — | Git references to compare against (variadic — put `[agent]` before it, not after) |
 | `--compare-baseline` | no | `false` | Also run the no-skill baseline alongside the skill |
+| `--output <path>` | no | `~/.skill-eval` | Root for everything the run writes; must resolve outside the workspace and the skill |
 | `-v, --debug` | no | `false` | Print verbose logs to the console (trial transcripts are always saved) |
 | `[agent]` | no | `gemini-cli` | Agent backend to use |
 
@@ -222,7 +223,9 @@ Refer to your runner's documentation for the full set of settings and policy key
 
 ## Reports
 
-Each run writes to `.project-skill-evals/runs/<timestamp>/`: one log per trial and a self-contained HTML report you can open in any browser.
+Each run writes to `~/.skill-eval/<skill>/runs/<timestamp>/`: one log per trial and a self-contained HTML report you can open in any browser. The command prints the resolved location in its header and links the report when it finishes.
+
+Nothing lands inside the workspace under evaluation or inside the skill — the isolated trial worktrees included. That is deliberate: the evaluated agent explores the workspace, and reports or transcripts from earlier runs sitting there would contaminate the measurement it is producing. `--output <path>` moves the root somewhere else, and a path that resolves inside either one is rejected before the first trial starts.
 
 Expanding an eval gives you three sections:
 
