@@ -16,6 +16,8 @@ export interface EvalRunOptions {
   skillPath: string;
   skillName: string;
   runDir: string;
+  /** Root the tool writes to, always outside the workspace and the skill. */
+  artifactsDir: string;
   isBaseline?: boolean;
   timeoutMs?: number;
   judgeRetryDelayMs?: number;
@@ -36,7 +38,7 @@ export class EvalRunner {
   private functionalGrader: ModelBasedGrader;
 
   constructor(private options: EvalRunOptions) {
-    this.env = new EvalEnvironment({ workspace: options.workspace });
+    this.env = new EvalEnvironment({ workspace: options.workspace, artifactsDir: options.artifactsDir });
     this.runner = RunnerFactory.create(options.agent);
     this.triggerGrader = new TriggerGrader(options.skillName, this.runner.skillDispatchToolName);
     // Inject the same runner for judging so swapping the agent backend works end-to-end
@@ -57,7 +59,7 @@ export class EvalRunner {
       const prevId = attempt === 1
         ? `task-${task.id}-trial-${trialId}`
         : `task-${task.id}-trial-${trialId}-r${attempt - 1}`;
-      this.env.removeWorktree(path.resolve(this.options.workspace, '.project-skill-evals', 'worktrees', prevId));
+      this.env.removeWorktree(this.env.worktreePathFor(prevId));
     }
     try {
       uiCtx.updateLog('Setting up…');
@@ -196,7 +198,7 @@ export class EvalRunner {
       const prevId = attempt === 1
         ? `task-${task.id}-${evalModeLabel}-trial-${trialId}`
         : `task-${task.id}-${evalModeLabel}-trial-${trialId}-r${attempt - 1}`;
-      this.env.removeWorktree(path.resolve(this.options.workspace, '.project-skill-evals', 'worktrees', prevId));
+      this.env.removeWorktree(this.env.worktreePathFor(prevId));
     }
     try {
       uiCtx.updateLog('Setting up…');

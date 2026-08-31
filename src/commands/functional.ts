@@ -9,6 +9,7 @@ import { EvalRunner } from '../core/eval-runner.js';
 import { AgentPool } from '../core/agent-pool.js';
 import { aggregatePassAtK, aggregateAssertionPassRate, aggregateTokenStats, aggregateDurationStats } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
+import { resolveOutputDir } from '../core/output-location.js';
 import { ConfigError } from '../core/errors.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderFunctionalTable, renderRunHeader } from '../utils/table-renderer.js';
@@ -24,13 +25,14 @@ export async function functionalCommand(
   skillPath: string,
   maxAgents: number = 4,
   injectedSuite?: EvalSuite,
-  numTrials: number = 3,
+  numTrials: number = 5,
   reporter: Reporter = new HtmlReporter(),
   timeoutMs?: number,
   evalId?: number,
   compareRefs: string[] = [],
   compareBaseline = false,
-  evalFile?: string
+  evalFile?: string,
+  output?: string
 ): Promise<void> {
   if (!injectedSuite) preflight(agent, workspace, skillPath);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath, evalFile);
@@ -61,7 +63,11 @@ export async function functionalCommand(
 
   const { skill_name, tasks } = suite;
 
-  const env = new EvalEnvironment({ workspace });
+  // Resolved before any trial runs: an artifacts root inside the workspace or the
+  // skill is rejected here, not after the first agent has already been launched.
+  const artifactsDir = resolveOutputDir({ output, skillName: skill_name, workspace, skillPath });
+
+  const env = new EvalEnvironment({ workspace, artifactsDir });
   await env.setup();
 
   // Ensure worktrees are cleaned up even when the process is interrupted (Ctrl+C).
@@ -72,15 +78,16 @@ export async function functionalCommand(
   // Every run gets its own directory: trial logs and the report always land here.
   const startTime = new Date();
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
-  const runDir = path.resolve(workspace, '.project-skill-evals', 'runs', timestamp);
+  const runDir = path.resolve(artifactsDir, 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
 
+  // Historical refs still land in the workspace; they move in spec 01 phase 2.
   const refPathBase = path.resolve(workspace, '.project-skill-evals', 'skill-refs');
   const variantRunners = new Map<string, EvalRunner>();
 
   // 1. Local Runner
   variantRunners.set('local', new EvalRunner({
-    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: false, timeoutMs,
+    agent, workspace, skillPath, skillName: skill_name, runDir, artifactsDir, isBaseline: false, timeoutMs,
     variant: 'local'
   }));
 
@@ -97,6 +104,7 @@ export async function functionalCommand(
       skillPath: path.join(refDir, path.relative(workspace, skillPath)), // Same relative path
       skillName: skill_name,
       runDir,
+      artifactsDir,
       isBaseline: false,
       timeoutMs,
       variant: `ref:${ref}`
@@ -105,7 +113,7 @@ export async function functionalCommand(
 
   // 3. Baseline Runner
   const withoutSkillRunner = compareBaseline ? new EvalRunner({
-    agent, workspace, skillPath, skillName: skill_name, runDir, isBaseline: true, timeoutMs,
+    agent, workspace, skillPath, skillName: skill_name, runDir, artifactsDir, isBaseline: true, timeoutMs,
     variant: 'baseline'
   }) : undefined;
 

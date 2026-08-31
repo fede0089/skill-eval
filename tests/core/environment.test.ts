@@ -1,24 +1,44 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { execFileSync } from 'node:child_process';
 import * as assert from 'node:assert';
 import { test, mock } from 'node:test';
 import { EvalEnvironment } from '../../src/core/environment.js';
 import { executor } from '../../src/utils/exec.js';
 import { Logger } from '../../src/utils/logger.js';
 
-test('EvalEnvironment.createWorktree should return expected path', async (t) => {
-  const env = new EvalEnvironment({ workspace: process.cwd() });
-  const taskId = 'test-task';
-  const expectedPath = path.resolve(process.cwd(), '.project-skill-evals', 'worktrees', taskId);
+/**
+ * The artifacts root is always created separately from the workspace: nothing the
+ * tool generates may land inside the repository under evaluation.
+ */
+function makeWorkspaceAndArtifacts(): { workspace: string; artifactsDir: string } {
+  return {
+    workspace: fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-ws-')),
+    artifactsDir: fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-artifacts-'))
+  };
+}
 
-  // We can't easily mock spawnSync here without issues in this env,
-  // but we can verify the path generation logic.
-  assert.ok(expectedPath.includes('.project-skill-evals/worktrees/test-task'));
+test('EvalEnvironment.worktreePathFor places worktrees under the artifacts root', () => {
+  const { workspace, artifactsDir } = makeWorkspaceAndArtifacts();
+
+  try {
+    const env = new EvalEnvironment({ workspace, artifactsDir });
+    const worktreePath = env.worktreePathFor('test-task');
+
+    assert.strictEqual(worktreePath, path.join(artifactsDir, 'worktrees', 'test-task'));
+    assert.ok(
+      !worktreePath.startsWith(workspace + path.sep),
+      'Worktree must not be placed inside the workspace under evaluation'
+    );
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(artifactsDir, { recursive: true, force: true });
+  }
 });
 
 test('EvalEnvironment.removeWorktree should not warn when git fails but path is already gone', (t) => {
-  const env = new EvalEnvironment({ workspace: process.cwd() });
+  const env = new EvalEnvironment({ workspace: process.cwd(), artifactsDir: '/tmp/skill-eval-artifacts' });
 
   mock.method(executor, 'spawnSync', mock.fn(() => ({ status: 128 })));
   const warnMock = mock.fn();
@@ -35,7 +55,7 @@ test('EvalEnvironment.removeWorktree should not warn when git fails but path is 
 test('EvalEnvironment.removeWorktree should silently clean up when git fails but dir still exists', (t) => {
   // Use a real temp dir so existsSync returns true and rmSync actually removes it
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-worktree-test-'));
-  const env = new EvalEnvironment({ workspace: process.cwd() });
+  const env = new EvalEnvironment({ workspace: process.cwd(), artifactsDir: '/tmp/skill-eval-artifacts' });
 
   mock.method(executor, 'spawnSync', mock.fn(() => ({ status: 128 })));
   const warnMock = mock.fn();
@@ -50,16 +70,15 @@ test('EvalEnvironment.removeWorktree should silently clean up when git fails but
 });
 
 test('EvalEnvironment.teardown cleans up remaining worktrees and skill-refs', async (t) => {
-  // Use a real temp workspace so we avoid re-mocking fs properties across tests
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
-  const worktreesDir = path.join(workspace, '.project-skill-evals', 'worktrees');
+  const { workspace, artifactsDir } = makeWorkspaceAndArtifacts();
+  const worktreesDir = path.join(artifactsDir, 'worktrees');
   fs.mkdirSync(path.join(worktreesDir, 'leftover-1'), { recursive: true });
   fs.mkdirSync(path.join(worktreesDir, 'leftover-2'), { recursive: true });
-  
-  const skillRefsDir = path.join(workspace, '.project-skill-evals', 'skill-refs');
+
+  const skillRefsDir = path.join(artifactsDir, 'skill-refs');
   fs.mkdirSync(path.join(skillRefsDir, 'ref-1'), { recursive: true });
 
-  const env = new EvalEnvironment({ workspace });
+  const env = new EvalEnvironment({ workspace, artifactsDir });
   const spawnMock = t.mock.method(executor, 'spawnSync', () => ({ status: 0 }));
 
   try {
@@ -67,6 +86,7 @@ test('EvalEnvironment.teardown cleans up remaining worktrees and skill-refs', as
     assert.ok(!fs.existsSync(skillRefsDir), 'Expected skill-refs directory to be removed');
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 
   const removeCalls = spawnMock.mock.calls
@@ -83,18 +103,18 @@ test('EvalEnvironment.teardown cleans up remaining worktrees and skill-refs', as
   );
 });
 
-test('EvalEnvironment.teardown runs git worktree prune', async (t) => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
-  const worktreesDir = path.join(workspace, '.project-skill-evals', 'worktrees');
-  fs.mkdirSync(worktreesDir, { recursive: true }); // exists but empty
+test('EvalEnvironment.teardown runs git worktree prune against the workspace repository', async (t) => {
+  const { workspace, artifactsDir } = makeWorkspaceAndArtifacts();
+  fs.mkdirSync(path.join(artifactsDir, 'worktrees'), { recursive: true }); // exists but empty
 
-  const env = new EvalEnvironment({ workspace });
+  const env = new EvalEnvironment({ workspace, artifactsDir });
   const spawnMock = t.mock.method(executor, 'spawnSync', () => ({ status: 0 }));
 
   try {
     await env.teardown();
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 
   const pruneCalls = spawnMock.mock.calls.filter(c => {
@@ -102,14 +122,18 @@ test('EvalEnvironment.teardown runs git worktree prune', async (t) => {
     return args[0] === 'worktree' && args[1] === 'prune';
   });
   assert.strictEqual(pruneCalls.length, 1, 'Expected git worktree prune to be called once');
-  assert.deepStrictEqual(pruneCalls[0].arguments[2], { stdio: 'ignore', cwd: workspace });
+  assert.deepStrictEqual(
+    pruneCalls[0].arguments[2],
+    { stdio: 'ignore', cwd: workspace },
+    'Git must run against the workspace repository, not the artifacts root'
+  );
 });
 
 
 test('EvalEnvironment.createWorktree should recover from stale physical directory', (t) => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
+  const { workspace, artifactsDir } = makeWorkspaceAndArtifacts();
   const evalId = 'test-stale-recovery';
-  const worktreePath = path.join(workspace, '.project-skill-evals', 'worktrees', evalId);
+  const worktreePath = path.join(artifactsDir, 'worktrees', evalId);
 
   // Simulate a previous crashed run: directory already exists with leftover content
   fs.mkdirSync(worktreePath, { recursive: true });
@@ -128,7 +152,7 @@ test('EvalEnvironment.createWorktree should recover from stale physical director
     return { status: spawnCallCount === 3 ? 0 : 128 };
   });
 
-  const env = new EvalEnvironment({ workspace });
+  const env = new EvalEnvironment({ workspace, artifactsDir });
   try {
     const result = env.createWorktree(evalId);
 
@@ -142,21 +166,59 @@ test('EvalEnvironment.createWorktree should recover from stale physical director
     assert.ok(fs.existsSync(worktreePath), 'Worktree directory should exist after add');
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 });
 
 test('EvalEnvironment.teardown is a no-op when worktrees dir does not exist', async (t) => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
-  // Do NOT create .project-skill-evals/worktrees — it should not exist
+  const { workspace, artifactsDir } = makeWorkspaceAndArtifacts();
+  // Do NOT create <artifactsDir>/worktrees — it should not exist
 
-  const env = new EvalEnvironment({ workspace });
+  const env = new EvalEnvironment({ workspace, artifactsDir });
   const spawnMock = t.mock.method(executor, 'spawnSync', () => ({ status: 0 }));
 
   try {
     await env.teardown();
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 
   assert.strictEqual(spawnMock.mock.callCount(), 0, 'Expected no spawnSync calls');
+});
+
+test('EvalEnvironment.createWorktree works against a real repository with the artifacts root outside it', () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-realrepo-'));
+  const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-artifacts-'));
+
+  const gitOptions = { cwd: workspace, stdio: 'ignore' as const };
+  execFileSync('git', ['init', '-q'], gitOptions);
+  fs.writeFileSync(path.join(workspace, 'README.md'), '# fixture\n', 'utf-8');
+  execFileSync('git', ['add', '-A'], gitOptions);
+  execFileSync('git', [
+    '-c', 'user.email=test@example.com', '-c', 'user.name=Test',
+    'commit', '-qm', 'init'
+  ], gitOptions);
+
+  const env = new EvalEnvironment({ workspace, artifactsDir });
+
+  try {
+    const worktreePath = env.createWorktree('task-1-trial-1');
+
+    assert.ok(fs.existsSync(worktreePath), 'Worktree should have been created');
+    assert.ok(
+      fs.existsSync(path.join(worktreePath, 'README.md')),
+      'Worktree should contain the repository content'
+    );
+    assert.ok(
+      !worktreePath.startsWith(fs.realpathSync(workspace) + path.sep),
+      'Worktree must live outside the repository under evaluation'
+    );
+
+    env.removeWorktree(worktreePath);
+    assert.ok(!fs.existsSync(worktreePath), 'removeWorktree should have cleaned it up');
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(artifactsDir, { recursive: true, force: true });
+  }
 });

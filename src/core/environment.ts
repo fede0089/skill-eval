@@ -5,24 +5,32 @@ import { Logger } from '../utils/logger.js';
 import { ExecutionError } from './errors.js';
 
 export interface EnvironmentOptions {
+  /** Repository the worktrees are cut from; every git command runs with its cwd here. */
   workspace: string;
+  /** Root the tool writes to, always outside the workspace and the skill. */
+  artifactsDir: string;
 }
 
 export class EvalEnvironment {
   private workspace: string;
+  private artifactsDir: string;
 
   constructor(options: EnvironmentOptions) {
     this.workspace = options.workspace;
+    this.artifactsDir = options.artifactsDir;
+  }
+
+  /** Path of the worktree for an eval, under the artifacts root. */
+  public worktreePathFor(evalId: string): string {
+    return path.resolve(this.artifactsDir, 'worktrees', evalId);
   }
 
   public async setup(): Promise<void> {
   }
 
   public async teardown(): Promise<void> {
-    const evalsDir = path.resolve(this.workspace, '.project-skill-evals');
-    
     // 1. Cleanup Worktrees
-    const worktreesDir = path.join(evalsDir, 'worktrees');
+    const worktreesDir = path.join(this.artifactsDir, 'worktrees');
     if (fs.existsSync(worktreesDir)) {
       for (const entry of fs.readdirSync(worktreesDir)) {
         this.removeWorktree(path.join(worktreesDir, entry));
@@ -31,7 +39,7 @@ export class EvalEnvironment {
     }
 
     // 2. Cleanup Skill Refs
-    const skillRefsDir = path.join(evalsDir, 'skill-refs');
+    const skillRefsDir = path.join(this.artifactsDir, 'skill-refs');
     if (fs.existsSync(skillRefsDir)) {
       try {
         fs.rmSync(skillRefsDir, { recursive: true, force: true });
@@ -46,7 +54,7 @@ export class EvalEnvironment {
    * This provides isolation by ensuring each test runs in its own clean copy of the repo.
    */
   public createWorktree(evalId: string): string {
-    const worktreePath = path.resolve(this.workspace, '.project-skill-evals', 'worktrees', evalId);
+    const worktreePath = this.worktreePathFor(evalId);
     const branchName = path.basename(worktreePath);
 
     // Ensure the path is clean before adding a worktree.
