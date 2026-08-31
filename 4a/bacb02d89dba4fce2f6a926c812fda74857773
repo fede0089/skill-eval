@@ -1,0 +1,19 @@
+tests/cli-options.test.ts
+  s_b8e3a755fdcc8f::t_6081cdda34e18b 1-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "4abacb02d89dba4fce2f6a926c812fda74857773",
+  "prompts": {},
+  "sessions": {
+    "s_b8e3a755fdcc8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "048027a5-3875-4505-a092-b4b3f6435147",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
