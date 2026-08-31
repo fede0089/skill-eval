@@ -1,0 +1,19 @@
+tests/core/historical-variant.test.ts
+  s_b8e3a755fdcc8f::t_7738121c9c7a02 1-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "f079e1b105e2e9950e5681bc85b7514a0439a29b",
+  "prompts": {},
+  "sessions": {
+    "s_b8e3a755fdcc8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "048027a5-3875-4505-a092-b4b3f6435147",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
