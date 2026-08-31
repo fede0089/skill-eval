@@ -55,11 +55,12 @@ program
   .requiredOption('--workspace <path>', 'Path to the workspace/repo to evaluate against')
   .requiredOption('--skill <path>', 'Path to the skill directory')
   .option('--agents <number>', 'Number of parallel agents', '4')
-  .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
+  .option('--trials <number>', 'Number of trials per task for pass@k calculation', '5')
   .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .option('--eval-file <name>', 'Run only the evals from this file in evals/ (e.g. edge-cases.json)')
   .option('--compare-ref [refs...]', 'Compare against historical git references')
+  .option('--output <path>', 'Root for everything the run writes; must be outside the workspace and the skill (default: ~/.skill-eval)')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
@@ -68,7 +69,7 @@ program
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     const compareRefs = parseCompareRefs(options.compareRef);
-    triggerCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, options.evalFile).catch(errorHandler);
+    triggerCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, options.evalFile, options.output).catch(errorHandler);
   });
 
 program
@@ -77,12 +78,13 @@ program
   .requiredOption('--workspace <path>', 'Path to the workspace/repo to evaluate against')
   .requiredOption('--skill <path>', 'Path to the skill directory')
   .option('--agents <number>', 'Number of parallel agents', '4')
-  .option('--trials <number>', 'Number of trials per task for pass@k calculation', '3')
+  .option('--trials <number>', 'Number of trials per task for pass@k calculation', '5')
   .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .option('--eval-file <name>', 'Run only the evals from this file in evals/ (e.g. edge-cases.json)')
   .option('--compare-ref [refs...]', 'Compare against historical git references')
   .option('--compare-baseline', 'Also run the no-skill baseline alongside the skill')
+  .option('--output <path>', 'Root for everything the run writes; must be outside the workspace and the skill (default: ~/.skill-eval)')
   .action((agent, options) => {
     const workspace = path.resolve(options.workspace);
     const selectedAgent = agent || DEFAULT_AGENT;
@@ -92,7 +94,7 @@ program
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     const compareRefs = parseCompareRefs(options.compareRef);
     const compareBaseline = !!options.compareBaseline;
-    functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, compareBaseline, options.evalFile).catch(errorHandler);
+    functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, compareBaseline, options.evalFile, options.output).catch(errorHandler);
   });
 
 
