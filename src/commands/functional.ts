@@ -81,8 +81,7 @@ export async function functionalCommand(
   const runDir = path.resolve(artifactsDir, 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
 
-  // Historical refs still land in the workspace; they move in spec 01 phase 2.
-  const refPathBase = path.resolve(workspace, '.project-skill-evals', 'skill-refs');
+  const refPathBase = path.resolve(artifactsDir, 'skill-refs');
   const variantRunners = new Map<string, EvalRunner>();
 
   // 1. Local Runner
