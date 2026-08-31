@@ -100,8 +100,11 @@ export async function functionalCommand(
 
     variantRunners.set(`ref:${ref}`, new EvalRunner({
       agent,
-      workspace: refDir, // Run inside extracted repo
-      skillPath: path.join(refDir, path.relative(workspace, skillPath)), // Same relative path
+      // Worktrees are always cut from the real workspace repository: `git archive`
+      // produces no .git, so the extracted copy is not a repository at all. It
+      // contributes only the skill implementation, addressed absolutely.
+      workspace,
+      skillPath: path.resolve(refDir, path.relative(workspace, path.resolve(workspace, skillPath))),
       skillName: skill_name,
       runDir,
       artifactsDir,
