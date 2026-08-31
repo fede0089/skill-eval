@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import * as path from 'path';
+import * as os from 'os';
 import { AggregatedTokenStats, EvalSuiteReport, EvalTrial } from '../types/index.js';
 import { Logger } from './logger.js';
 import { computePassAtK } from '../core/statistics.js';
@@ -81,7 +82,6 @@ export interface RunHeaderConfig {
   command: 'trigger' | 'functional';
   skillName: string;
   agent: string;
-  workspace: string;
   tasks: number;
   trials: number;
   maxAgents: number;
@@ -92,6 +92,14 @@ export interface RunHeaderConfig {
 }
 
 const BOX_INNER = 56; // visible chars between │ and │ (one space padding each side)
+
+/** Shortens a path under the user's home to its '~' form for display. */
+function collapseHome(target: string): string {
+  const home = os.homedir();
+  return target === home || target.startsWith(home + path.sep)
+    ? '~' + target.slice(home.length)
+    : target;
+}
 
 function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, '');
@@ -113,7 +121,7 @@ function boxLabel(key: string, value: string): string {
  * Always shown regardless of debug mode.
  */
 export function renderRunHeader(config: RunHeaderConfig): void {
-  const { command, skillName, agent, workspace, tasks, trials, maxAgents, timeoutMs, runDir, evalId, evalFile } = config;
+  const { command, skillName, agent, tasks, trials, maxAgents, timeoutMs, runDir, evalId, evalFile } = config;
 
   let timeoutStr = 'None';
   if (timeoutMs && timeoutMs > 0) {
@@ -121,9 +129,13 @@ export function renderRunHeader(config: RunHeaderConfig): void {
     timeoutStr = timeoutSec % 60 === 0 ? `${timeoutSec / 60}m` : `${timeoutSec}s`;
   }
 
-  const relRunDir = path.relative(workspace, runDir);
+  // The run directory lives outside the workspace, so an absolute path is the only
+  // useful form; truncating from the left keeps the run's own timestamp visible.
   const maxOutputLen = BOX_INNER - 13; // 11 label + 2 spaces
-  const outputStr = relRunDir.length > maxOutputLen ? relRunDir.slice(0, maxOutputLen - 1) + '…' : relRunDir;
+  const outputStr = collapseHome(runDir);
+  const outputLine = outputStr.length > maxOutputLen
+    ? '…' + outputStr.slice(outputStr.length - (maxOutputLen - 1))
+    : outputStr;
 
   const titleLabel = 'skill-eval';
   const dashes = '─'.repeat(BOX_INNER - titleLabel.length);
@@ -144,7 +156,7 @@ export function renderRunHeader(config: RunHeaderConfig): void {
   process.stdout.write(boxLabel('agent', agent) + '\n');
   process.stdout.write(boxLabel('run', runLine) + '\n');
   process.stdout.write(boxLabel('timeout', timeoutStr) + '\n');
-  process.stdout.write(boxLabel('output', outputStr) + '\n');
+  process.stdout.write(boxLabel('output', outputLine) + '\n');
   process.stdout.write(bottom + '\n\n');
 }
 
