@@ -18,17 +18,24 @@ export interface EnvironmentOptions {
    * command-level environment owns them, so per-trial environments omit it.
    */
   skillRefsDir?: string;
+  /**
+   * Materialized skill implementations — what each variant links into its trial
+   * environment — under the evidence root. Owned like `skillRefsDir`.
+   */
+  skillImplDir?: string;
 }
 
 export class EvalEnvironment {
   private workspace: string;
   private worktreesDir: string;
   private skillRefsDir?: string;
+  private skillImplDir?: string;
 
   constructor(options: EnvironmentOptions) {
     this.workspace = options.workspace;
     this.worktreesDir = options.worktreesDir;
     this.skillRefsDir = options.skillRefsDir;
+    this.skillImplDir = options.skillImplDir;
   }
 
   /** Path of the isolated environment for an eval, inside the workspace. */
@@ -55,13 +62,19 @@ export class EvalEnvironment {
       }
     }
 
-    // 2. Extracted historical refs, only when this environment owns them.
-    if (this.skillRefsDir && fs.existsSync(this.skillRefsDir)) {
-      try {
-        fs.rmSync(this.skillRefsDir, { recursive: true, force: true });
-      } catch (err) {
-        Logger.warn(`Failed to remove skill-refs directory at ${this.skillRefsDir}. Manual cleanup may be required.`);
-      }
+    // 2. Working copies of the skill under the evidence root — the extracted
+    // historical refs and the materialized implementations — only when this
+    // environment owns them. The run's evidence itself is never touched.
+    this.removeOwnedDir(this.skillRefsDir, 'skill-refs');
+    this.removeOwnedDir(this.skillImplDir, 'skill-impl');
+  }
+
+  private removeOwnedDir(dir: string | undefined, label: string): void {
+    if (!dir || !fs.existsSync(dir)) return;
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch (err) {
+      Logger.warn(`Failed to remove ${label} directory at ${dir}. Manual cleanup may be required.`);
     }
   }
 

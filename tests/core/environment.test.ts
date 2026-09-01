@@ -71,7 +71,7 @@ test('EvalEnvironment.removeWorktree should silently clean up when git fails but
   mock.reset();
 });
 
-test('EvalEnvironment.teardown cleans up remaining trial environments and skill-refs', async (t) => {
+test('EvalEnvironment.teardown cleans up remaining trial environments and the working copies of the skill', async (t) => {
   const { workspace, worktreesDir, artifactsDir } = makeWorkspaceAndArtifacts();
   fs.mkdirSync(path.join(worktreesDir, 'leftover-1'), { recursive: true });
   fs.mkdirSync(path.join(worktreesDir, 'leftover-2'), { recursive: true });
@@ -79,12 +79,16 @@ test('EvalEnvironment.teardown cleans up remaining trial environments and skill-
   const skillRefsDir = path.join(artifactsDir, 'skill-refs');
   fs.mkdirSync(path.join(skillRefsDir, 'ref-1'), { recursive: true });
 
-  const env = new EvalEnvironment({ workspace, worktreesDir, skillRefsDir });
+  const skillImplDir = path.join(artifactsDir, 'skill-impl');
+  fs.mkdirSync(path.join(skillImplDir, 'local', 'mock-skill'), { recursive: true });
+
+  const env = new EvalEnvironment({ workspace, worktreesDir, skillRefsDir, skillImplDir });
   const spawnMock = t.mock.method(executor, 'spawnSync', () => ({ status: 0 }));
 
   try {
     await env.teardown();
     assert.ok(!fs.existsSync(skillRefsDir), 'Expected skill-refs directory to be removed');
+    assert.ok(!fs.existsSync(skillImplDir), 'Expected skill-impl directory to be removed');
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     fs.rmSync(artifactsDir, { recursive: true, force: true });
