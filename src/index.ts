@@ -50,7 +50,7 @@ program.on('option:debug', () => {
 });
 
 program
-  .command('trigger [agent]')
+  .command('trigger')
   .description('Evaluate triggering of an agent skill')
   .requiredOption('--workspace <path>', 'Path to the workspace/repo to evaluate against')
   .requiredOption('--skill <path>', 'Path to the skill directory')
@@ -60,20 +60,21 @@ program
   .option('--eval-id <id>', 'Run only the eval with this ID (numeric)')
   .option('--eval-file <name>', 'Run only the evals from this file in evals/ (e.g. edge-cases.json)')
   .option('--compare-ref [refs...]', 'Compare against historical git references')
+  .option('--executor-agent <name>', 'Agent that runs the evaluated task', DEFAULT_AGENT)
   .option('--output <path>', 'Root for everything the run writes; must be outside the workspace and the skill (default: ~/.skill-eval)')
-  .action((agent, options) => {
+  .action((options) => {
     const workspace = path.resolve(options.workspace);
-    const selectedAgent = agent || DEFAULT_AGENT;
+    const executorAgent = options.executorAgent;
     const maxAgents = parseInt(options.agents, 10);
     const numTrials = parseInt(options.trials, 10);
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     const compareRefs = parseCompareRefs(options.compareRef);
-    triggerCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, options.evalFile, options.output).catch(errorHandler);
+    triggerCommand(executorAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, options.evalFile, options.output).catch(errorHandler);
   });
 
 program
-  .command('functional [agent]')
+  .command('functional')
   .description('Evaluate functional correctness of an agent skill against expectations')
   .requiredOption('--workspace <path>', 'Path to the workspace/repo to evaluate against')
   .requiredOption('--skill <path>', 'Path to the skill directory')
@@ -84,17 +85,22 @@ program
   .option('--eval-file <name>', 'Run only the evals from this file in evals/ (e.g. edge-cases.json)')
   .option('--compare-ref [refs...]', 'Compare against historical git references')
   .option('--compare-baseline', 'Also run the no-skill baseline alongside the skill')
+  .option('--executor-agent <name>', 'Agent that runs the evaluated task', DEFAULT_AGENT)
+  .option('--judge-agent <name>', 'Agent that grades the result (default: the executor agent)')
   .option('--output <path>', 'Root for everything the run writes; must be outside the workspace and the skill (default: ~/.skill-eval)')
-  .action((agent, options) => {
+  .action((options) => {
     const workspace = path.resolve(options.workspace);
-    const selectedAgent = agent || DEFAULT_AGENT;
+    const executorAgent = options.executorAgent;
+    // A judge left unspecified is the executor itself: the roles are separable,
+    // not mandatory to separate.
+    const judgeAgent = options.judgeAgent || executorAgent;
     const maxAgents = parseInt(options.agents, 10);
     const numTrials = parseInt(options.trials, 10);
     const timeoutMs = options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined;
     const evalId = options.evalId !== undefined ? parseInt(options.evalId, 10) : undefined;
     const compareRefs = parseCompareRefs(options.compareRef);
     const compareBaseline = !!options.compareBaseline;
-    functionalCommand(selectedAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, compareBaseline, options.evalFile, options.output).catch(errorHandler);
+    functionalCommand(executorAgent, judgeAgent, workspace, options.skill, maxAgents, undefined, numTrials, new HtmlReporter(), timeoutMs, evalId, compareRefs, compareBaseline, options.evalFile, options.output).catch(errorHandler);
   });
 
 

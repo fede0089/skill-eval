@@ -45,7 +45,7 @@ if (isMain) {
   const result = spawnSync(process.execPath, [
     './dist/index.js',
     command,
-    runner,
+    '--executor-agent', runner,
     '--workspace', '.',
     '--skill', './mock-skill',
     ...extraArgs,

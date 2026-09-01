@@ -18,7 +18,7 @@ import { git } from '../utils/git.js';
 import type { Reporter } from '../reporters/index.js';
 
 export async function triggerCommand(
-  agent: string,
+  executorAgent: string,
   workspace: string,
   skillPath: string,
   maxAgents: number = 4,
@@ -31,7 +31,7 @@ export async function triggerCommand(
   evalFile?: string,
   output?: string
 ): Promise<void> {
-  if (!injectedSuite) preflight(agent, workspace, skillPath);
+  if (!injectedSuite) preflight(executorAgent, workspace, skillPath);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath, evalFile);
 
   if (evalId !== undefined) {
@@ -73,7 +73,7 @@ export async function triggerCommand(
 
   // 1. Local Runner
   variantRunners.set('local', new EvalRunner({
-    executorAgent: agent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir, isBaseline: false, timeoutMs,
+    executorAgent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir, isBaseline: false, timeoutMs,
     variant: 'local'
   }));
 
@@ -87,7 +87,7 @@ export async function triggerCommand(
     Logger.write(chalk.green('Done\n'));
 
     variantRunners.set(`ref:${ref}`, new EvalRunner({
-      executorAgent: agent,
+      executorAgent,
       // Worktrees are always cut from the real workspace repository: `git archive`
       // produces no .git, so the extracted copy is not a repository at all. It
       // contributes only the skill implementation, addressed absolutely.
@@ -116,7 +116,7 @@ export async function triggerCommand(
   const subtaskLabels = skillVersions.flatMap(v => Array.from({ length: numTrials }, (_, i) => `${v} ${i + 1}`));
 
   try {
-    renderRunHeader({ command: 'trigger', skillName: skill_name, agent, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId, evalFile });
+    renderRunHeader({ command: 'trigger', skillName: skill_name, agent: executorAgent, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId, evalFile });
     Logger.write(`--- Trigger Pass ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
 
@@ -252,7 +252,7 @@ export async function triggerCommand(
       timestamp: startTime.toISOString(),
       command: 'trigger',
       skill_name,
-      agent,
+      agent: executorAgent,
       metrics: {
         passedCount: tasksPassedCount,
         totalCount: tasks.length,

@@ -20,7 +20,8 @@ import chalk from 'chalk';
 import { git } from '../utils/git.js';
 
 export async function functionalCommand(
-  agent: string,
+  executorAgent: string,
+  judgeAgent: string,
   workspace: string,
   skillPath: string,
   maxAgents: number = 4,
@@ -34,7 +35,7 @@ export async function functionalCommand(
   evalFile?: string,
   output?: string
 ): Promise<void> {
-  if (!injectedSuite) preflight(agent, workspace, skillPath);
+  if (!injectedSuite) preflight(executorAgent, workspace, skillPath, judgeAgent);
   const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath, evalFile);
 
   // Negative evals (should_trigger: false) only make sense for the trigger command:
@@ -91,7 +92,7 @@ export async function functionalCommand(
 
   // 1. Local Runner
   variantRunners.set('local', new EvalRunner({
-    executorAgent: agent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir, isBaseline: false, timeoutMs,
+    executorAgent, judgeAgent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir, isBaseline: false, timeoutMs,
     variant: 'local'
   }));
 
@@ -105,7 +106,8 @@ export async function functionalCommand(
     Logger.write(chalk.green('Done\n'));
 
     variantRunners.set(`ref:${ref}`, new EvalRunner({
-      executorAgent: agent,
+      executorAgent,
+      judgeAgent,
       // Worktrees are always cut from the real workspace repository: `git archive`
       // produces no .git, so the extracted copy is not a repository at all. It
       // contributes only the skill implementation, addressed absolutely.
@@ -122,7 +124,7 @@ export async function functionalCommand(
 
   // 3. Baseline Runner
   const withoutSkillRunner = compareBaseline ? new EvalRunner({
-    executorAgent: agent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir, isBaseline: true, timeoutMs,
+    executorAgent, judgeAgent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir, isBaseline: true, timeoutMs,
     variant: 'baseline'
   }) : undefined;
 
@@ -146,7 +148,7 @@ export async function functionalCommand(
     : skillVersions.flatMap(v => Array.from({ length: numTrials }, (_, i) => `${v} ${i + 1}`));
 
   try {
-    renderRunHeader({ command: 'functional', skillName: skill_name, agent, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId, evalFile });
+    renderRunHeader({ command: 'functional', skillName: skill_name, agent: executorAgent, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId, evalFile });
     Logger.write(`──────────────────────────────────────────────────\n`);
 
     for (let i = 0; i < tasks.length; i++) {
@@ -335,7 +337,7 @@ export async function functionalCommand(
       timestamp: startTime.toISOString(),
       command: 'functional',
       skill_name,
-      agent,
+      agent: executorAgent,
       metrics: {
         passedCount: withSkillTasksAllPassedCount,
         totalCount: tasks.length,
