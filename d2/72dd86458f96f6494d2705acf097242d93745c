@@ -1,0 +1,21 @@
+src/core/environment.ts
+  s_375d768edcc837::t_d93818d77838a9 21-25,32,38,65-77
+tests/core/environment.test.ts
+  s_375d768edcc837::t_d93818d77838a9 74,82-85,91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "d272dd86458f96f6494d2705acf097242d93745c",
+  "prompts": {},
+  "sessions": {
+    "s_375d768edcc837": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "648f203d-148d-4a72-914f-c6460d5cb1ac",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
