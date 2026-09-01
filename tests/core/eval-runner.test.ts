@@ -494,14 +494,14 @@ test('EvalRunner.runTriggerTask copies evals/config/gemini-cli/ into worktree .g
   }
 });
 
-test('EvalRunner reads the evaluation config from the frozen benchmark, not from the variant skill', async () => {
+test('EvalRunner reads the evaluation config from the frozen evals, not from the variant skill', async () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
-  // The shape of a historical variant: its own skill carries a benchmark that must
-  // not be applied, while the frozen one lives outside it.
+  // The shape of a historical variant: its own skill carries evals that must not be
+  // applied, while the frozen ones live outside it.
   const variantSkill = path.join(workspace, 'ref-copy', 'test-skill');
   fs.mkdirSync(path.join(variantSkill, 'evals', 'config'), { recursive: true });
-  const frozenBenchmark = path.join(workspace, 'run', 'benchmark');
-  fs.mkdirSync(path.join(frozenBenchmark, 'config'), { recursive: true });
+  const frozenEvalsDir = path.join(workspace, 'run', 'evals');
+  fs.mkdirSync(path.join(frozenEvalsDir, 'config'), { recursive: true });
 
   try {
     const agentRunnerMock = makeAgentRunnerMock();
@@ -510,14 +510,14 @@ test('EvalRunner reads the evaluation config from the frozen benchmark, not from
 
     const runner = new EvalRunner({
       executorAgent: 'gemini-cli', workspace, skillPath: variantSkill, skillName: 'test-skill',
-      runDir: '/tmp', worktreesDir: '/tmp/worktrees', benchmarkDir: frozenBenchmark,
+      runDir: '/tmp', worktreesDir: '/tmp/worktrees', frozenEvalsDir,
     });
 
     await runner.runTriggerTask({ id: 1, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
 
     assert.strictEqual(
       agentRunnerMock.applyRunnerConfig.mock.calls[0].arguments[0],
-      path.join(frozenBenchmark, 'config'),
+      path.join(frozenEvalsDir, 'config'),
       'The variant must be measured with the frozen config, not with the one it carries'
     );
   } finally {

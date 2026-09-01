@@ -3,10 +3,10 @@ import * as assert from 'node:assert';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { freezeBenchmark, materializeImplementation } from '../../src/core/benchmark.js';
+import { freezeEvals, materializeImplementation } from '../../src/core/skill-parts.js';
 import { ConfigError } from '../../src/core/errors.js';
 
-/** A skill with both parts populated: an implementation around a benchmark. */
+/** A skill with both parts populated: an implementation around its evals. */
 function makeSkill(root: string, name = 'mock-skill'): string {
   const skillPath = path.join(root, name);
   fs.mkdirSync(path.join(skillPath, 'references'), { recursive: true });
@@ -21,8 +21,8 @@ function makeSkill(root: string, name = 'mock-skill'): string {
   return skillPath;
 }
 
-test('materializeImplementation carries the implementation and leaves the benchmark behind', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-benchmark-'));
+test('materializeImplementation carries the implementation and leaves the evals behind', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-skill-parts-'));
   try {
     const skillPath = makeSkill(root);
     const target = materializeImplementation(skillPath, path.join(root, 'skill-impl', 'local'));
@@ -39,8 +39,8 @@ test('materializeImplementation carries the implementation and leaves the benchm
   }
 });
 
-test('materializeImplementation excludes only the benchmark at the root of the skill', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-benchmark-'));
+test('materializeImplementation excludes only the evals directory at the root of the skill', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-skill-parts-'));
   try {
     const skillPath = makeSkill(root);
     // A directory deeper down that happens to share the name belongs to the implementation.
@@ -50,14 +50,14 @@ test('materializeImplementation excludes only the benchmark at the root of the s
     const target = materializeImplementation(skillPath, path.join(root, 'skill-impl', 'local'));
 
     assert.ok(fs.existsSync(path.join(target, 'references', 'evals', 'how-to.md')), 'A nested evals/ is implementation');
-    assert.ok(!fs.existsSync(path.join(target, 'evals')), 'The root evals/ is still the benchmark');
+    assert.ok(!fs.existsSync(path.join(target, 'evals')), 'The root evals/ is still what measures the skill');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
 test('materializeImplementation replaces an earlier materialization instead of merging into it', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-benchmark-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-skill-parts-'));
   try {
     const skillPath = makeSkill(root);
     const targetDir = path.join(root, 'skill-impl', 'local');
@@ -75,16 +75,16 @@ test('materializeImplementation replaces an earlier materialization instead of m
   }
 });
 
-test('freezeBenchmark copies the whole benchmark into the run directory', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-benchmark-'));
+test('freezeEvals copies the whole evals directory into the run directory', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-skill-parts-'));
   try {
     const skillPath = makeSkill(root);
     const runDir = path.join(root, 'runs', '2026-09-01');
     fs.mkdirSync(runDir, { recursive: true });
 
-    const frozen = freezeBenchmark(skillPath, runDir);
+    const frozen = freezeEvals(skillPath, runDir);
 
-    assert.strictEqual(frozen.dir, path.join(runDir, 'benchmark'), 'The frozen copy lives with the run evidence');
+    assert.strictEqual(frozen.dir, path.join(runDir, 'evals'), 'The frozen copy lives with the run evidence');
     assert.strictEqual(frozen.source, path.join(skillPath, 'evals'));
     assert.deepStrictEqual(frozen.evalFiles, ['edge-cases.json', 'license.json']);
     assert.ok(fs.existsSync(path.join(frozen.dir, 'license.json')));
@@ -98,14 +98,14 @@ test('freezeBenchmark copies the whole benchmark into the run directory', () => 
   }
 });
 
-test('freezeBenchmark fails when the skill carries no benchmark', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-benchmark-'));
+test('freezeEvals fails when the skill carries no evals', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-skill-parts-'));
   try {
     const skillPath = path.join(root, 'no-evals-skill');
     fs.mkdirSync(skillPath, { recursive: true });
     fs.writeFileSync(path.join(skillPath, 'SKILL.md'), '# skill\n');
 
-    assert.throws(() => freezeBenchmark(skillPath, root), ConfigError);
+    assert.throws(() => freezeEvals(skillPath, root), ConfigError);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

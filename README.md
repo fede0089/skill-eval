@@ -44,7 +44,7 @@ For each eval prompt, skill-eval spins up parallel agent processes with the curr
 >
 > Each `--compare-ref` version is extracted under the artifacts root, outside the workspace, and removed when the run ends. Every variant's trials are still cut from the workspace repository — the extracted copy contributes only the skill implementation.
 >
-> The benchmark is frozen at the start of the run, and every variant is measured with it: a historical version brings its implementation and nothing else, never its own evals or evaluation config. That is what makes the numbers comparable when the benchmark itself changed between the two versions.
+> The evals are frozen at the start of the run, and every variant is measured with them: a historical version brings its implementation and nothing else, never its own evals or evaluation config. That is what makes the numbers comparable when the evals themselves changed between the two versions.
 
 ## Installation
 
@@ -124,7 +124,7 @@ Supported runners:
 my-skill/                           # ── implementation: what tells the agent how to work
 ├── SKILL.md                        # skill definition (required)
 ├── references/                     # anything else your skill ships
-└── evals/                          # ── benchmark: what measures it (required)
+└── evals/                          # ── evals: what measures it (required)
     ├── my-evals.json               # one or more eval files (*.json)
     └── config/                     # runner configuration (optional but often needed)
         ├── gemini-cli/             # copied to <worktree>/.gemini/ before each trial
@@ -135,7 +135,7 @@ my-skill/                           # ── implementation: what tells the agen
             └── settings.json
 ```
 
-A skill has two parts, and the tool keeps them apart. Everything outside `evals/` is the **implementation** — what tells the agent how to work. `evals/` is the **benchmark** — the evals, the expectations and the evaluation config of both measuring roles.
+A skill has two parts, and the tool keeps them apart. Everything outside `evals/` is the **implementation** — what tells the agent how to work. `evals/` is what measures it — the prompts, the expectations and the evaluation config of both measuring roles.
 
 **Only the implementation reaches a trial.** The evaluated agent gets a copy of your skill with `evals/` left out, so it cannot read the expectations it is about to be graded with. The consequence is that your `SKILL.md` must not reference anything living under `evals/` — those files never arrive.
 
@@ -246,7 +246,7 @@ Refer to your runner's documentation for the full set of settings and policy key
 
 ## Reports
 
-Each run writes to `~/.skill-eval/<skill>/runs/<timestamp>/`: one log per trial, a `benchmark/` copy of the frozen benchmark every variant was measured with, and a self-contained HTML report you can open in any browser. The command prints the resolved location in its header and links the report when it finishes.
+Each run writes to `~/.skill-eval/<skill>/runs/<timestamp>/`: one log per trial, an `evals/` copy of the frozen evals every variant was measured with, and a self-contained HTML report you can open in any browser. The command prints the resolved location in its header and links the report when it finishes.
 
 No evidence lands inside the workspace under evaluation or inside the skill — reports, trial logs and the extracted copies of historical refs all stay out. That is deliberate: the evaluated agent explores the workspace, and reports or transcripts from earlier runs sitting there would contaminate the measurement it is producing. `--output <path>` moves the root somewhere else, and a path that resolves inside either one is rejected before the first trial starts.
 

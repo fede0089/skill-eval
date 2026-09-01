@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { executor } from '../utils/exec.js';
 import { EvalEnvironment } from './environment.js';
-import { BENCHMARK_DIRNAME } from './benchmark.js';
+import { EVALS_DIRNAME } from './skill-parts.js';
 import { RunnerFactory, AgentRunner } from '../runners/index.js';
 import { AgentTranscript, EvalTask, EvalTrial, AssertionResult } from '../types/index.js';
 import { TriggerGrader, ModelBasedGrader } from './evaluator.js';
@@ -23,11 +23,11 @@ export interface EvalRunOptions {
   /** Directory inside the workspace holding the isolated environment of each trial. */
   worktreesDir: string;
   /**
-   * Frozen benchmark this variant is measured with. Every variant of a run shares
-   * one, so a historical ref never imposes its own evaluation config. Falls back to
-   * the skill's own benchmark when the caller froze nothing.
+   * Frozen evals this variant is measured with. Every variant of a run shares one
+   * set, so a historical ref never imposes its own evaluation config. Falls back to
+   * the skill's own evals when the caller froze nothing.
    */
-  benchmarkDir?: string;
+  frozenEvalsDir?: string;
   isBaseline?: boolean;
   timeoutMs?: number;
   judgeRetryDelayMs?: number;
@@ -59,13 +59,13 @@ export class EvalRunner {
   }
 
   /**
-   * Where the evaluation config of each role is read from. The frozen benchmark when
-   * the run has one; otherwise the benchmark the skill itself carries.
+   * Where the evaluation config of each role is read from. The frozen evals when the
+   * run has them; otherwise the evals the skill itself carries.
    */
   private evalConfigDir(): string {
-    const benchmarkDir = this.options.benchmarkDir
-      ?? path.resolve(this.options.workspace, this.options.skillPath, BENCHMARK_DIRNAME);
-    return path.join(benchmarkDir, 'config');
+    const evalsDir = this.options.frozenEvalsDir
+      ?? path.resolve(this.options.workspace, this.options.skillPath, EVALS_DIRNAME);
+    return path.join(evalsDir, 'config');
   }
 
   constructor(private options: EvalRunOptions) {

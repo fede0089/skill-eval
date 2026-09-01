@@ -27,13 +27,13 @@ entries land here first under `Unreleased`.
 
 ### Changed
 
-- **The benchmark is frozen at the start of a run and measures every variant.**
+- **The evals are frozen at the start of a run and measure every variant.**
   `evals/`, its expectations and the evaluation config of both measuring roles
-  are copied once, into `benchmark/` inside the run directory. A
-  `--compare-ref` version now contributes only its implementation: it no longer
-  brings its own evaluation config to the comparison, so a change in the
-  benchmark between two versions can no longer move the numbers.
-- The HTML report header records which benchmark produced the numbers.
+  are copied once, into `evals/` inside the run directory. A `--compare-ref`
+  version now contributes only its implementation: it no longer brings its own
+  evaluation config to the comparison, so a change in the evals between two
+  versions can no longer move the numbers.
+- The HTML report header records which evals produced the numbers.
 
 ### Fixed
 

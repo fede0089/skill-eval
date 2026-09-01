@@ -10,7 +10,7 @@ import { AgentPool } from '../core/agent-pool.js';
 import { aggregatePassAtK, aggregateAssertionPassRate, aggregateTokenStats, aggregateDurationStats } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { resolveOutputDir } from '../core/output-location.js';
-import { freezeBenchmark, materializeImplementation } from '../core/benchmark.js';
+import { freezeEvals, materializeImplementation } from '../core/skill-parts.js';
 import { ConfigError } from '../core/errors.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderFunctionalTable, renderRunHeader } from '../utils/table-renderer.js';
@@ -91,26 +91,26 @@ export async function functionalCommand(
   const runDir = path.resolve(artifactsDir, 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
 
-  // The benchmark is frozen once, here, and every variant of the run is measured with
+  // The evals are frozen once, here, and every variant of the run is measured with
   // this copy: a historical ref contributes only its implementation, so the numbers stay
   // comparable even when its evals or its evaluation config had changed. An injected
   // suite means the tool was told not to read the skill from disk, so nothing is frozen
   // and nothing is cut — exactly as when preflight is skipped.
   const absoluteSkillPath = path.resolve(workspace, skillPath);
-  const benchmark = injectedSuite ? undefined : freezeBenchmark(absoluteSkillPath, runDir);
+  const frozenEvals = injectedSuite ? undefined : freezeEvals(absoluteSkillPath, runDir);
 
   const variantRunners = new Map<string, EvalRunner>();
 
   // 1. Local Runner
   // What a trial links is the implementation alone: the evaluated agent must not find
   // the expectations it is being graded with inside its own working environment.
-  const localImplPath = benchmark
+  const localImplPath = frozenEvals
     ? materializeImplementation(absoluteSkillPath, path.join(implPathBase, 'local'))
     : skillPath;
 
   variantRunners.set('local', new EvalRunner({
     executorAgent, judgeAgent, workspace, skillPath: localImplPath, skillName: skill_name, runDir, worktreesDir,
-    benchmarkDir: benchmark?.dir, isBaseline: false, timeoutMs,
+    frozenEvalsDir: frozenEvals?.dir, isBaseline: false, timeoutMs,
     variant: 'local'
   }));
 
@@ -121,7 +121,7 @@ export async function functionalCommand(
     // Where the skill landed is answered by whoever extracted it: the archive is of the
     // skill's repository, which may not be the workspace under evaluation.
     const refSkillPath = git.extractSkillRef(absoluteSkillPath, ref, refDir);
-    const refImplPath = benchmark
+    const refImplPath = frozenEvals
       ? materializeImplementation(refSkillPath, path.join(implPathBase, ref))
       : refSkillPath;
     Logger.write(chalk.green('Done\n'));
@@ -137,7 +137,7 @@ export async function functionalCommand(
       skillName: skill_name,
       runDir,
       worktreesDir,
-      benchmarkDir: benchmark?.dir,
+      frozenEvalsDir: frozenEvals?.dir,
       isBaseline: false,
       timeoutMs,
       variant: `ref:${ref}`
@@ -149,7 +149,7 @@ export async function functionalCommand(
   // frozen evaluation config as every other variant.
   const withoutSkillRunner = compareBaseline ? new EvalRunner({
     executorAgent, judgeAgent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir,
-    benchmarkDir: benchmark?.dir, isBaseline: true, timeoutMs,
+    frozenEvalsDir: frozenEvals?.dir, isBaseline: true, timeoutMs,
     variant: 'baseline'
   }) : undefined;
 
@@ -364,12 +364,12 @@ export async function functionalCommand(
       skill_name,
       executorAgent,
       judgeAgent,
-      // What produced these numbers: one benchmark, frozen at the start of the run
-      // and shared by every variant.
-      benchmark: benchmark && {
-        source: benchmark.source,
-        frozen: path.relative(runDir, benchmark.dir),
-        evalFiles: benchmark.evalFiles
+      // What produced these numbers: one set of evals, frozen at the start of the
+      // run and shared by every variant.
+      frozenEvals: frozenEvals && {
+        source: frozenEvals.source,
+        frozen: path.relative(runDir, frozenEvals.dir),
+        evalFiles: frozenEvals.evalFiles
       },
       metrics: {
         passedCount: withSkillTasksAllPassedCount,

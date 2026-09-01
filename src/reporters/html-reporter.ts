@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import type { EvalSuiteReport, EvalTrial, ReportBenchmark, TaskResult } from '../types/index.js';
+import type { EvalSuiteReport, EvalTrial, ReportFrozenEvals, TaskResult } from '../types/index.js';
 import { Logger } from '../utils/logger.js';
 import type { Reporter } from './reporter.js';
 import { detectAnomalies, type Anomaly } from '../core/anomalies.js';
@@ -56,8 +56,8 @@ export interface RunData {
   executorAgent: string;
   /** Absent when no agent fulfils the judge role, as in a trigger run. */
   judgeAgent?: string;
-  /** Absent when the run froze no benchmark. */
-  benchmark?: ReportBenchmark;
+  /** Absent when the run froze no evals. */
+  frozenEvals?: ReportFrozenEvals;
   timestamp: string;
   tasks: RunTask[];
 }
@@ -103,7 +103,7 @@ export function buildRunData(report: EvalSuiteReport): RunData {
     skill: report.skill_name,
     executorAgent: report.executorAgent,
     judgeAgent: report.judgeAgent,
-    benchmark: report.benchmark,
+    frozenEvals: report.frozenEvals,
     timestamp: report.timestamp,
     tasks: report.results.map(result => {
       const variants = variantsOf(result, functional);
@@ -497,7 +497,7 @@ input[type="text"] { width: 190px; }
     <div class="header-meta">
       <span><b>Executor</b> <span id="hdr-executor">—</span></span>
       <span id="hdr-judge-wrap" hidden><b>Judge</b> <span id="hdr-judge">—</span></span>
-      <span id="hdr-benchmark-wrap" hidden><b>Benchmark</b> <span id="hdr-benchmark">—</span></span>
+      <span id="hdr-evals-wrap" hidden><b>Evals</b> <span id="hdr-evals">—</span></span>
       <span><b>Type</b> <span id="hdr-type">—</span></span>
       <span><b>Date</b> <span id="hdr-date">—</span></span>
     </div>
@@ -690,15 +690,15 @@ input[type="text"] { width: 190px; }
     /* A run nobody judged says so by leaving the role out, not by naming an agent. */
     document.getElementById('hdr-judge').textContent = RUN.judgeAgent || '';
     document.getElementById('hdr-judge-wrap').hidden = !RUN.judgeAgent;
-    /* Which benchmark produced these numbers. Frozen at the start of the run and
-       shared by every variant, so it is what a later comparison has to reuse. */
-    var bench = RUN.benchmark;
-    var benchWrap = document.getElementById('hdr-benchmark-wrap');
-    document.getElementById('hdr-benchmark').textContent = bench
-      ? bench.frozen + '/' + (bench.evalFiles.length ? '  ·  ' + bench.evalFiles.join(', ') : '')
+    /* Which evals produced these numbers. Frozen at the start of the run and shared
+       by every variant, so they are what a later comparison has to reuse. */
+    var frozen = RUN.frozenEvals;
+    var frozenWrap = document.getElementById('hdr-evals-wrap');
+    document.getElementById('hdr-evals').textContent = frozen
+      ? (frozen.evalFiles.length ? frozen.evalFiles.join(', ') : frozen.frozen + '/')
       : '';
-    benchWrap.title = bench ? 'Frozen from ' + bench.source : '';
-    benchWrap.hidden = !bench;
+    frozenWrap.title = frozen ? 'Frozen from ' + frozen.source + ' into ' + frozen.frozen + '/' : '';
+    frozenWrap.hidden = !frozen;
     document.getElementById('hdr-type').textContent = RUN.command === 'functional' ? 'Functional' : 'Trigger';
     document.getElementById('hdr-date').textContent = new Date(RUN.timestamp).toLocaleString();
   }

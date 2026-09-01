@@ -425,18 +425,18 @@ test('the trials table lists every trial with its anomalies and controls', () =>
   assert.ok(!details.includes('trial-detail'), 'trial detail rows stay collapsed until asked for');
 });
 
-test('buildRunData carries the frozen benchmark, and invents none when the run froze nothing', () => {
+test('buildRunData carries the frozen evals, and invents none when the run froze nothing', () => {
   const frozen = {
     source: '/home/dev/my-skill/evals',
-    frozen: 'benchmark',
+    frozen: 'evals',
     evalFiles: ['edge-cases.json', 'license.json'],
   };
 
-  const measured = buildRunData(makeFunctionalReport({ benchmark: frozen }));
-  assert.deepStrictEqual(measured.benchmark, frozen, 'The report must say which benchmark produced these numbers');
+  const measured = buildRunData(makeFunctionalReport({ frozenEvals: frozen }));
+  assert.deepStrictEqual(measured.frozenEvals, frozen, 'The report must say which evals produced these numbers');
 
   // A run that froze nothing says so by leaving it out, not by naming a directory.
-  assert.strictEqual(buildRunData(makeFunctionalReport()).benchmark, undefined);
+  assert.strictEqual(buildRunData(makeFunctionalReport()).frozenEvals, undefined);
 });
 
 test('buildRunData carries the agent of each role, and invents no judge when none graded', () => {

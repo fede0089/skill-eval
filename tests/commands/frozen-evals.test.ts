@@ -21,7 +21,7 @@ function commit(cwd: string, message: string): void {
   ], { cwd, stdio: 'ignore' });
 }
 
-function writeBenchmark(skillPath: string, expectation: string, settings: string): void {
+function writeEvals(skillPath: string, expectation: string, settings: string): void {
   fs.mkdirSync(path.join(skillPath, 'evals', 'config', 'gemini-cli'), { recursive: true });
   fs.writeFileSync(path.join(skillPath, 'evals', 'license.json'), JSON.stringify({
     skill_name: 'mock-skill',
@@ -30,7 +30,7 @@ function writeBenchmark(skillPath: string, expectation: string, settings: string
   fs.writeFileSync(path.join(skillPath, 'evals', 'config', 'gemini-cli', 'settings.json'), settings);
 }
 
-test('functionalCommand measures every variant with the frozen benchmark and links only implementations', async (t) => {
+test('functionalCommand measures every variant with the frozen evals and links only implementations', async (t) => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-frozen-repo-'));
   const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-frozen-out-'));
   const skillPath = path.join(workspace, 'mock-skill');
@@ -38,11 +38,11 @@ test('functionalCommand measures every variant with the frozen benchmark and lin
   execFileSync('git', ['init', '-q'], { cwd: workspace, stdio: 'ignore' });
   fs.mkdirSync(skillPath, { recursive: true });
   fs.writeFileSync(path.join(skillPath, 'SKILL.md'), '# old implementation\n');
-  writeBenchmark(skillPath, 'the old expectation', '{"frozen":false}');
+  writeEvals(skillPath, 'the old expectation', '{"frozen":false}');
   commit(workspace, 'the historical version');
 
   fs.writeFileSync(path.join(skillPath, 'SKILL.md'), '# new implementation\n');
-  writeBenchmark(skillPath, 'the local expectation', '{"frozen":true}');
+  writeEvals(skillPath, 'the local expectation', '{"frozen":true}');
   commit(workspace, 'the local version');
 
   // Preflight only asks the shell whether the agent binary is on PATH; everything
@@ -73,26 +73,26 @@ test('functionalCommand measures every variant with the frozen benchmark and lin
     const local = byVariant.get('local')!;
     const historical = byVariant.get('ref:HEAD~1')!;
 
-    // 1. One frozen benchmark for both variants, and it is the local one.
-    assert.ok(local.benchmarkDir, 'Expected the run to have frozen a benchmark');
-    assert.strictEqual(historical.benchmarkDir, local.benchmarkDir, 'Both variants must be measured with the same benchmark');
+    // 1. One frozen set of evals for both variants, and it is the local one.
+    assert.ok(local.frozenEvalsDir, 'Expected the run to have frozen the evals');
+    assert.strictEqual(historical.frozenEvalsDir, local.frozenEvalsDir, 'Both variants must be measured with the same evals');
     assert.strictEqual(
-      fs.readFileSync(path.join(local.benchmarkDir!, 'config', 'gemini-cli', 'settings.json'), 'utf-8'),
+      fs.readFileSync(path.join(local.frozenEvalsDir!, 'config', 'gemini-cli', 'settings.json'), 'utf-8'),
       '{"frozen":true}',
       'The frozen evaluation config must be the local one, not the one the ref carried'
     );
     assert.match(
-      fs.readFileSync(path.join(local.benchmarkDir!, 'license.json'), 'utf-8'),
+      fs.readFileSync(path.join(local.frozenEvalsDir!, 'license.json'), 'utf-8'),
       /the local expectation/
     );
 
-    // 2. Each variant contributes its own implementation, and no benchmark travels with it.
+    // 2. Each variant contributes its own implementation, and no evals travel with it.
     assert.strictEqual(fs.readFileSync(path.join(local.skillPath, 'SKILL.md'), 'utf-8'), '# new implementation\n');
     assert.strictEqual(fs.readFileSync(path.join(historical.skillPath, 'SKILL.md'), 'utf-8'), '# old implementation\n');
     for (const [variant, options] of byVariant) {
       assert.ok(
         !fs.existsSync(path.join(options.skillPath, 'evals')),
-        `The trial environment of '${variant}' must not receive the benchmark`
+        `The trial environment of '${variant}' must not receive the evals`
       );
       assert.ok(
         !path.resolve(options.skillPath).startsWith(path.resolve(skillPath) + path.sep) &&
