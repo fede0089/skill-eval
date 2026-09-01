@@ -256,7 +256,7 @@ The report carries the full run data and computes every figure in the browser, s
 A published sample report is available at [fede0089.github.io/skill-eval/sample-report.html](https://fede0089.github.io/skill-eval/sample-report.html), generated from this project root with:
 
 ```sh
-skill-eval functional --workspace . --skill mock-skill --trials 2 --compare-baseline claude-code
+skill-eval functional --workspace . --skill mock-skill --trials 2 --compare-baseline --executor-agent claude-code
 ```
 
 ![Sample HTML report](docs/sample-report.png)
