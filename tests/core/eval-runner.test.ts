@@ -822,3 +822,69 @@ test('EvalRunner attaches a summary with the log pointer even when the agent err
   assert.strictEqual(trial.summary?.output, '');
   assert.strictEqual(trial.summary?.logFile, 'task_6_local_trial_1.log');
 });
+
+// ── Agent roles ──────────────────────────────────────────────────────────────
+
+/** Registers one runner mock per agent name, as RunnerFactory would. */
+function mockRunnersByAgent(runners: Record<string, ReturnType<typeof makeAgentRunnerMock>>) {
+  mock.method(RunnerFactory, 'create', (agent: string) => {
+    const runner = runners[agent];
+    assert.ok(runner, `Unexpected agent requested from the factory: ${agent}`);
+    return runner;
+  });
+}
+
+const JUDGE_VERDICT_NDJSON = [
+  JSON.stringify({ type: 'message', role: 'assistant', content: JSON.stringify([{ assertion: 'test', passed: true, reason: 'ok' }]) }),
+  JSON.stringify({ type: 'result', status: 'success' })
+].join('\n');
+
+test('EvalRunner.runFunctionalTask runs the judge on the judge agent and applies both runner configs to the worktree', async () => {
+  const executorRunner = makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: makeSkillActivationNdjson('t1', true) }));
+  const judgeRunner = makeAgentRunnerMock(async () => ({ response: JUDGE_VERDICT_NDJSON, raw_output: '' }));
+  mockRunnersByAgent({ 'gemini-cli': executorRunner, 'claude-code': judgeRunner });
+
+  const runner = new EvalRunner({
+    executorAgent: 'gemini-cli', judgeAgent: 'claude-code', workspace: '/tmp', skillPath: './mock-skill',
+    skillName: 'mock-skill', runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
+  });
+
+  stubWorktree({ stubExec: true });
+
+  const result = await runner.runFunctionalTask({ id: 40, prompt: 'test', assertions: ['test'] }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.trialPassed, true, 'The judge on the other backend should have graded the trial');
+  assert.strictEqual(executorRunner.runPrompt.mock.callCount(), 1, 'The executor runs the task once');
+  assert.strictEqual(judgeRunner.runPrompt.mock.callCount(), 1, 'The judge runs the grading prompt, not the executor');
+
+  // Both roles run in the same worktree, so both backends need their config there.
+  assert.strictEqual(executorRunner.applyRunnerConfig.mock.callCount(), 1);
+  assert.strictEqual(judgeRunner.applyRunnerConfig.mock.callCount(), 1);
+  const [executorConfigDir, executorWorktree] = executorRunner.applyRunnerConfig.mock.calls[0].arguments as [string, string];
+  const [judgeConfigDir, judgeWorktree] = judgeRunner.applyRunnerConfig.mock.calls[0].arguments as [string, string];
+  assert.strictEqual(judgeConfigDir, executorConfigDir, 'Both roles read their config from the same evals/config/ directory');
+  assert.strictEqual(judgeWorktree, executorWorktree, 'Both roles are configured in the worktree the trial runs in');
+});
+
+test('EvalRunner.runFunctionalTask applies the runner config once when both roles name the same agent', async () => {
+  let call = 0;
+  const soleRunner = makeAgentRunnerMock(async () => {
+    call++;
+    return call === 1
+      ? { response: 'ok', raw_output: makeSkillActivationNdjson('t1', true) }
+      : { response: JUDGE_VERDICT_NDJSON, raw_output: '' };
+  });
+  mockRunnersByAgent({ 'gemini-cli': soleRunner });
+
+  const runner = new EvalRunner({
+    executorAgent: 'gemini-cli', judgeAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill',
+    skillName: 'mock-skill', runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
+  });
+
+  stubWorktree({ stubExec: true });
+
+  const result = await runner.runFunctionalTask({ id: 41, prompt: 'test', assertions: ['test'] }, 0, 1, { updateLog: () => {} } as any);
+
+  assert.strictEqual(result.trialPassed, true);
+  assert.strictEqual(soleRunner.applyRunnerConfig.mock.callCount(), 1, 'One agent in both roles should be configured once, as before roles existed');
+});

@@ -46,7 +46,7 @@ function makeTriggerReport(overrides: Partial<EvalSuiteReport> = {}): EvalSuiteR
   };
 }
 
-function makeFunctionalReport(): EvalSuiteReport {
+function makeFunctionalReport(overrides: Partial<EvalSuiteReport> = {}): EvalSuiteReport {
   return {
     timestamp: '2026-01-01T00:00:00.000Z',
     command: 'functional',
@@ -74,6 +74,7 @@ function makeFunctionalReport(): EvalSuiteReport {
         }
       },
     ],
+    ...overrides,
   };
 }
 
@@ -422,4 +423,16 @@ test('the trials table lists every trial with its anomalies and controls', () =>
   assert.strictEqual((details.match(/class="trial-row/g) ?? []).length, 6, 'one row per trial per variant');
   assert.strictEqual((details.match(/data-act="exclude"/g) ?? []).length, 6, 'every trial can be excluded');
   assert.ok(!details.includes('trial-detail'), 'trial detail rows stay collapsed until asked for');
+});
+
+test('buildRunData carries the agent of each role, and invents no judge when none graded', () => {
+  const judged = buildRunData(makeFunctionalReport({ executorAgent: 'gemini-cli', judgeAgent: 'claude-code' }));
+  assert.strictEqual(judged.executorAgent, 'gemini-cli');
+  assert.strictEqual(judged.judgeAgent, 'claude-code');
+
+  // A trigger run is graded programmatically: the role stays empty rather than
+  // repeating the executor, which would claim an agent judged it.
+  const unjudged = buildRunData(makeTriggerReport());
+  assert.strictEqual(unjudged.executorAgent, 'gemini-cli');
+  assert.strictEqual(unjudged.judgeAgent, undefined);
 });

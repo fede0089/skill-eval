@@ -76,3 +76,30 @@ test('preflight: does not throw when all checks pass', () => {
 
   mock.reset();
 });
+
+test('preflight: throws naming the judge role when only the judge binary is missing', () => {
+  // With two agents in play, "binary not found" has to say which of the two.
+  mock.method(executor, 'execSync', mock.fn((cmd: string) => {
+    if (cmd === 'which claude') throw new Error('not found');
+    return Buffer.from('/usr/bin/gemini');
+  }));
+
+  assert.throws(
+    () => preflight('gemini-cli', process.cwd(), './mock-skill', 'claude-code'),
+    (err) => err instanceof ExecutionError && err.message.startsWith("Judge agent binary 'claude'"),
+    'Should throw ExecutionError naming the judge role and its binary'
+  );
+
+  mock.reset();
+});
+
+test('preflight: checks one binary when both roles name the same agent', () => {
+  const execMock = mock.fn(() => Buffer.from('/usr/bin/gemini'));
+  mock.method(executor, 'execSync', execMock);
+
+  preflight('gemini-cli', process.cwd(), './mock-skill', 'gemini-cli');
+
+  assert.strictEqual(execMock.mock.callCount(), 1, 'The same agent in both roles is one binary to verify');
+
+  mock.reset();
+});
