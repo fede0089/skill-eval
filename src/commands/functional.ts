@@ -364,6 +364,13 @@ export async function functionalCommand(
       skill_name,
       executorAgent,
       judgeAgent,
+      // What produced these numbers: one benchmark, frozen at the start of the run
+      // and shared by every variant.
+      benchmark: benchmark && {
+        source: benchmark.source,
+        frozen: path.relative(runDir, benchmark.dir),
+        evalFiles: benchmark.evalFiles
+      },
       metrics: {
         passedCount: withSkillTasksAllPassedCount,
         totalCount: tasks.length,

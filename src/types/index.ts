@@ -140,6 +140,20 @@ export interface AgentTranscript {
   [key: string]: unknown;
 }
 
+/**
+ * The benchmark a run was measured with. Every variant shares one, so this is the
+ * record of what produced the numbers — and of what a later comparison has to
+ * reuse for those numbers to mean anything.
+ */
+export interface ReportBenchmark {
+  /** The skill's benchmark directory the frozen copy was taken from. */
+  source: string;
+  /** Where the frozen copy lives, relative to the run directory. */
+  frozen: string;
+  /** Eval files the frozen copy holds. */
+  evalFiles: string[];
+}
+
 export interface EvalSuiteReport {
   timestamp: string;
   command?: 'trigger' | 'functional';
@@ -148,6 +162,8 @@ export interface EvalSuiteReport {
   executorAgent: string;
   /** Agent that graded it. Absent when nothing graded — trigger grades programmatically. */
   judgeAgent?: string;
+  /** Frozen benchmark every variant was measured with. Absent when nothing was frozen. */
+  benchmark?: ReportBenchmark;
   metrics: {
     passedCount?: number;
     totalCount: number;

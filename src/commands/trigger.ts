@@ -276,6 +276,13 @@ export async function triggerCommand(
       skill_name,
       // No judgeAgent: trigger grades programmatically, so no agent fills that role.
       executorAgent,
+      // What produced these numbers: one benchmark, frozen at the start of the run
+      // and shared by every variant.
+      benchmark: benchmark && {
+        source: benchmark.source,
+        frozen: path.relative(runDir, benchmark.dir),
+        evalFiles: benchmark.evalFiles
+      },
       metrics: {
         passedCount: tasksPassedCount,
         totalCount: tasks.length,
