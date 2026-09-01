@@ -99,7 +99,9 @@ export async function functionalCommand(
   for (const ref of compareRefs) {
     const refDir = path.join(refPathBase, ref);
     Logger.write(`   Extracting ref '${ref}'... `);
-    git.extractSkillRef(skillPath, ref, refDir);
+    // Where the skill landed is answered by whoever extracted it: the archive is of the
+    // skill's repository, which may not be the workspace under evaluation.
+    const refSkillPath = git.extractSkillRef(skillPath, ref, refDir);
     Logger.write(chalk.green('Done\n'));
 
     variantRunners.set(`ref:${ref}`, new EvalRunner({
@@ -108,7 +110,7 @@ export async function functionalCommand(
       // produces no .git, so the extracted copy is not a repository at all. It
       // contributes only the skill implementation, addressed absolutely.
       workspace,
-      skillPath: path.resolve(refDir, path.relative(workspace, path.resolve(workspace, skillPath))),
+      skillPath: refSkillPath,
       skillName: skill_name,
       runDir,
       worktreesDir,
