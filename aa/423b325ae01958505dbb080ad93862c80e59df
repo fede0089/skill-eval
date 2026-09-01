@@ -1,0 +1,42 @@
+src/commands/functional.ts
+  s_375d768edcc837::t_57607cf0d45945 13,94,100,107,113,124,140,152,367-372
+src/core/eval-runner.ts
+  s_375d768edcc837::t_57607cf0d45945 5,26-28,30,62-63,66-68
+src/types/index.ts
+  s_375d768edcc837::t_5805d591431be4 144-146,148-149,165-166
+README.md
+  s_375d768edcc837::t_522c252e323adc 47,127,138,249
+CHANGELOG.md
+  s_375d768edcc837::t_522c252e323adc 30,32-36
+src/reporters/html-reporter.ts
+  s_375d768edcc837::t_5805d591431be4 3,59-60,106,500,693-698,700-701
+tests/commands/frozen-evals.test.ts
+  s_375d768edcc837::t_4e4c1c94c5f3ae 1-108
+tests/reporters/html-reporter.test.ts
+  s_375d768edcc837::t_4e4c1c94c5f3ae 428,431,435-436,439
+src/commands/trigger.ts
+  s_375d768edcc837::t_57607cf0d45945 13,75,81,88,94,105,120,279-284
+src/core/skill-parts.ts
+  s_375d768edcc837::t_57607cf0d45945 1-83
+tests/core/skill-parts.test.ts
+  s_375d768edcc837::t_b71aec87a05f95 25,43,60,79,102
+  s_375d768edcc837::t_4e4c1c94c5f3ae 1-24,26-42,44-59,61-78,80-101,103-112
+tests/core/eval-runner.test.ts
+  s_375d768edcc837::t_4e4c1c94c5f3ae 497,499-500,503-504,513,520
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "aa423b325ae01958505dbb080ad93862c80e59df",
+  "prompts": {},
+  "sessions": {
+    "s_375d768edcc837": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "648f203d-148d-4a72-914f-c6460d5cb1ac",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
