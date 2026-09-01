@@ -1,0 +1,21 @@
+README.md
+  s_1df1a4c1c03bf9::t_825a17a1775c8e 259
+AGENTS.md
+  s_1df1a4c1c03bf9::t_825a17a1775c8e 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "bf6daa65b741bef36ec561f5e921a89a53b9fdde",
+  "prompts": {},
+  "sessions": {
+    "s_1df1a4c1c03bf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b89bf062-9e85-4f79-adeb-a159b07d4e61",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
