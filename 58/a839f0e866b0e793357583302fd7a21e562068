@@ -1,0 +1,28 @@
+src/commands/trigger.ts
+  s_1df1a4c1c03bf9::t_556e0d21c6f778 21,34,76,90,119
+  s_1df1a4c1c03bf9::t_f50ab78f32cb29 255
+scripts/run-mock-eval.mjs
+  s_1df1a4c1c03bf9::t_f50ab78f32cb29 48
+src/commands/functional.ts
+  s_1df1a4c1c03bf9::t_d4a8b1d33510fd 23-24,38,95,109-110,127,151,340
+tests/core/phase-2-validation.test.ts
+  s_1df1a4c1c03bf9::t_f50ab78f32cb29 33
+src/index.ts
+  s_1df1a4c1c03bf9::t_5fc3e9c0992611 53,63,65,67,73,77,88-89,91,93-96,103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "58a839f0e866b0e793357583302fd7a21e562068",
+  "prompts": {},
+  "sessions": {
+    "s_1df1a4c1c03bf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b89bf062-9e85-4f79-adeb-a159b07d4e61",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
