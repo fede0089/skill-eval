@@ -494,6 +494,38 @@ test('EvalRunner.runTriggerTask copies evals/config/gemini-cli/ into worktree .g
   }
 });
 
+test('EvalRunner reads the evaluation config from the frozen benchmark, not from the variant skill', async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
+  // The shape of a historical variant: its own skill carries a benchmark that must
+  // not be applied, while the frozen one lives outside it.
+  const variantSkill = path.join(workspace, 'ref-copy', 'test-skill');
+  fs.mkdirSync(path.join(variantSkill, 'evals', 'config'), { recursive: true });
+  const frozenBenchmark = path.join(workspace, 'run', 'benchmark');
+  fs.mkdirSync(path.join(frozenBenchmark, 'config'), { recursive: true });
+
+  try {
+    const agentRunnerMock = makeAgentRunnerMock();
+    mock.method(RunnerFactory, 'create', () => agentRunnerMock);
+    stubWorktree();
+
+    const runner = new EvalRunner({
+      executorAgent: 'gemini-cli', workspace, skillPath: variantSkill, skillName: 'test-skill',
+      runDir: '/tmp', worktreesDir: '/tmp/worktrees', benchmarkDir: frozenBenchmark,
+    });
+
+    await runner.runTriggerTask({ id: 1, prompt: 'test' }, 0, 1, { updateLog: () => {} } as any);
+
+    assert.strictEqual(
+      agentRunnerMock.applyRunnerConfig.mock.calls[0].arguments[0],
+      path.join(frozenBenchmark, 'config'),
+      'The variant must be measured with the frozen config, not with the one it carries'
+    );
+  } finally {
+    mock.reset();
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
 test('EvalRunner.runTriggerTask does not fail when evals/config/gemini-cli/ does not exist', async () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-test-'));
   const worktreePath = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-worktree-'));
