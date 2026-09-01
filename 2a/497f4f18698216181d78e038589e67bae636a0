@@ -1,0 +1,31 @@
+src/commands/functional.ts
+  s_1df1a4c1c03bf9::t_bef6b954f95633 151,340-341
+src/utils/table-renderer.ts
+  s_1df1a4c1c03bf9::t_bef6b954f95633 84-86,126,158-159
+src/types/index.ts
+  s_1df1a4c1c03bf9::t_bef6b954f95633 147-150
+tests/utils/table-renderer.test.ts
+  s_1df1a4c1c03bf9::t_ff11755a3986b1 20,46
+tests/reporters/html-reporter.test.ts
+  s_1df1a4c1c03bf9::t_ff11755a3986b1 13,54,85,156,195,344
+src/reporters/html-reporter.ts
+  s_1df1a4c1c03bf9::t_ff11755a3986b1 56-58,102-103,495-496,685-688
+src/commands/trigger.ts
+  s_1df1a4c1c03bf9::t_bef6b954f95633 119,255-256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "2a497f4f18698216181d78e038589e67bae636a0",
+  "prompts": {},
+  "sessions": {
+    "s_1df1a4c1c03bf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b89bf062-9e85-4f79-adeb-a159b07d4e61",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
