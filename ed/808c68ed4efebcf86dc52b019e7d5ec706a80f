@@ -1,0 +1,19 @@
+tests/commands/functional.test.ts
+  s_1df1a4c1c03bf9::t_ed1eca3459512d 36,70,104,139,168,195,237
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "ed808c68ed4efebcf86dc52b019e7d5ec706a80f",
+  "prompts": {},
+  "sessions": {
+    "s_1df1a4c1c03bf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b89bf062-9e85-4f79-adeb-a159b07d4e61",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
