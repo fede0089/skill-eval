@@ -20,6 +20,27 @@ entries land here first under `Unreleased`.
   skill-eval functional --executor-agent codex --workspace . --skill ./my-skill
   ```
 
+- **A skill can no longer reference anything under `evals/` from its
+  implementation.** The evaluated agent now receives the skill with `evals/`
+  left out, so it cannot read the expectations it is being graded with. A
+  `SKILL.md` pointing at a file below `evals/` will find nothing there.
+
+### Changed
+
+- **The benchmark is frozen at the start of a run and measures every variant.**
+  `evals/`, its expectations and the evaluation config of both measuring roles
+  are copied once, into `benchmark/` inside the run directory. A
+  `--compare-ref` version now contributes only its implementation: it no longer
+  brings its own evaluation config to the comparison, so a change in the
+  benchmark between two versions can no longer move the numbers.
+- The HTML report header records which benchmark produced the numbers.
+
+### Fixed
+
+- A relative `--skill` is now resolved against `--workspace` before extracting a
+  `--compare-ref` version. Running from anywhere other than the workspace root
+  extracted the ref from whatever repository the shell happened to be in.
+
 ### Added
 
 - `--executor-agent <name>` on both commands: the agent that runs the evaluated
