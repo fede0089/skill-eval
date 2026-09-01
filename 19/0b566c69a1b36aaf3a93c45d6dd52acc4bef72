@@ -1,0 +1,19 @@
+src/core/eval-runner.ts
+  s_375d768edcc837::t_cc930937e755c6 5,25-30,61-70,100,242
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "190b566c69a1b36aaf3a93c45d6dd52acc4bef72",
+  "prompts": {},
+  "sessions": {
+    "s_375d768edcc837": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "648f203d-148d-4a72-914f-c6460d5cb1ac",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
