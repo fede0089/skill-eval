@@ -89,7 +89,7 @@ test('EvalRunner runs a historical variant against the workspace repository, lin
       'The evidence root must hold no trial environment'
     );
   } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 });

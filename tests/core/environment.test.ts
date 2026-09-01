@@ -34,7 +34,7 @@ test('EvalEnvironment.worktreePathFor places trial environments inside the works
       'The trial environment must live inside the workspace under evaluation'
     );
   } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 });
@@ -86,7 +86,7 @@ test('EvalEnvironment.teardown cleans up remaining trial environments and skill-
     await env.teardown();
     assert.ok(!fs.existsSync(skillRefsDir), 'Expected skill-refs directory to be removed');
   } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 
@@ -114,7 +114,7 @@ test('EvalEnvironment.teardown runs git worktree prune against the workspace rep
   try {
     await env.teardown();
   } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 
@@ -166,7 +166,7 @@ test('EvalEnvironment.createWorktree should recover from stale physical director
     assert.ok(!fs.existsSync(path.join(worktreePath, 'leftover.txt')), 'Stale leftover.txt should have been removed before add');
     assert.ok(fs.existsSync(worktreePath), 'Worktree directory should exist after add');
   } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 });
@@ -181,7 +181,7 @@ test('EvalEnvironment.teardown is a no-op when the trial environments dir does n
   try {
     await env.teardown();
   } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 
@@ -215,7 +215,7 @@ test('EvalEnvironment.createWorktree works against a real repository', () => {
     env.removeWorktree(worktreePath);
     assert.ok(!fs.existsSync(worktreePath), 'removeWorktree should have cleaned it up');
   } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 });
@@ -257,7 +257,7 @@ test('EvalEnvironment.createWorktree keeps the trial environment inside the work
     );
   } finally {
     env.removeWorktree(env.worktreePathFor('task-1-local-trial-1'));
-    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 });
@@ -282,7 +282,7 @@ test('EvalEnvironment.teardown removes a trial environment abandoned by an inter
       'The directory that held it should go too, leaving the workspace as it was found'
     );
   } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 });
