@@ -152,8 +152,9 @@ function sanitizeJsonControlChars(json: string): string {
 
 /**
  * Model-based grader that uses an LLM Judge to verify functional assertions.
- * The judgeRunner is injected so the grader uses the same agent backend as the evaluation,
- * making it easy to swap the runner (e.g. gemini-cli → claude) without touching this class.
+ * The judgeRunner is injected because the judge is a role of its own: it may run on a
+ * different backend than the agent that executed the task, and this class never needs
+ * to know which one it got.
  */
 export class ModelBasedGrader {
   constructor(private skillName: string, private judgeRunner: AgentRunner) {}

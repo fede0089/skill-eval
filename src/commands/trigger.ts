@@ -73,7 +73,7 @@ export async function triggerCommand(
 
   // 1. Local Runner
   variantRunners.set('local', new EvalRunner({
-    agent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir, isBaseline: false, timeoutMs,
+    executorAgent: agent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir, isBaseline: false, timeoutMs,
     variant: 'local'
   }));
 
@@ -87,7 +87,7 @@ export async function triggerCommand(
     Logger.write(chalk.green('Done\n'));
 
     variantRunners.set(`ref:${ref}`, new EvalRunner({
-      agent,
+      executorAgent: agent,
       // Worktrees are always cut from the real workspace repository: `git archive`
       // produces no .git, so the extracted copy is not a repository at all. It
       // contributes only the skill implementation, addressed absolutely.

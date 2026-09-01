@@ -40,7 +40,7 @@ test('EvalRunner.runFunctionalTask baseline prompt should include negative instr
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: true
   });
 
@@ -64,7 +64,7 @@ test('EvalRunner.runFunctionalTask baseline with skill activation → Invalid Ba
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: makeSkillActivationNdjson() })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: true
   });
 
@@ -80,7 +80,7 @@ test('EvalRunner.runFunctionalTask baseline with clean log → validation passes
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: true
   });
 
@@ -96,7 +96,7 @@ test('EvalRunner.runFunctionalTask target with no skill activation → Invalid T
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: '{"type":"message","content":"hello"}' })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -112,7 +112,7 @@ test('EvalRunner.runFunctionalTask with error transcript sets isError:true', asy
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ error: 'Process timeout exceeded (600 seconds)' })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -128,7 +128,7 @@ test('EvalRunner.runFunctionalTask target with successful skill activation → v
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: makeSkillActivationNdjson('t1', true) })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -147,7 +147,7 @@ test('EvalRunner.runTriggerTask negative eval passes when the skill does not act
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: cleanNdjson })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -166,7 +166,7 @@ test('EvalRunner.runTriggerTask negative eval fails on an attempted activation t
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: makeSkillActivationNdjson() })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -184,7 +184,7 @@ test('EvalRunner.runTriggerTask negative eval reports isError when no events are
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: 'plain text without any events' })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -200,7 +200,7 @@ test('EvalRunner.runTriggerTask positive eval still requires a successful activa
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: 'ok', raw_output: makeSkillActivationNdjson('tool-9', true) })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -219,7 +219,7 @@ test('EvalRunner.runTriggerTask with stream-json error result sets isError:true'
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: ndjsonError, raw_output: '' })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -236,7 +236,7 @@ test('EvalRunner.runFunctionalTask with stream-json error result sets isError:tr
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: ndjsonError, raw_output: '' })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -257,7 +257,7 @@ test('EvalRunner.runTriggerTask with error transcript always calls removeWorktre
   }));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -280,7 +280,7 @@ test('EvalRunner.runFunctionalTask with error transcript always calls removeWork
   }));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -303,7 +303,7 @@ test('EvalRunner.runTriggerTask uses unique worktree name per retry attempt', as
   }));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -338,7 +338,7 @@ test('EvalRunner.runTriggerTask gives each variant its own worktree name', async
   // resolve to the same worktree directory or the same temporary branch.
   for (const variant of ['local', 'ref:main']) {
     const runner = new EvalRunner({
-      agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+      executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
       runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false, variant
     });
     await runner.runTriggerTask({ id: 7, prompt: 'test' }, 0, 3, { updateLog: () => {} } as any, 0);
@@ -398,7 +398,7 @@ test('EvalRunner.runFunctionalTask retries only the judge when gradeModelBased t
   }));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false, judgeRetryDelayMs: 0
   });
 
@@ -433,7 +433,7 @@ test('EvalRunner.runFunctionalTask returns inconclusive failure (isError unset) 
   }));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false, judgeRetryDelayMs: 0
   });
 
@@ -479,7 +479,7 @@ test('EvalRunner.runTriggerTask copies evals/config/gemini-cli/ into worktree .g
     mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
 
     const runner = new EvalRunner({
-      agent: 'gemini-cli', workspace, skillPath: './test-skill', skillName: 'test-skill',
+      executorAgent: 'gemini-cli', workspace, skillPath: './test-skill', skillName: 'test-skill',
       runDir: '/tmp', worktreesDir: '/tmp/worktrees',
     });
 
@@ -509,7 +509,7 @@ test('EvalRunner.runTriggerTask does not fail when evals/config/gemini-cli/ does
     mock.method(EvalEnvironment.prototype, 'removeWorktree', () => {});
 
     const runner = new EvalRunner({
-      agent: 'gemini-cli', workspace, skillPath: './test-skill', skillName: 'test-skill',
+      executorAgent: 'gemini-cli', workspace, skillPath: './test-skill', skillName: 'test-skill',
       runDir: '/tmp', worktreesDir: '/tmp/worktrees',
     });
 
@@ -534,7 +534,7 @@ test('EvalRunner.runTriggerTask extracts tokenStats when result event has stats'
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: resultWithStats, raw_output: '' })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees'
   });
 
@@ -553,7 +553,7 @@ test('EvalRunner.runTriggerTask has no tokenStats when result event lacks stats'
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: JSON.stringify({ type: 'result', status: 'success' }), raw_output: '' })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees'
   });
 
@@ -574,7 +574,7 @@ test('EvalRunner.runFunctionalTask extracts tokenStats for with-skill trial', as
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: ndjsonWithSkill, raw_output: ndjsonWithSkill })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: false
   });
 
@@ -592,7 +592,7 @@ test('EvalRunner.runFunctionalTask extracts tokenStats for without-skill trial',
   mock.method(RunnerFactory, 'create', () => makeAgentRunnerMock(async () => ({ response: ndjsonBaseline, raw_output: '' })));
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp', worktreesDir: '/tmp/worktrees', isBaseline: true
   });
 
@@ -611,7 +611,7 @@ test('EvalRunner.runTriggerTask log filename includes variant slug (local)', asy
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp/runs/abc', worktreesDir: '/tmp/worktrees', variant: 'local'
   });
   stubWorktree();
@@ -627,7 +627,7 @@ test('EvalRunner.runTriggerTask log filename slugifies ref:<name>', async () => 
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp/runs/abc', worktreesDir: '/tmp/worktrees', variant: 'ref:main'
   });
   stubWorktree();
@@ -643,7 +643,7 @@ test('EvalRunner.runTriggerTask log filename slugifies ref with slash (feature/b
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp/runs/abc', worktreesDir: '/tmp/worktrees', variant: 'ref:feature/my-branch'
   });
   stubWorktree();
@@ -661,7 +661,7 @@ test('EvalRunner.runFunctionalTask log filename includes variant slug for local'
   const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-runs-'));
   try {
     const runner = new EvalRunner({
-      agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+      executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
       runDir, isBaseline: false, variant: 'local'
     });
     stubWorktree({ stubExec: true });
@@ -682,7 +682,7 @@ test('EvalRunner.runFunctionalTask log filename uses baseline variant for skill-
   const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-runs-'));
   try {
     const runner = new EvalRunner({
-      agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+      executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
       runDir, isBaseline: true, variant: 'baseline'
     });
     stubWorktree({ stubExec: true });
@@ -703,7 +703,7 @@ test('EvalRunner.runFunctionalTask log filename slugifies ref:<name>', async () 
   const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-runs-'));
   try {
     const runner = new EvalRunner({
-      agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+      executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
       runDir, isBaseline: false, variant: 'ref:v1.0'
     });
     stubWorktree({ stubExec: true });
@@ -722,7 +722,7 @@ test('EvalRunner.runTriggerTask defaults to local variant when not provided (bac
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp/runs/abc', worktreesDir: '/tmp/worktrees',
   });
   stubWorktree();
@@ -740,7 +740,7 @@ test('EvalRunner.runFunctionalTask defaults to baseline variant when isBaseline=
   const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-runs-'));
   try {
     const runner = new EvalRunner({
-      agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+      executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
       runDir, isBaseline: true,
     });
     stubWorktree({ stubExec: true });
@@ -764,7 +764,7 @@ test('EvalRunner writes a trial log even when DEBUG is unset', async () => {
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp/runs/abc', worktreesDir: '/tmp/worktrees', variant: 'local'
   });
   stubWorktree();
@@ -792,7 +792,7 @@ test('EvalRunner.runTriggerTask attaches a summary built from the agent stream',
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp/runs/abc', worktreesDir: '/tmp/worktrees', variant: 'local'
   });
   stubWorktree();
@@ -811,7 +811,7 @@ test('EvalRunner attaches a summary with the log pointer even when the agent err
   mock.method(RunnerFactory, 'create', () => agentRunnerMock);
 
   const runner = new EvalRunner({
-    agent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
+    executorAgent: 'gemini-cli', workspace: '/tmp', skillPath: './mock-skill', skillName: 'mock-skill',
     runDir: '/tmp/runs/abc', worktreesDir: '/tmp/worktrees', variant: 'local'
   });
   stubWorktree();

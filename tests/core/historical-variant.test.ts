@@ -59,7 +59,7 @@ test('EvalRunner runs a historical variant against the workspace repository, lin
   // The wiring the commands use for a historical variant: the real repository as
   // the workspace, the skill addressed absolutely inside the extracted copy.
   const runner = new EvalRunner({
-    agent: 'gemini-cli',
+    executorAgent: 'gemini-cli',
     workspace,
     skillPath: extractedSkillPath,
     skillName: 'mock-skill',

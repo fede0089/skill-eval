@@ -11,7 +11,10 @@ import { parseNdjsonEvents, parseStreamResult, parseTokenStats } from '../utils/
 import { Logger } from '../utils/logger.js';
 
 export interface EvalRunOptions {
-  agent: string;
+  /** Agent that runs the evaluated task. */
+  executorAgent: string;
+  /** Agent that grades the result. Falls back to the executor when not given. */
+  judgeAgent?: string;
   workspace: string;
   skillPath: string;
   skillName: string;
@@ -34,6 +37,7 @@ function slugifyVariant(v: string): string {
 export class EvalRunner {
   private env: EvalEnvironment;
   private runner: AgentRunner;
+  private judgeRunner: AgentRunner;
   private triggerGrader: TriggerGrader;
   private functionalGrader: ModelBasedGrader;
 
@@ -49,10 +53,14 @@ export class EvalRunner {
 
   constructor(private options: EvalRunOptions) {
     this.env = new EvalEnvironment({ workspace: options.workspace, worktreesDir: options.worktreesDir });
-    this.runner = RunnerFactory.create(options.agent);
+    this.runner = RunnerFactory.create(options.executorAgent);
+    // One runner per role. Both roles share an instance when they name the same
+    // agent, so a single-agent run behaves exactly as it did before roles existed.
+    this.judgeRunner = options.judgeAgent && options.judgeAgent !== options.executorAgent
+      ? RunnerFactory.create(options.judgeAgent)
+      : this.runner;
     this.triggerGrader = new TriggerGrader(options.skillName, this.runner.skillDispatchToolName);
-    // Inject the same runner for judging so swapping the agent backend works end-to-end
-    this.functionalGrader = new ModelBasedGrader(options.skillName, this.runner);
+    this.functionalGrader = new ModelBasedGrader(options.skillName, this.judgeRunner);
   }
 
   async runTriggerTask(task: EvalTask, index: number, trialId: number, uiCtx: EvalTaskContext, attempt = 0): Promise<EvalTrial> {
@@ -210,7 +218,15 @@ export class EvalRunner {
       if (!skillDisabled) {
         await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
       }
-      this.runner.applyRunnerConfig(path.resolve(this.options.workspace, this.options.skillPath, 'evals', 'config'), worktreePath);
+      // The judge runs in this same worktree — it reads the files the agent worked on —
+      // so when the two roles use different backends both configs are applied here.
+      // Each runner writes to its own directory ('.gemini/', '.codex/', '.claude/'),
+      // so they never collide.
+      const evalConfigDir = path.resolve(this.options.workspace, this.options.skillPath, 'evals', 'config');
+      this.runner.applyRunnerConfig(evalConfigDir, worktreePath);
+      if (this.judgeRunner !== this.runner) {
+        this.judgeRunner.applyRunnerConfig(evalConfigDir, worktreePath);
+      }
 
       uiCtx.updateLog('Executing prompt…');
       if (logPath) fs.appendFileSync(logPath, `\n# SECTION: ${evalModeLabel.toUpperCase()} AGENT RUN\n`);
