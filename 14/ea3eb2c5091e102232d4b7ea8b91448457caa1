@@ -1,0 +1,35 @@
+tests/core/environment.test.ts
+  s_b8e3a755fdcc8f::t_344bdbdcfde124 12-13,15-16,18-19,24-25,28,31,33-34,43,60,74-75,82,108-109,111,135,137,156,174-176,178,191,194,205
+tests/core/historical-variant.test.ts
+  s_b8e3a755fdcc8f::t_dd8b20709d583d 19,44,67,84-89
+tests/core/eval-runner.test.ts
+  s_b8e3a755fdcc8f::t_dd8b20709d583d 44,68,84,100,116,132,151,170,188,204,223,240,261,284,307,342,402,437,483,513,538,557,578,596,615,631,647,726,768,796,815
+src/core/eval-runner.ts
+  s_b8e3a755fdcc8f::t_d46fc97a260354 19-20,51
+src/core/environment.ts
+  s_b8e3a755fdcc8f::t_4e212731c56f3f 10-20,25-26,30-31,34,36,43-48,51-55,58-59,61,63
+src/commands/functional.ts
+  s_b8e3a755fdcc8f::t_d46fc97a260354 76,94,114,123
+  s_b8e3a755fdcc8f::t_e8c0d3fa3773db 70-75
+.gitignore
+  s_b8e3a755fdcc8f::t_dd8b20709d583d 2
+src/commands/trigger.ts
+  s_b8e3a755fdcc8f::t_e8c0d3fa3773db 51-56
+  s_b8e3a755fdcc8f::t_d46fc97a260354 58,76,96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "14ea3eb2c5091e102232d4b7ea8b91448457caa1",
+  "prompts": {},
+  "sessions": {
+    "s_b8e3a755fdcc8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "048027a5-3875-4505-a092-b4b3f6435147",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
