@@ -227,7 +227,9 @@ Refer to your runner's documentation for the full set of settings and policy key
 
 Each run writes to `~/.skill-eval/<skill>/runs/<timestamp>/`: one log per trial and a self-contained HTML report you can open in any browser. The command prints the resolved location in its header and links the report when it finishes.
 
-Nothing lands inside the workspace under evaluation or inside the skill — the isolated trial worktrees and the extracted copies of historical refs included. That is deliberate: the evaluated agent explores the workspace, and reports or transcripts from earlier runs sitting there would contaminate the measurement it is producing. `--output <path>` moves the root somewhere else, and a path that resolves inside either one is rejected before the first trial starts.
+No evidence lands inside the workspace under evaluation or inside the skill — reports, trial logs and the extracted copies of historical refs all stay out. That is deliberate: the evaluated agent explores the workspace, and reports or transcripts from earlier runs sitting there would contaminate the measurement it is producing. `--output <path>` moves the root somewhere else, and a path that resolves inside either one is rejected before the first trial starts.
+
+The isolated environment each trial runs in is the exception, and it is deliberate too: it is created inside the workspace, under `.skill-eval-worktrees/`, and removed when the run ends. Agent CLIs resolve credentials, folder trust and project settings by walking up from their working directory, so a trial running outside your tree would lose all of it — and an agent working in an ambient context unlike the real one is measuring something else. The directory holds no evidence, only a throwaway checkout per trial.
 
 Expanding an eval gives you three sections:
 
