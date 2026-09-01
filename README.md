@@ -75,10 +75,10 @@ npm link        # makes `skill-eval` available globally
 
 ```sh
 # Checks that the skill is triggered (invoked) for each prompt
-skill-eval trigger --workspace <path> --skill <path> [options] [agent]
+skill-eval trigger --workspace <path> --skill <path> [options]
 
 # Checks that the skill produces correct output (skill-only by default)
-skill-eval functional --workspace <path> --skill <path> [options] [agent]
+skill-eval functional --workspace <path> --skill <path> [options]
 ```
 
 ### Options
@@ -92,11 +92,23 @@ skill-eval functional --workspace <path> --skill <path> [options] [agent]
 | `--timeout <seconds>` | no | none | Kill the agent after this many seconds |
 | `--eval-id <id>` | no | all | Run only the eval with this numeric ID |
 | `--eval-file <name>` | no | all | Run only the evals from this file in `evals/` (e.g. `edge-cases.json`) |
-| `--compare-ref [refs...]` | no | — | Git references to compare against (variadic — put `[agent]` before it, not after) |
+| `--compare-ref [refs...]` | no | — | Git references to compare against (variadic — keep it last, or follow it with another flag) |
 | `--compare-baseline` | no | `false` | Also run the no-skill baseline alongside the skill |
 | `--output <path>` | no | `~/.skill-eval` | Root for everything the run writes; must resolve outside the workspace and the skill |
 | `-v, --debug` | no | `false` | Print verbose logs to the console (trial transcripts are always saved) |
-| `[agent]` | no | `gemini-cli` | Agent backend to use |
+| `--executor-agent <name>` | no | `gemini-cli` | Agent that runs the evaluated task |
+| `--judge-agent <name>` | no | the executor agent | Agent that grades the result (`functional` only) |
+
+The two roles are chosen separately, so you can have one backend solve the task
+and another grade it:
+
+```sh
+skill-eval functional --workspace . --skill ./my-skill \
+  --executor-agent gemini-cli --judge-agent claude-code
+```
+
+`trigger` takes no `--judge-agent`: it decides whether the skill was activated by
+reading the transcript, so no agent judges anything there.
 
 Supported runners:
 
@@ -184,6 +196,8 @@ evals/config/claude-code/  →  <worktree>/.claude/
 ```
 
 Use this to ship both settings and policies alongside your evals. Anything inside `evals/config/<runner>/` is dropped verbatim into the runner's config directory, so you can use the runner's full configuration surface — not just `settings.json`.
+
+This happens per role. The judge runs in the same worktree as the task it grades, so a judge on another backend reads its own `evals/config/<runner>/` from that same directory — ship one for each backend you name.
 
 ### Gemini CLI example
 

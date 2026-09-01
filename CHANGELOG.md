@@ -1,0 +1,35 @@
+# Changelog
+
+Notable changes to `skill-eval`. Versions are tagged by the `release:*` scripts;
+entries land here first under `Unreleased`.
+
+## Unreleased
+
+### Breaking
+
+- **The positional agent argument is gone.** `skill-eval trigger gemini-cli …`
+  and `skill-eval functional codex …` now fail with `error: too many arguments`.
+  One position cannot name two roles, and keeping it alongside the new flags
+  would leave two ways to choose an agent.
+
+  ```sh
+  # before
+  skill-eval functional codex --workspace . --skill ./my-skill
+
+  # now
+  skill-eval functional --executor-agent codex --workspace . --skill ./my-skill
+  ```
+
+### Added
+
+- `--executor-agent <name>` on both commands: the agent that runs the evaluated
+  task. Defaults to `gemini-cli`, as the positional argument did.
+- `--judge-agent <name>` on `functional`: the agent that grades the result.
+  Defaults to the executor agent, so a run that names neither behaves exactly as
+  before. `trigger` does not take it — it reads the transcript to decide whether
+  the skill was activated, so no agent judges anything there.
+- Each role runs with the configuration your skill ships for its backend. Both
+  roles work in the same trial worktree, so when they use different backends,
+  both `evals/config/<runner>/` directories are applied there.
+- The run header and the HTML report record which agent filled each role. A
+  `trigger` run reports no judge instead of repeating the executor.
