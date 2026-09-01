@@ -219,3 +219,70 @@ test('EvalEnvironment.createWorktree works against a real repository', () => {
     fs.rmSync(artifactsDir, { recursive: true, force: true });
   }
 });
+
+test('EvalEnvironment.createWorktree keeps the trial environment inside the workspace and out of the evidence root', () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-realrepo-'));
+  const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-artifacts-'));
+  const worktreesDir = path.join(workspace, '.skill-eval-worktrees');
+
+  const gitOptions = { cwd: workspace, stdio: 'ignore' as const };
+  execFileSync('git', ['init', '-q'], gitOptions);
+  fs.writeFileSync(path.join(workspace, 'README.md'), '# fixture\n', 'utf-8');
+  execFileSync('git', ['add', '-A'], gitOptions);
+  execFileSync('git', [
+    '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'init'
+  ], gitOptions);
+
+  const env = new EvalEnvironment({ workspace, worktreesDir });
+
+  try {
+    const worktreePath = env.createWorktree('task-1-local-trial-1');
+    // os.tmpdir() is itself a symlink on macOS, so both sides are canonicalized.
+    const realWorktreePath = fs.realpathSync(worktreePath);
+
+    // The agent's working directory has to sit under the author's own tree: that is
+    // where the CLI finds the credentials, folder trust and project settings it
+    // resolves by walking up.
+    assert.ok(
+      realWorktreePath.startsWith(fs.realpathSync(workspace) + path.sep),
+      'The trial environment must live inside the workspace under evaluation'
+    );
+    assert.ok(
+      !realWorktreePath.startsWith(fs.realpathSync(artifactsDir) + path.sep),
+      'The evidence root must hold no trial environment'
+    );
+    assert.ok(
+      fs.existsSync(path.join(worktreePath, 'README.md')),
+      'The trial environment should carry the repository content'
+    );
+  } finally {
+    env.removeWorktree(env.worktreePathFor('task-1-local-trial-1'));
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(artifactsDir, { recursive: true, force: true });
+  }
+});
+
+test('EvalEnvironment.teardown removes a trial environment abandoned by an interrupted run', async (t) => {
+  const { workspace, worktreesDir, artifactsDir } = makeWorkspaceAndArtifacts();
+
+  // No run created this one: it is what an abruptly interrupted run left behind.
+  const abandoned = path.join(worktreesDir, 'task-9-local-trial-3');
+  fs.mkdirSync(abandoned, { recursive: true });
+  fs.writeFileSync(path.join(abandoned, 'stale.txt'), 'leftover', 'utf-8');
+
+  const env = new EvalEnvironment({ workspace, worktreesDir });
+  t.mock.method(executor, 'spawnSync', () => ({ status: 128 })); // git cannot help: the path is unregistered
+
+  try {
+    await env.teardown();
+
+    assert.ok(!fs.existsSync(abandoned), 'The abandoned trial environment should be gone');
+    assert.ok(
+      !fs.existsSync(worktreesDir),
+      'The directory that held it should go too, leaving the workspace as it was found'
+    );
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(artifactsDir, { recursive: true, force: true });
+  }
+});
