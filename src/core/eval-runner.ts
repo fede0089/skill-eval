@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { executor } from '../utils/exec.js';
 import { EvalEnvironment } from './environment.js';
+import { BENCHMARK_DIRNAME } from './benchmark.js';
 import { RunnerFactory, AgentRunner } from '../runners/index.js';
 import { AgentTranscript, EvalTask, EvalTrial, AssertionResult } from '../types/index.js';
 import { TriggerGrader, ModelBasedGrader } from './evaluator.js';
@@ -21,6 +22,12 @@ export interface EvalRunOptions {
   runDir: string;
   /** Directory inside the workspace holding the isolated environment of each trial. */
   worktreesDir: string;
+  /**
+   * Frozen benchmark this variant is measured with. Every variant of a run shares
+   * one, so a historical ref never imposes its own evaluation config. Falls back to
+   * the skill's own benchmark when the caller froze nothing.
+   */
+  benchmarkDir?: string;
   isBaseline?: boolean;
   timeoutMs?: number;
   judgeRetryDelayMs?: number;
@@ -49,6 +56,16 @@ export class EvalRunner {
   private worktreeIdFor(taskId: number, variantSlug: string, trialId: number, attempt: number): string {
     const base = `task-${taskId}-${variantSlug}-trial-${trialId}`;
     return attempt > 0 ? `${base}-r${attempt}` : base;
+  }
+
+  /**
+   * Where the evaluation config of each role is read from. The frozen benchmark when
+   * the run has one; otherwise the benchmark the skill itself carries.
+   */
+  private evalConfigDir(): string {
+    const benchmarkDir = this.options.benchmarkDir
+      ?? path.resolve(this.options.workspace, this.options.skillPath, BENCHMARK_DIRNAME);
+    return path.join(benchmarkDir, 'config');
   }
 
   constructor(private options: EvalRunOptions) {
@@ -80,7 +97,7 @@ export class EvalRunner {
       uiCtx.updateLog('Setting up…');
       worktreePath = this.env.createWorktree(worktreeId);
       await this.runner.linkSkill(path.resolve(this.options.workspace, this.options.skillPath), worktreePath);
-      this.runner.applyRunnerConfig(path.resolve(this.options.workspace, this.options.skillPath, 'evals', 'config'), worktreePath);
+      this.runner.applyRunnerConfig(this.evalConfigDir(), worktreePath);
 
       uiCtx.updateLog('Executing prompt…');
       const startMs = Date.now();
@@ -222,7 +239,7 @@ export class EvalRunner {
       // so when the two roles use different backends both configs are applied here.
       // Each runner writes to its own directory ('.gemini/', '.codex/', '.claude/'),
       // so they never collide.
-      const evalConfigDir = path.resolve(this.options.workspace, this.options.skillPath, 'evals', 'config');
+      const evalConfigDir = this.evalConfigDir();
       this.runner.applyRunnerConfig(evalConfigDir, worktreePath);
       if (this.judgeRunner !== this.runner) {
         this.judgeRunner.applyRunnerConfig(evalConfigDir, worktreePath);
