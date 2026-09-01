@@ -33,7 +33,7 @@ test('functionalCommand should handle tasks and trials', async (t) => {
   mock.method(EvalRunner.prototype, 'runFunctionalTask', runnerMock.runFunctionalTask);
 
   try {
-    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1);
+    await functionalCommand('gemini-cli', 'gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1);
 
     // Verify skill-only runs: 1 task × 1 trial = 1 call
     assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 1);
@@ -67,7 +67,7 @@ test('functionalCommand should run all trials in parallel (no early abort on err
   mock.method(EvalRunner.prototype, 'runFunctionalTask', runnerMock.runFunctionalTask);
 
   try {
-    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 3);
+    await functionalCommand('gemini-cli', 'gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 3);
 
     // skill-only: 3 trials (one throws at callCount=2) → 4 calls (3 original + 1 retry)
     assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 4);
@@ -101,7 +101,7 @@ test('functionalCommand should run baseline when compareBaseline is enabled', as
   mock.method(EvalRunner.prototype, 'runFunctionalTask', runnerMock.runFunctionalTask);
 
   try {
-    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, undefined, undefined, undefined, [], true);
+    await functionalCommand('gemini-cli', 'gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, undefined, undefined, undefined, [], true);
 
     // 1 task × 1 trial × 2 modes (baseline + local) = 2 calls
     assert.strictEqual(runnerMock.runFunctionalTask.mock.callCount(), 2);
@@ -136,7 +136,7 @@ test('functionalCommand should skip trigger-only evals (should_trigger: false)',
   mock.method(EvalRunner.prototype, 'runFunctionalTask', runFunctionalTask);
 
   try {
-    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1);
+    await functionalCommand('gemini-cli', 'gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1);
 
     assert.strictEqual(runFunctionalTask.mock.callCount(), 1, 'Only the functional eval should run');
     const taskRun = runFunctionalTask.mock.calls[0].arguments[0] as { id: number };
@@ -165,7 +165,7 @@ test('functionalCommand should reject --eval-id targeting a trigger-only eval', 
 
   try {
     await assert.rejects(
-      () => functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, undefined, undefined, 2),
+      () => functionalCommand('gemini-cli', 'gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, undefined, undefined, 2),
       (err: Error) => err instanceof ConfigError && err.message.includes('Eval #2 is trigger-only')
     );
   } finally {
@@ -192,7 +192,7 @@ test('functionalCommand should reject a suite left empty by trigger-only evals',
 
   try {
     await assert.rejects(
-      () => functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1),
+      () => functionalCommand('gemini-cli', 'gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1),
       (err: Error) => err instanceof ConfigError && err.message.includes('No evals left to run')
     );
   } finally {
@@ -234,7 +234,7 @@ test('functionalCommand drops the transcript but keeps the trial summary in the 
   const capturingReporter = { generate: (report: any) => { captured = report; } };
 
   try {
-    await functionalCommand('gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, capturingReporter);
+    await functionalCommand('gemini-cli', 'gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, capturingReporter);
 
     const trial = captured.results[0].skillTrials['local'][0];
     assert.strictEqual(trial.transcript, undefined, 'the raw transcript must not reach the report');
