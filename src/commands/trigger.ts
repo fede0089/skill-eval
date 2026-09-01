@@ -101,7 +101,7 @@ export async function triggerCommand(
     Logger.write(`   Extracting ref '${ref}'... `);
     // Where the skill landed is answered by whoever extracted it: the archive is of the
     // skill's repository, which may not be the workspace under evaluation.
-    const refSkillPath = git.extractSkillRef(skillPath, ref, refDir);
+    const refSkillPath = git.extractSkillRef(absoluteSkillPath, ref, refDir);
     const refImplPath = benchmark
       ? materializeImplementation(refSkillPath, path.join(implPathBase, ref))
       : refSkillPath;
