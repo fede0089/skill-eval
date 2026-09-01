@@ -1,0 +1,26 @@
+tests/reporters/html-reporter.test.ts
+  s_1df1a4c1c03bf9::t_8ebd79ed7f501a 49,77
+  s_1df1a4c1c03bf9::t_836f5005269f22 427-438
+tests/core/eval-runner.test.ts
+  s_1df1a4c1c03bf9::t_6f42a493d1ccd6 825-890
+tests/core/preflight.test.ts
+  s_1df1a4c1c03bf9::t_836f5005269f22 79-105
+tests/cli-options.test.ts
+  s_1df1a4c1c03bf9::t_f02bb5888285de 4,34-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "5482e24d31cdb88d3f1088c734bfcbf73b302516",
+  "prompts": {},
+  "sessions": {
+    "s_1df1a4c1c03bf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b89bf062-9e85-4f79-adeb-a159b07d4e61",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
