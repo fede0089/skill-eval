@@ -16,8 +16,8 @@ export interface EvalRunOptions {
   skillPath: string;
   skillName: string;
   runDir: string;
-  /** Root the tool writes to, always outside the workspace and the skill. */
-  artifactsDir: string;
+  /** Directory inside the workspace holding the isolated environment of each trial. */
+  worktreesDir: string;
   isBaseline?: boolean;
   timeoutMs?: number;
   judgeRetryDelayMs?: number;
@@ -48,7 +48,7 @@ export class EvalRunner {
   }
 
   constructor(private options: EvalRunOptions) {
-    this.env = new EvalEnvironment({ workspace: options.workspace, artifactsDir: options.artifactsDir });
+    this.env = new EvalEnvironment({ workspace: options.workspace, worktreesDir: options.worktreesDir });
     this.runner = RunnerFactory.create(options.agent);
     this.triggerGrader = new TriggerGrader(options.skillName, this.runner.skillDispatchToolName);
     // Inject the same runner for judging so swapping the agent backend works end-to-end

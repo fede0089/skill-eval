@@ -16,6 +16,7 @@ test('EvalRunner runs a historical variant against the workspace repository, lin
   // A real repository with a skill inside it, plus an artifacts root outside both.
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-histrepo-'));
   const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-eval-artifacts-'));
+  const worktreesDir = path.join(workspace, '.skill-eval-worktrees');
   const skillDirName = 'mock-skill';
 
   const gitOptions = { cwd: workspace, stdio: 'ignore' as const };
@@ -40,7 +41,7 @@ test('EvalRunner runs a historical variant against the workspace repository, lin
   // The old wiring passed the extracted copy as the workspace. Now that the copy
   // lives outside the repository, git has nothing to walk up to and worktree
   // creation fails — the failure this variant's wiring exists to avoid.
-  const brokenEnv = new EvalEnvironment({ workspace: refDir, artifactsDir });
+  const brokenEnv = new EvalEnvironment({ workspace: refDir, worktreesDir: path.join(refDir, '.skill-eval-worktrees') });
   assert.throws(
     () => brokenEnv.createWorktree('task-1-ref-HEAD-trial-1'),
     /Failed to create git worktree/,
@@ -63,7 +64,7 @@ test('EvalRunner runs a historical variant against the workspace repository, lin
     skillPath: extractedSkillPath,
     skillName: 'mock-skill',
     runDir: artifactsDir,
-    artifactsDir,
+    worktreesDir,
     isBaseline: false,
     variant: 'ref:HEAD'
   });
@@ -80,8 +81,12 @@ test('EvalRunner runs a historical variant against the workspace repository, lin
 
     const worktreePath = linkSkillMock.mock.calls[0].arguments[1] as string;
     assert.ok(
-      worktreePath.startsWith(path.join(artifactsDir, 'worktrees') + path.sep),
-      'The worktree must live under the artifacts root'
+      worktreePath.startsWith(worktreesDir + path.sep),
+      'The trial environment must live inside the workspace, not under the evidence root'
+    );
+    assert.ok(
+      !worktreePath.startsWith(artifactsDir + path.sep),
+      'The evidence root must hold no trial environment'
     );
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });

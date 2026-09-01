@@ -1,5 +1,5 @@
 node_modules/
-.project-skill-evals/
+.skill-eval-worktrees/
 dist/
 tmp/
 conductor/

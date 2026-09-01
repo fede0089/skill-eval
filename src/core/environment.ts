@@ -7,44 +7,60 @@ import { ExecutionError } from './errors.js';
 export interface EnvironmentOptions {
   /** Repository the worktrees are cut from; every git command runs with its cwd here. */
   workspace: string;
-  /** Root the tool writes to, always outside the workspace and the skill. */
-  artifactsDir: string;
+  /**
+   * Directory holding the isolated environment of each trial. It lives inside the
+   * workspace so the agent resolves credentials, folder trust and project settings
+   * exactly as it would in the author's real use, and it is removed on teardown.
+   */
+  worktreesDir: string;
+  /**
+   * Extracted copies of historical refs, under the evidence root. Only the
+   * command-level environment owns them, so per-trial environments omit it.
+   */
+  skillRefsDir?: string;
 }
 
 export class EvalEnvironment {
   private workspace: string;
-  private artifactsDir: string;
+  private worktreesDir: string;
+  private skillRefsDir?: string;
 
   constructor(options: EnvironmentOptions) {
     this.workspace = options.workspace;
-    this.artifactsDir = options.artifactsDir;
+    this.worktreesDir = options.worktreesDir;
+    this.skillRefsDir = options.skillRefsDir;
   }
 
-  /** Path of the worktree for an eval, under the artifacts root. */
+  /** Path of the isolated environment for an eval, inside the workspace. */
   public worktreePathFor(evalId: string): string {
-    return path.resolve(this.artifactsDir, 'worktrees', evalId);
+    return path.resolve(this.worktreesDir, evalId);
   }
 
   public async setup(): Promise<void> {
   }
 
   public async teardown(): Promise<void> {
-    // 1. Cleanup Worktrees
-    const worktreesDir = path.join(this.artifactsDir, 'worktrees');
-    if (fs.existsSync(worktreesDir)) {
-      for (const entry of fs.readdirSync(worktreesDir)) {
-        this.removeWorktree(path.join(worktreesDir, entry));
+    // 1. Trial environments. Anything found here is removed, including what an
+    // interrupted earlier run left behind, and the directory goes with it so the
+    // workspace is left exactly as it was found.
+    if (fs.existsSync(this.worktreesDir)) {
+      for (const entry of fs.readdirSync(this.worktreesDir)) {
+        this.removeWorktree(path.join(this.worktreesDir, entry));
       }
       executor.spawnSync('git', ['worktree', 'prune'], { stdio: 'ignore', cwd: this.workspace });
+      try {
+        fs.rmSync(this.worktreesDir, { recursive: true, force: true });
+      } catch (err) {
+        Logger.warn(`Failed to remove trial environments directory at ${this.worktreesDir}. Manual cleanup may be required.`);
+      }
     }
 
-    // 2. Cleanup Skill Refs
-    const skillRefsDir = path.join(this.artifactsDir, 'skill-refs');
-    if (fs.existsSync(skillRefsDir)) {
+    // 2. Extracted historical refs, only when this environment owns them.
+    if (this.skillRefsDir && fs.existsSync(this.skillRefsDir)) {
       try {
-        fs.rmSync(skillRefsDir, { recursive: true, force: true });
+        fs.rmSync(this.skillRefsDir, { recursive: true, force: true });
       } catch (err) {
-        Logger.warn(`Failed to remove skill-refs directory at ${skillRefsDir}. Manual cleanup may be required.`);
+        Logger.warn(`Failed to remove skill-refs directory at ${this.skillRefsDir}. Manual cleanup may be required.`);
       }
     }
   }

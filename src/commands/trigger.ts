@@ -48,8 +48,14 @@ export async function triggerCommand(
   // skill is rejected here, not after the first agent has already been launched.
   const artifactsDir = resolveOutputDir({ output, skillName: skill_name, workspace, skillPath });
 
+  // The isolated environment of each trial lives inside the workspace: the agent has to
+  // resolve its ambient configuration exactly as it would in the author's real use. The
+  // evidence — runs, trial logs and extracted refs — stays under the artifacts root.
+  const worktreesDir = path.resolve(workspace, '.skill-eval-worktrees');
+  const refPathBase = path.resolve(artifactsDir, 'skill-refs');
+
   // Setup Environment (global setup)
-  const env = new EvalEnvironment({ workspace, artifactsDir });
+  const env = new EvalEnvironment({ workspace, worktreesDir, skillRefsDir: refPathBase });
   await env.setup();
 
   // Ensure worktrees are cleaned up even when the process is interrupted (Ctrl+C).
@@ -63,12 +69,11 @@ export async function triggerCommand(
   const runDir = path.resolve(artifactsDir, 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
 
-  const refPathBase = path.resolve(artifactsDir, 'skill-refs');
   const variantRunners = new Map<string, EvalRunner>();
 
   // 1. Local Runner
   variantRunners.set('local', new EvalRunner({
-    agent, workspace, skillPath, skillName: skill_name, runDir, artifactsDir, isBaseline: false, timeoutMs,
+    agent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir, isBaseline: false, timeoutMs,
     variant: 'local'
   }));
 
@@ -88,7 +93,7 @@ export async function triggerCommand(
       skillPath: path.resolve(refDir, path.relative(workspace, path.resolve(workspace, skillPath))),
       skillName: skill_name,
       runDir,
-      artifactsDir,
+      worktreesDir,
       isBaseline: false,
       timeoutMs,
       variant: `ref:${ref}`
