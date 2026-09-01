@@ -144,7 +144,10 @@ export interface EvalSuiteReport {
   timestamp: string;
   command?: 'trigger' | 'functional';
   skill_name: string;
-  agent: string;
+  /** Agent that ran the evaluated task. */
+  executorAgent: string;
+  /** Agent that graded it. Absent when nothing graded — trigger grades programmatically. */
+  judgeAgent?: string;
   metrics: {
     passedCount?: number;
     totalCount: number;

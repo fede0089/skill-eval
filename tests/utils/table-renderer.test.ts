@@ -17,7 +17,7 @@ function makeTriggerReport(numTrials = 1, overrides: Partial<EvalSuiteReport> = 
     timestamp: '2026-01-01T00:00:00.000Z',
     command: 'trigger',
     skill_name: 'test-skill',
-    agent: 'gemini-cli',
+    executorAgent: 'gemini-cli',
     metrics: { 
       passedCount: 1, 
       totalCount: 1, 
@@ -43,7 +43,7 @@ function makeFunctionalReport(numTrials = 1, withBaseline = true): EvalSuiteRepo
     timestamp: '2026-01-01T00:00:00.000Z',
     command: 'functional',
     skill_name: 'test-skill',
-    agent: 'gemini-cli',
+    executorAgent: 'gemini-cli',
     metrics: {
       passedCount: 1, totalCount: 1, numTrials,
       scores: withBaseline ? { 'baseline': '0%', 'local': '100%' } : { 'local': '100%' },

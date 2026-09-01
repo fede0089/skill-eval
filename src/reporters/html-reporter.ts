@@ -53,7 +53,9 @@ export interface RunData {
   runId: string;
   command: string;
   skill: string;
-  agent: string;
+  executorAgent: string;
+  /** Absent when no agent fulfils the judge role, as in a trigger run. */
+  judgeAgent?: string;
   timestamp: string;
   tasks: RunTask[];
 }
@@ -97,7 +99,8 @@ export function buildRunData(report: EvalSuiteReport): RunData {
     runId: report.timestamp.replace(/[:.]/g, '-'),
     command: report.command ?? (functional ? 'functional' : 'trigger'),
     skill: report.skill_name,
-    agent: report.agent,
+    executorAgent: report.executorAgent,
+    judgeAgent: report.judgeAgent,
     timestamp: report.timestamp,
     tasks: report.results.map(result => {
       const variants = variantsOf(result, functional);
@@ -489,7 +492,8 @@ input[type="text"] { width: 190px; }
   <div class="header">
     <h1 id="hdr-skill">—</h1>
     <div class="header-meta">
-      <span><b>Agent</b> <span id="hdr-agent">—</span></span>
+      <span><b>Executor</b> <span id="hdr-executor">—</span></span>
+      <span id="hdr-judge-wrap" hidden><b>Judge</b> <span id="hdr-judge">—</span></span>
       <span><b>Type</b> <span id="hdr-type">—</span></span>
       <span><b>Date</b> <span id="hdr-date">—</span></span>
     </div>
@@ -678,7 +682,10 @@ input[type="text"] { width: 190px; }
   /* ── Render: header + suite metrics ─────────────────────────── */
   function renderHeader() {
     document.getElementById('hdr-skill').textContent = RUN.skill;
-    document.getElementById('hdr-agent').textContent = RUN.agent;
+    document.getElementById('hdr-executor').textContent = RUN.executorAgent;
+    /* A run nobody judged says so by leaving the role out, not by naming an agent. */
+    document.getElementById('hdr-judge').textContent = RUN.judgeAgent || '';
+    document.getElementById('hdr-judge-wrap').hidden = !RUN.judgeAgent;
     document.getElementById('hdr-type').textContent = RUN.command === 'functional' ? 'Functional' : 'Trigger';
     document.getElementById('hdr-date').textContent = new Date(RUN.timestamp).toLocaleString();
   }

@@ -116,7 +116,7 @@ export async function triggerCommand(
   const subtaskLabels = skillVersions.flatMap(v => Array.from({ length: numTrials }, (_, i) => `${v} ${i + 1}`));
 
   try {
-    renderRunHeader({ command: 'trigger', skillName: skill_name, agent: executorAgent, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId, evalFile });
+    renderRunHeader({ command: 'trigger', skillName: skill_name, executorAgent, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId, evalFile });
     Logger.write(`--- Trigger Pass ---\n`);
     Logger.write(`──────────────────────────────────────────────────\n`);
 
@@ -252,7 +252,8 @@ export async function triggerCommand(
       timestamp: startTime.toISOString(),
       command: 'trigger',
       skill_name,
-      agent: executorAgent,
+      // No judgeAgent: trigger grades programmatically, so no agent fills that role.
+      executorAgent,
       metrics: {
         passedCount: tasksPassedCount,
         totalCount: tasks.length,

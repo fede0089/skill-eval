@@ -148,7 +148,7 @@ export async function functionalCommand(
     : skillVersions.flatMap(v => Array.from({ length: numTrials }, (_, i) => `${v} ${i + 1}`));
 
   try {
-    renderRunHeader({ command: 'functional', skillName: skill_name, agent: executorAgent, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId, evalFile });
+    renderRunHeader({ command: 'functional', skillName: skill_name, executorAgent, judgeAgent, tasks: tasks.length, trials: numTrials, maxAgents, timeoutMs, runDir, evalId, evalFile });
     Logger.write(`──────────────────────────────────────────────────\n`);
 
     for (let i = 0; i < tasks.length; i++) {
@@ -337,7 +337,8 @@ export async function functionalCommand(
       timestamp: startTime.toISOString(),
       command: 'functional',
       skill_name,
-      agent: executorAgent,
+      executorAgent,
+      judgeAgent,
       metrics: {
         passedCount: withSkillTasksAllPassedCount,
         totalCount: tasks.length,

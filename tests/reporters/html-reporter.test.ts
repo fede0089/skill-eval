@@ -10,7 +10,7 @@ function makeTriggerReport(overrides: Partial<EvalSuiteReport> = {}): EvalSuiteR
     timestamp: '2026-01-01T00:00:00.000Z',
     command: 'trigger',
     skill_name: 'test-skill',
-    agent: 'gemini-cli',
+    executorAgent: 'gemini-cli',
     metrics: {
       passedCount: 2,
       totalCount: 3,
@@ -51,7 +51,7 @@ function makeFunctionalReport(): EvalSuiteReport {
     timestamp: '2026-01-01T00:00:00.000Z',
     command: 'functional',
     skill_name: 'func-skill',
-    agent: 'gemini-cli',
+    executorAgent: 'gemini-cli',
     metrics: {
       passedCount: 4,
       totalCount: 5,
@@ -82,7 +82,7 @@ function makeSkillOnlyFunctionalReport(): EvalSuiteReport {
     timestamp: '2026-01-01T00:00:00.000Z',
     command: 'functional',
     skill_name: 'func-skill',
-    agent: 'gemini-cli',
+    executorAgent: 'gemini-cli',
     metrics: {
       passedCount: 2,
       totalCount: 3,
@@ -153,7 +153,7 @@ test('generateHtml renders failing assertion text and judge reason in functional
   const report: EvalSuiteReport = {
     timestamp: '2026-01-01T00:00:00.000Z',
     skill_name: 'func-skill',
-    agent: 'gemini-cli',
+    executorAgent: 'gemini-cli',
     metrics: {
       passedCount: 0,
       totalCount: 1,
@@ -192,7 +192,7 @@ function makeReportWith(trials: any[], overrides: Partial<EvalSuiteReport> = {})
     timestamp: '2026-01-01T00:00:00.000Z',
     command: 'functional',
     skill_name: 'test-skill',
-    agent: 'gemini-cli',
+    executorAgent: 'gemini-cli',
     metrics: { totalCount: 1, numTrials: trials.length, scores: {}, passAtK: {}, assertionPassRate: {} },
     results: [{ taskId: 1, prompt: 'Do something', baselineTrials: [], skillTrials: { local: trials } }],
     ...overrides,
@@ -341,7 +341,7 @@ function parityReport(): EvalSuiteReport {
     timestamp: '2026-01-01T00:00:00.000Z',
     command: 'functional',
     skill_name: 'test-skill',
-    agent: 'gemini-cli',
+    executorAgent: 'gemini-cli',
     metrics: { totalCount: 1, numTrials: 3, scores: {}, passAtK: {}, assertionPassRate: {} },
     results: [{ taskId: 1, prompt: 'Do something', baselineTrials: baseline, skillTrials: { local } }],
   };

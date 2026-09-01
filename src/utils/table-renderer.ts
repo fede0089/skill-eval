@@ -81,7 +81,9 @@ function formatPassAt1(trials: EvalTrial[]): string {
 export interface RunHeaderConfig {
   command: 'trigger' | 'functional';
   skillName: string;
-  agent: string;
+  executorAgent: string;
+  /** Omitted when no agent fulfils the judge role, as in a trigger run. */
+  judgeAgent?: string;
   tasks: number;
   trials: number;
   maxAgents: number;
@@ -121,7 +123,7 @@ function boxLabel(key: string, value: string): string {
  * Always shown regardless of debug mode.
  */
 export function renderRunHeader(config: RunHeaderConfig): void {
-  const { command, skillName, agent, tasks, trials, maxAgents, timeoutMs, runDir, evalId, evalFile } = config;
+  const { command, skillName, executorAgent, judgeAgent, tasks, trials, maxAgents, timeoutMs, runDir, evalId, evalFile } = config;
 
   let timeoutStr = 'None';
   if (timeoutMs && timeoutMs > 0) {
@@ -153,7 +155,8 @@ export function renderRunHeader(config: RunHeaderConfig): void {
   process.stdout.write(top + '\n');
   process.stdout.write(boxLine(title) + '\n');
   process.stdout.write(boxLine() + '\n');
-  process.stdout.write(boxLabel('agent', agent) + '\n');
+  process.stdout.write(boxLabel('executor', executorAgent) + '\n');
+  if (judgeAgent) process.stdout.write(boxLabel('judge', judgeAgent) + '\n');
   process.stdout.write(boxLabel('run', runLine) + '\n');
   process.stdout.write(boxLabel('timeout', timeoutStr) + '\n');
   process.stdout.write(boxLabel('output', outputLine) + '\n');
