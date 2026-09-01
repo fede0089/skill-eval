@@ -10,6 +10,7 @@ import { AgentPool } from '../core/agent-pool.js';
 import { aggregatePassAtK, aggregateAssertionPassRate, aggregateTokenStats, aggregateDurationStats } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { resolveOutputDir } from '../core/output-location.js';
+import { freezeBenchmark, materializeImplementation } from '../core/benchmark.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderTriggerTable, renderRunHeader } from '../utils/table-renderer.js';
 import { HtmlReporter } from '../reporters/index.js';
@@ -50,12 +51,14 @@ export async function triggerCommand(
 
   // The isolated environment of each trial lives inside the workspace: the agent has to
   // resolve its ambient configuration exactly as it would in the author's real use. The
-  // evidence — runs, trial logs and extracted refs — stays under the artifacts root.
+  // evidence — runs, trial logs — and the working copies of the skill stay under the
+  // artifacts root.
   const worktreesDir = path.resolve(workspace, '.skill-eval-worktrees');
   const refPathBase = path.resolve(artifactsDir, 'skill-refs');
+  const implPathBase = path.resolve(artifactsDir, 'skill-impl');
 
   // Setup Environment (global setup)
-  const env = new EvalEnvironment({ workspace, worktreesDir, skillRefsDir: refPathBase });
+  const env = new EvalEnvironment({ workspace, worktreesDir, skillRefsDir: refPathBase, skillImplDir: implPathBase });
   await env.setup();
 
   // Ensure worktrees are cleaned up even when the process is interrupted (Ctrl+C).
@@ -69,11 +72,26 @@ export async function triggerCommand(
   const runDir = path.resolve(artifactsDir, 'runs', timestamp);
   fs.mkdirSync(runDir, { recursive: true });
 
+  // The benchmark is frozen once, here, and every variant of the run is measured with
+  // this copy: a historical ref contributes only its implementation, so the numbers stay
+  // comparable even when its evals or its evaluation config had changed. An injected
+  // suite means the tool was told not to read the skill from disk, so nothing is frozen
+  // and nothing is cut — exactly as when preflight is skipped.
+  const absoluteSkillPath = path.resolve(workspace, skillPath);
+  const benchmark = injectedSuite ? undefined : freezeBenchmark(absoluteSkillPath, runDir);
+
   const variantRunners = new Map<string, EvalRunner>();
 
   // 1. Local Runner
+  // What a trial links is the implementation alone: the evaluated agent must not find
+  // the expectations it is being graded with inside its own working environment.
+  const localImplPath = benchmark
+    ? materializeImplementation(absoluteSkillPath, path.join(implPathBase, 'local'))
+    : skillPath;
+
   variantRunners.set('local', new EvalRunner({
-    executorAgent, workspace, skillPath, skillName: skill_name, runDir, worktreesDir, isBaseline: false, timeoutMs,
+    executorAgent, workspace, skillPath: localImplPath, skillName: skill_name, runDir, worktreesDir,
+    benchmarkDir: benchmark?.dir, isBaseline: false, timeoutMs,
     variant: 'local'
   }));
 
@@ -84,6 +102,9 @@ export async function triggerCommand(
     // Where the skill landed is answered by whoever extracted it: the archive is of the
     // skill's repository, which may not be the workspace under evaluation.
     const refSkillPath = git.extractSkillRef(skillPath, ref, refDir);
+    const refImplPath = benchmark
+      ? materializeImplementation(refSkillPath, path.join(implPathBase, ref))
+      : refSkillPath;
     Logger.write(chalk.green('Done\n'));
 
     variantRunners.set(`ref:${ref}`, new EvalRunner({
@@ -92,10 +113,11 @@ export async function triggerCommand(
       // produces no .git, so the extracted copy is not a repository at all. It
       // contributes only the skill implementation, addressed absolutely.
       workspace,
-      skillPath: refSkillPath,
+      skillPath: refImplPath,
       skillName: skill_name,
       runDir,
       worktreesDir,
+      benchmarkDir: benchmark?.dir,
       isBaseline: false,
       timeoutMs,
       variant: `ref:${ref}`
