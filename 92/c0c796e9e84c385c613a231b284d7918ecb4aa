@@ -1,0 +1,25 @@
+tests/core/eval-runner.test.ts
+  s_375d768edcc837::t_4bbccbee8c6136 497-528
+tests/reporters/html-reporter.test.ts
+  s_375d768edcc837::t_763ab77d9cf237 428-441
+tests/core/benchmark.test.ts
+  s_375d768edcc837::t_bc9258cd6bc279 1-112
+tests/commands/frozen-benchmark.test.ts
+  s_375d768edcc837::t_fabb82201ab463 1-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "92c0c796e9e84c385c613a231b284d7918ecb4aa",
+  "prompts": {},
+  "sessions": {
+    "s_375d768edcc837": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "648f203d-148d-4a72-914f-c6460d5cb1ac",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
