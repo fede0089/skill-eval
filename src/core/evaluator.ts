@@ -140,7 +140,7 @@ export class TriggerGrader {
  * rejects as "Bad control character in string literal" (common in LLM-generated JSON).
  * Structural whitespace between JSON keys/values is left untouched.
  */
-function sanitizeJsonControlChars(json: string): string {
+export function sanitizeJsonControlChars(json: string): string {
   return json.replace(/"(?:[^"\\]|\\.)*"/g, (match) => {
     return match
       .replace(/\n/g, '\\n')

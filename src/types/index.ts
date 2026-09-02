@@ -324,3 +324,23 @@ export interface SessionBalance {
    */
   endToEnd?: { initial: number; final: number };
 }
+
+/** The single hypothesis an optimizer proposes, with what it says the change should improve. */
+export interface OptimizerProposal {
+  hypothesis: string;
+  predictions: PredictedExpectation[];
+}
+
+/**
+ * Why an attempt never reached a comparison. Every one of them is treated the
+ * same: what fell outside the scope is reverted, the candidate is not measured,
+ * the reason is reported, and the proposal is consumed all the same.
+ */
+export type InvalidReason =
+  | 'no-declaration'
+  | 'unparsable-declaration'
+  | 'unknown-expectation'
+  | 'out-of-scope'
+  | 'timeout'
+  | 'agent-error'
+  | 'no-change';
