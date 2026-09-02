@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { executor } from '../utils/exec.js';
@@ -77,13 +78,88 @@ function parsePorcelain(raw: string): Map<string, string> {
   return entries;
 }
 
+/**
+ * The state of one path that differs from the committed version: what git says
+ * about it, and what it holds. The digest is there because a status alone cannot
+ * tell a file the author had already modified from the same file modified again
+ * by someone else.
+ */
+export interface WorkingTreeEntry {
+  status: string;
+  digest: string;
+}
+
+export type WorkingTreeSnapshot = Map<string, WorkingTreeEntry>;
+
 export class SkillGit {
   private readonly repoRoot: string;
+  private readonly skillRelPath: string;
   private readonly pathspec: string[];
 
   constructor(repo: SkillRepo) {
     this.repoRoot = repo.repoRoot;
+    this.skillRelPath = repo.skillRelPath;
     this.pathspec = implementationPathspec(repo.skillRelPath);
+  }
+
+  /** Whether a repository-relative path belongs to the skill's implementation. */
+  private insideImplementation(target: string): boolean {
+    const base = this.skillRelPath === '' ? '' : `${this.skillRelPath}/`;
+    if (base !== '' && !target.startsWith(base)) return false;
+    return !target.startsWith(`${base}${EVALS_DIRNAME}/`);
+  }
+
+  private digestOf(target: string): string {
+    try {
+      return crypto.createHash('sha1').update(fs.readFileSync(path.join(this.repoRoot, target))).digest('hex');
+    } catch {
+      // Deleted, or a directory entry git reported as a whole: nothing to hash.
+      return 'absent';
+    }
+  }
+
+  /**
+   * What the whole repository looks like right now, relative to the committed
+   * version. Taken before handing the tree to an agent, so what the agent changed
+   * outside the skill can be told apart from what the author already had there.
+   */
+  public snapshotWorkingTree(): WorkingTreeSnapshot {
+    const raw = this.git(['status', '--porcelain', '-z'], 'read the status of the working tree');
+    const snapshot: WorkingTreeSnapshot = new Map();
+    for (const [target, status] of parsePorcelain(raw)) {
+      snapshot.set(target, { status, digest: this.digestOf(target) });
+    }
+    return snapshot;
+  }
+
+  /**
+   * Undoes what changed outside the skill's implementation since `before`.
+   *
+   * The comparison is against that snapshot and never against HEAD: what the
+   * author already had pending outside the skill has to be left exactly as it
+   * was. A path the agent created is removed; a tracked one is checked out.
+   *
+   * @returns the paths that were reverted.
+   */
+  public revertOutOfScope(before: WorkingTreeSnapshot): string[] {
+    const after = this.snapshotWorkingTree();
+    const reverted: string[] = [];
+
+    for (const [target, state] of after) {
+      if (this.insideImplementation(target)) continue;
+
+      const prior = before.get(target);
+      if (prior && prior.status === state.status && prior.digest === state.digest) continue;
+
+      if (state.status.startsWith('??')) {
+        fs.rmSync(path.join(this.repoRoot, target), { recursive: true, force: true });
+      } else {
+        this.git(['checkout', '--', target], `revert '${target}', which the agent changed outside its scope`);
+      }
+      reverted.push(target);
+    }
+
+    return reverted;
   }
 
   /** The committed version currently in effect. */
@@ -130,16 +206,22 @@ export class SkillGit {
    * and everything outside the skill are left as they are.
    */
   public restoreImplementation(): void {
-    const tracked = this.git(
-      ['ls-tree', '-r', '--name-only', 'HEAD', '--', ...this.pathspec],
-      'list the committed files of the skill implementation'
-    ).trim();
+    const checkout = executor.spawnSync(
+      'git',
+      ['checkout', 'HEAD', '--', ...this.pathspec],
+      { cwd: this.repoRoot, encoding: 'utf-8' }
+    );
 
-    // A skill that is not committed yet has nothing to check out; `clean` alone
-    // is the whole restoration.
-    if (tracked !== '') {
-      this.git(['checkout', 'HEAD', '--', ...this.pathspec], 'restore the skill implementation');
+    if (checkout.status !== 0) {
+      const stderr = (checkout.stderr ?? '').toString().trim();
+      // A skill with nothing committed under its implementation has nothing to
+      // check out, and `clean` alone is the whole restoration. Any other failure
+      // means the implementation was left as the candidate had it.
+      if (!/did not match any file\(s\) known to git/.test(stderr)) {
+        throw new ExecutionError(`Failed to restore the skill implementation: ${stderr}`);
+      }
     }
+
     this.git(['clean', '-fd', '--', ...this.pathspec], 'remove the files the candidate added');
   }
 
