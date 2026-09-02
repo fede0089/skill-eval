@@ -43,6 +43,16 @@ entries land here first under `Unreleased`.
 
 ### Added
 
+- **`skill-eval evolve`** — an evolution session. It freezes the skill's evals
+  for the whole session, measures the implementation in your working tree
+  against the committed one under those evals, and commits the candidate only
+  when its aggregate improves, the expectations you declared with `--predict`
+  actually improved, and nothing the committed version always passed now always
+  fails. A rejected candidate is restored, and what you had in the tree when the
+  session started stays recoverable as a patch. Every Git operation is scoped to
+  the skill's implementation: the evals and anything you have staged or pending
+  elsewhere are never touched, and no branch is switched, pushed or opened as a
+  pull request.
 - `--executor-agent <name>` on both commands: the agent that runs the evaluated
   task. Defaults to `gemini-cli`, as the positional argument did.
 - `--judge-agent <name>` on `functional`: the agent that grades the result.

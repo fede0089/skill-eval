@@ -81,6 +81,9 @@ skill-eval trigger --workspace <path> --skill <path> [options]
 
 # Checks that the skill produces correct output (skill-only by default)
 skill-eval functional --workspace <path> --skill <path> [options]
+
+# Measures the skill as it stands against its committed version, and keeps what measures better
+skill-eval evolve --workspace <path> --skill <path> [options]
 ```
 
 ### Options
@@ -99,7 +102,8 @@ skill-eval functional --workspace <path> --skill <path> [options]
 | `--output <path>` | no | `~/.skill-eval` | Root for everything the run writes; must resolve outside the workspace and the skill |
 | `-v, --debug` | no | `false` | Print verbose logs to the console (trial transcripts are always saved) |
 | `--executor-agent <name>` | no | `gemini-cli` | Agent that runs the evaluated task |
-| `--judge-agent <name>` | no | the executor agent | Agent that grades the result (`functional` only) |
+| `--judge-agent <name>` | no | the executor agent | Agent that grades the result (`functional` and `evolve`) |
+| `--predict <items...>` | on a dirty tree | — | Expectations an uncommitted change should improve, as `<evalId>#<n>` (`evolve` only) |
 
 The two roles are chosen separately, so you can have one backend solve the task
 and another grade it:
@@ -117,6 +121,50 @@ Supported runners:
 - `gemini-cli` (default)
 - `codex`
 - `claude-code`
+
+### Evolution sessions
+
+`evolve` turns the edit-measure-decide loop into one command. It freezes the
+skill's evals for the whole session, measures the implementation you have in
+your working tree against the version you have committed — both under those
+frozen evals, so the only difference between them is the implementation — and
+keeps the candidate only when the evidence backs it.
+
+```sh
+# you have been editing my-skill/SKILL.md and have not committed it
+skill-eval evolve --workspace . --skill ./my-skill --predict 1#3
+```
+
+A candidate is accepted only when three things hold at once:
+
+1. its aggregate effectiveness beats the committed version — equal is not better;
+2. every expectation you declared with `--predict` actually improved;
+3. no expectation the committed version passed in **all** its trials fails in
+   **all** of the candidate's.
+
+The second condition is why `--predict` exists. With a handful of trials and
+non-deterministic agents, the same skill untouched measures differently between
+runs, so accepting on the aggregate alone accepts chance. Declaring what your
+change should fix turns the comparison into a test of that claim: an aggregate
+that improves somewhere you did not predict is rejected as an unattributable
+improvement.
+
+`--predict` names expectations by position, `<evalId>#<n>` — eval `1`,
+expectation `3`. Run the session without it on a dirty tree and it stops before
+measuring anything, printing every frozen expectation with the identifier to
+use. Pass it more than once to declare several.
+
+Accepted, the session commits **only the skill's implementation** — never the
+evals, never anything else you have staged or pending — and the working tree is
+left on that version. Rejected, the implementation is restored from the
+committed version, and whatever you had in the tree when the session started is
+kept as a recoverable patch under the session directory. Either way the session
+closes with a balance, and an accepted session measures itself end to end with a
+fresh comparison between the version it started on and the one it ended on.
+
+Two things are your responsibility: **the branch** — commits land on whatever
+branch you left the session running on, and nothing switches branches, pushes or
+opens pull requests — and the agent configuration of your repository.
 
 ### Skill directory structure
 
