@@ -360,6 +360,9 @@ export function renderEvolveHeader(config: EvolveHeaderConfig): void {
   process.stdout.write(bottom + '\n\n');
 }
 
+/** Widest label of a proposal block, plus the space that separates it from the value. */
+const LABEL_WIDTH = 'effectiveness'.length + 1;
+
 /** Formats an effectiveness as a percentage with one decimal. */
 function formatEffectiveness(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
@@ -382,7 +385,7 @@ export function renderProposalOutcome(record: ProposalRecord): void {
   Logger.write(`\n${chalk.bold(`Proposal ${record.number}/${record.total}`)}${chalk.gray(`  ·  ${origin}`)}\n`);
 
   if (record.hypothesis) {
-    Logger.write(`   ${chalk.gray('hypothesis'.padEnd(13))}${record.hypothesis}\n`);
+    Logger.write(`   ${chalk.gray('hypothesis'.padEnd(LABEL_WIDTH))}${record.hypothesis}\n`);
   }
 
   const decision = record.decision;
@@ -394,7 +397,7 @@ export function renderProposalOutcome(record: ProposalRecord): void {
     const rates = outcome
       ? `  ${formatEffectiveness(outcome.incumbentRate)} → ${formatEffectiveness(outcome.candidateRate)} ${outcome.improved ? chalk.green('✓') : chalk.red('✗')}`
       : '';
-    Logger.write(`   ${chalk.gray(label.padEnd(13))}eval #${prediction.evalId} · ${prediction.expectation}${rates}\n`);
+    Logger.write(`   ${chalk.gray(label.padEnd(LABEL_WIDTH))}eval #${prediction.evalId} · ${prediction.expectation}${rates}\n`);
   }
 
   if (!decision) {
@@ -403,7 +406,7 @@ export function renderProposalOutcome(record: ProposalRecord): void {
   }
 
   Logger.write(
-    `   ${chalk.gray('effectiveness'.padEnd(13))}` +
+    `   ${chalk.gray('effectiveness'.padEnd(LABEL_WIDTH))}` +
     `${formatEffectiveness(decision.incumbentEffectiveness)} → ${formatEffectiveness(decision.candidateEffectiveness)}\n`
   );
 
