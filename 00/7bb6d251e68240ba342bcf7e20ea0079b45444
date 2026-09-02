@@ -1,0 +1,19 @@
+src/commands/evolve.ts
+  s_32ed2b5577667e::t_9e56db0e726246 143-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "007bb6d251e68240ba342bcf7e20ea0079b45444",
+  "prompts": {},
+  "sessions": {
+    "s_32ed2b5577667e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4fb464f8-ca90-4283-831e-8958d02bf0ab",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}

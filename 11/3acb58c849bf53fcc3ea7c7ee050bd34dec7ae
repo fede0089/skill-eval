@@ -1,0 +1,25 @@
+tests/commands/functional.test.ts
+  s_32ed2b5577667e::t_91987052bd703d 246-282
+tests/core/evolution.test.ts
+  s_32ed2b5577667e::t_ad39edd322e4f5 1-249
+tests/commands/evolve.test.ts
+  s_32ed2b5577667e::t_30954a1f5a2ceb 1-205
+tests/core/skill-git.test.ts
+  s_32ed2b5577667e::t_84b69c610902ae 1-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "113acb58c849bf53fcc3ea7c7ee050bd34dec7ae",
+  "prompts": {},
+  "sessions": {
+    "s_32ed2b5577667e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4fb464f8-ca90-4283-831e-8958d02bf0ab",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}

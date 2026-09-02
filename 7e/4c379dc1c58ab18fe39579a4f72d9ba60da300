@@ -1,0 +1,21 @@
+CHANGELOG.md
+  s_32ed2b5577667e::t_5ffe756149e701 46-55
+README.md
+  s_32ed2b5577667e::t_716809180afda2 84-86,105-106,125-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "7e4c379dc1c58ab18fe39579a4f72d9ba60da300",
+  "prompts": {},
+  "sessions": {
+    "s_32ed2b5577667e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4fb464f8-ca90-4283-831e-8958d02bf0ab",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}

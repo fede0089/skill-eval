@@ -1,0 +1,19 @@
+src/core/skill-git.ts
+  s_32ed2b5577667e::t_a90d66d8d2d3b8 1-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "942fd088e10eda95a333c4001c9f378be90ff5b1",
+  "prompts": {},
+  "sessions": {
+    "s_32ed2b5577667e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4fb464f8-ca90-4283-831e-8958d02bf0ab",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
