@@ -50,10 +50,56 @@ function missingPredictionMessage(suite: EvalSuite): string {
   );
 }
 
-/** The message an accepted proposal is committed with. */
-function commitMessage(record: ProposalRecord): string {
-  return `evolve: accept the working-tree change to the skill implementation\n\n` +
-    record.predictions.map(p => `Predicted: eval #${p.evalId} · ${p.expectation}`).join('\n') + '\n';
+export interface CommitContext {
+  skillName: string;
+  executorAgent: string;
+  judgeAgent: string;
+  /** Absent while the session runs no optimizer. */
+  optimizerAgent?: string;
+}
+
+/** Git's conventional subject limit; the hypothesis is cut to fit under it. */
+const SUBJECT_LIMIT = 72;
+
+/**
+ * The message an accepted proposal is committed with.
+ *
+ * It lands in the author's repository, not in this one, so it says what the
+ * evidence was rather than imitating this project's own style: the hypothesis as
+ * the subject, the two effectivenesses unrounded enough to be checkable, the
+ * expectations that were predicted and did improve, and where to find the run
+ * that measured them.
+ */
+export function buildCommitMessage(record: ProposalRecord, context: CommitContext): string {
+  const headline = record.hypothesis ?? 'accept the working-tree change';
+  const prefix = `evolve(${context.skillName}): `;
+  const room = SUBJECT_LIMIT - prefix.length;
+  const subject = prefix + (headline.length > room ? `${headline.slice(0, room - 1)}…` : headline);
+
+  const roles = [
+    `executor ${context.executorAgent}`,
+    `judge ${context.judgeAgent}`,
+    ...(context.optimizerAgent ? [`optimizer ${context.optimizerAgent}`] : [])
+  ].join(' · ');
+
+  const measured = record.decision
+    ? [
+        `Effectiveness ${record.decision.incumbentEffectiveness.toFixed(4)} → ` +
+        `${record.decision.candidateEffectiveness.toFixed(4)} under the evals frozen for the session.`,
+        ''
+      ]
+    : [];
+
+  const body = [
+    ...measured,
+    'Predicted and corroborated:',
+    ...record.predictions.map(p => `- eval #${p.evalId} · ${p.expectation}`),
+    '',
+    `Measured by: ${record.runDir ?? 'unknown'}`,
+    `Roles: ${roles}`
+  ];
+
+  return `${subject}\n\n${body.join('\n')}\n`;
 }
 
 /**
@@ -163,7 +209,8 @@ export async function evolveCommand(options: EvolveOptions): Promise<void> {
       };
 
       if (decision.verdict === 'accepted') {
-        record.sha = skillGit.shortSha(skillGit.commitImplementation(commitMessage(record)));
+        const message = buildCommitMessage(record, { skillName: suite.skill_name, executorAgent, judgeAgent });
+        record.sha = skillGit.shortSha(skillGit.commitImplementation(message));
       } else {
         skillGit.restoreImplementation();
       }
