@@ -3,7 +3,7 @@
 Notable changes to `skill-eval`. Versions are tagged by the `release:*` scripts;
 entries land here first under `Unreleased`.
 
-## Unreleased
+## 4.0.0 — 2026-09-02
 
 ### Breaking
 
