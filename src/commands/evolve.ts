@@ -140,7 +140,10 @@ export async function evolveCommand(options: EvolveOptions): Promise<void> {
     skillName: suite.skill_name,
     executorAgent,
     judgeAgent,
-    evals: suite.tasks.length,
+    // A session only ever measures functionally, so a trigger-only eval is
+    // frozen with the rest but never counted: saying otherwise promises the
+    // author a comparison over evals that will not take part in one.
+    evals: suite.tasks.filter(task => task.should_trigger !== false).length,
     trials: numTrials,
     maxAgents,
     timeoutMs,
