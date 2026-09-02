@@ -246,3 +246,22 @@ export interface FunctionalEvalResult extends EvalSummaryResult {
   baselineAllExpectationsPassed?: boolean;
   baselineExpectationsResults?: ExpectationResult[];
 }
+
+/**
+ * One expectation an author or an optimizer declared their change should
+ * improve. A proposal is accepted only when the evidence corroborates every
+ * one of them, so the pair (eval, expectation text) has to name an expectation
+ * the frozen evals actually hold.
+ */
+export interface PredictedExpectation {
+  evalId: number;
+  expectation: string;
+}
+
+/**
+ * Why a candidate was accepted or rejected.
+ * - `not-better`      the aggregate effectiveness did not improve; equal is not better.
+ * - `unattributable`  the aggregate improved but a declared expectation did not.
+ * - `total-regression` an expectation the incumbent passed in all its trials fails in all the candidate's.
+ */
+export type ProposalVerdict = 'accepted' | 'not-better' | 'unattributable' | 'total-regression';
