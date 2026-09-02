@@ -1,0 +1,23 @@
+src/utils/table-renderer.ts
+  s_32ed2b5577667e::t_27aea49e194e91 4,305-440
+src/core/evolution.ts
+  s_32ed2b5577667e::t_4166391ced5b7a 5,7
+src/types/index.ts
+  s_32ed2b5577667e::t_4166391ced5b7a 268-326
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "06bd8413ab252c66a5aebb1f814f1f2110f899da",
+  "prompts": {},
+  "sessions": {
+    "s_32ed2b5577667e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4fb464f8-ca90-4283-831e-8958d02bf0ab",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
