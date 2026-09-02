@@ -123,6 +123,8 @@ program
   .option('--timeout <seconds>', 'Agent timeout in seconds')
   .option('--executor-agent <name>', 'Agent that runs the evaluated task', DEFAULT_AGENT)
   .option('--judge-agent <name>', 'Agent that grades the result (default: the executor agent)')
+  .option('--optimizer-agent <name>', 'Agent that reads the evidence and proposes the change (default: the executor agent)')
+  .option('--proposals <number>', 'Ceiling of optimizer invocations; every proposal consumes one', '3')
   .option('--predict [items...]', 'Expectations an uncommitted change should improve, as <evalId>#<n>')
   .option('--output <path>', 'Root for everything the session writes; must be outside the workspace and the skill (default: ~/.skill-eval)')
   .action((options) => {
@@ -131,10 +133,12 @@ program
     evolveCommand({
       executorAgent,
       judgeAgent: options.judgeAgent || executorAgent,
+      optimizerAgent: options.optimizerAgent || executorAgent,
       workspace,
       skillPath: options.skill,
       maxAgents: parseInt(options.agents, 10),
       numTrials: parseInt(options.trials, 10),
+      proposals: parseInt(options.proposals, 10),
       timeoutMs: options.timeout ? parseInt(options.timeout, 10) * 1000 : undefined,
       output: options.output,
       predict: parsePredictions(options.predict)

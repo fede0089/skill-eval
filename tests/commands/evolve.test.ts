@@ -91,13 +91,16 @@ function cleanUp(fixture: Fixture): void {
   fs.rmSync(fixture.outputRoot, { recursive: true, force: true });
 }
 
-const SESSION = (fixture: Fixture, predict: string[]) => ({
+const SESSION = (fixture: Fixture, predict: string[], proposals = 0) => ({
   executorAgent: 'gemini-cli',
   judgeAgent: 'gemini-cli',
+  optimizerAgent: 'gemini-cli',
   workspace: fixture.workspace,
   skillPath: 'my-skill',
   maxAgents: 1,
   numTrials: 1,
+  // These cases are about the working-tree proposal, so no optimizer is invoked.
+  proposals,
   output: fixture.outputRoot,
   predict
 });

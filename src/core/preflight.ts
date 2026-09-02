@@ -8,7 +8,7 @@ import { RUNNER_REGISTRY } from '../runners/registry.js';
  * Verifies that an agent's CLI binary is installed and on PATH.
  * The role is named in the message so an author with two agents knows which one is missing.
  */
-function checkAgentBinary(agent: string, role: 'Agent' | 'Judge agent'): void {
+function checkAgentBinary(agent: string, role: 'Agent' | 'Judge agent' | 'Optimizer agent'): void {
   const binary = RUNNER_REGISTRY[agent]?.binary ?? agent;
 
   try {
@@ -32,11 +32,20 @@ function checkAgentBinary(agent: string, role: 'Agent' | 'Judge agent'): void {
  * @throws ExecutionError if an agent binary is not found.
  * @throws ConfigError if the skill path or its evals/ directory is missing.
  */
-export function preflight(executorAgent: string, workspace: string, skillPath: string, judgeAgent?: string): void {
+export function preflight(
+  executorAgent: string,
+  workspace: string,
+  skillPath: string,
+  judgeAgent?: string,
+  optimizerAgent?: string
+): void {
   checkAgentBinary(executorAgent, 'Agent');
-  // Only a judge on a different backend adds a binary to verify.
+  // Only a role on a different backend adds a binary to verify.
   if (judgeAgent && judgeAgent !== executorAgent) {
     checkAgentBinary(judgeAgent, 'Judge agent');
+  }
+  if (optimizerAgent && optimizerAgent !== executorAgent && optimizerAgent !== judgeAgent) {
+    checkAgentBinary(optimizerAgent, 'Optimizer agent');
   }
 
   const absoluteSkillPath = path.resolve(workspace, skillPath);

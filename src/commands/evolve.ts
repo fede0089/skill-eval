@@ -1,12 +1,25 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
-import { EvalSuite, EvalSuiteReport, PredictedExpectation, ProposalRecord, SessionBalance } from '../types/index.js';
+import {
+  EvalSuite,
+  EvalSuiteReport,
+  InvalidReason,
+  PredictedExpectation,
+  ProposalRecord,
+  SessionBalance
+} from '../types/index.js';
 import { ConfigError, ExecutionError } from '../core/errors.js';
 import { decide, effectiveness, isInconclusive, parseDeclaredPrediction, resolvePredictions } from '../core/evolution.js';
+import {
+  buildOptimizerPrompt,
+  parseOptimizerDeclaration,
+  runOptimizer,
+  summarizeExpectations
+} from '../core/optimizer.js';
 import { resolveOutputDir } from '../core/output-location.js';
 import { preflight } from '../core/preflight.js';
-import { freezeEvals } from '../core/skill-parts.js';
+import { EVALS_DIRNAME, freezeEvals } from '../core/skill-parts.js';
 import { resolveSkillRepo, SkillGit } from '../core/skill-git.js';
 import { loadEvalSuite } from '../utils/eval-loader.js';
 import { Logger } from '../utils/logger.js';
@@ -22,10 +35,14 @@ const INCUMBENT = 'ref:HEAD';
 export interface EvolveOptions {
   executorAgent: string;
   judgeAgent: string;
+  /** Agent that reads the evidence and proposes the change. */
+  optimizerAgent: string;
   workspace: string;
   skillPath: string;
   maxAgents?: number;
   numTrials?: number;
+  /** Ceiling of optimizer invocations. Every proposal consumes one, valid or not. */
+  proposals?: number;
   timeoutMs?: number;
   output?: string;
   /** Raw `--predict` values, in their `<evalId>#<n>` form. */
@@ -48,6 +65,26 @@ function missingPredictionMessage(suite: EvalSuite): string {
     `Declare it with --predict <evalId>#<n>, once per expectation (e.g. --predict 1#3).\n\n` +
     `Frozen expectations:\n${catalog}`
   );
+}
+
+/** What the terminal says about an attempt that never reached a comparison. */
+function describeInvalid(reason: InvalidReason, reverted: string[]): string {
+  switch (reason) {
+    case 'timeout':
+      return 'the optimizer ran out of time';
+    case 'agent-error':
+      return 'the optimizer failed to produce an answer';
+    case 'no-declaration':
+      return 'the optimizer declared no prediction';
+    case 'unparsable-declaration':
+      return 'the declaration could not be read';
+    case 'unknown-expectation':
+      return 'the declared expectations do not exist in the frozen evals';
+    case 'out-of-scope':
+      return `the optimizer changed ${reverted.length} path(s) outside the implementation: ${reverted.join(', ')}`;
+    case 'no-change':
+      return 'the optimizer changed nothing';
+  }
 }
 
 export interface CommitContext {
@@ -107,20 +144,21 @@ export function buildCommitMessage(record: ProposalRecord, context: CommitContex
  *
  * The committed version of the skill is always the best accepted version and the
  * working tree is the candidate under evaluation. The session freezes the evals
- * once, measures the candidate against the committed version under them, and
- * either commits the implementation or restores it — never touching the evals,
- * never touching anything the author has pending outside the skill.
+ * once, and every round measures the candidate against the committed version
+ * under them, committing the implementation or restoring it — never touching the
+ * evals, never touching anything the author has pending outside the skill.
  */
 export async function evolveCommand(options: EvolveOptions): Promise<void> {
   const {
-    executorAgent, judgeAgent, workspace, skillPath,
-    maxAgents = 4, numTrials = 5, timeoutMs, output, predict = []
+    executorAgent, judgeAgent, optimizerAgent, workspace, skillPath,
+    maxAgents = 4, numTrials = 5, proposals = 3, timeoutMs, output, predict = []
   } = options;
 
-  preflight(executorAgent, workspace, skillPath, judgeAgent);
+  preflight(executorAgent, workspace, skillPath, judgeAgent, optimizerAgent);
 
   const absoluteSkillPath = path.resolve(workspace, skillPath);
-  const skillGit = new SkillGit(resolveSkillRepo(absoluteSkillPath));
+  const repo = resolveSkillRepo(absoluteSkillPath);
+  const skillGit = new SkillGit(repo);
 
   // The artifacts root is named after the skill, which only the suite declares.
   const artifactsDir = resolveOutputDir({
@@ -136,22 +174,28 @@ export async function evolveCommand(options: EvolveOptions): Promise<void> {
   const frozenEvals = freezeEvals(absoluteSkillPath, sessionDir);
   const suite = loadEvalSuite(sessionDir);
 
+  const declared = predict.map(parseDeclaredPrediction);
+  const dirty = skillGit.hasImplementationChanges();
+  // The uncommitted state is a proposal of its own, and it does not spend the
+  // optimizer's budget: the ceiling the author asked for is invocations of the
+  // optimizer, whatever else the session does.
+  const totalProposals = (dirty ? 1 : 0) + proposals;
+
   renderEvolveHeader({
     skillName: suite.skill_name,
     executorAgent,
     judgeAgent,
+    optimizerAgent,
     // A session only ever measures functionally, so a trigger-only eval is
     // frozen with the rest but never counted: saying otherwise promises the
     // author a comparison over evals that will not take part in one.
     evals: suite.tasks.filter(task => task.should_trigger !== false).length,
     trials: numTrials,
     maxAgents,
+    proposals: totalProposals,
     timeoutMs,
     sessionDir
   });
-
-  const declared = predict.map(parseDeclaredPrediction);
-  const dirty = skillGit.hasImplementationChanges();
 
   if (!dirty && declared.length > 0) {
     throw new ConfigError(
@@ -191,39 +235,121 @@ export async function evolveCommand(options: EvolveOptions): Promise<void> {
     return { report, runDir: runDirFor(artifactsDir, report.timestamp) };
   };
 
+  /**
+   * Measures one candidate against the version in effect and acts on the verdict:
+   * accepted, the implementation is committed and becomes the incumbent;
+   * rejected, it is restored from that same version.
+   */
+  const settle = async (record: ProposalRecord): Promise<void> => {
+    const { report, runDir } = await evaluate(['HEAD']);
+    record.runDir = runDir;
+
+    if (isInconclusive(report, [CANDIDATE, INCUMBENT])) {
+      skillGit.restoreImplementation();
+      throw new ExecutionError(
+        `The comparison produced no comparable metric: a variant was left without a counted trial in some eval. ` +
+        `Nothing was committed and the skill implementation was restored. Evidence: ${runDir}`
+      );
+    }
+
+    record.decision = decide({
+      report, candidate: CANDIDATE, incumbent: INCUMBENT, predictions: record.predictions
+    });
+
+    if (record.decision.verdict === 'accepted') {
+      const message = buildCommitMessage(record, {
+        skillName: suite.skill_name, executorAgent, judgeAgent, optimizerAgent
+      });
+      record.sha = skillGit.shortSha(skillGit.commitImplementation(message));
+    } else {
+      skillGit.restoreImplementation();
+    }
+
+    records.push(record);
+    renderProposalOutcome(record);
+  };
+
   let failure: unknown;
+  /** Evidence the next optimizer invocation reads: the latest comparison. */
+  let lastEvidence: string | undefined;
 
   try {
     if (dirty) {
       const predictions: PredictedExpectation[] = resolvePredictions(suite, declared);
-      const { report, runDir } = await evaluate(['HEAD']);
+      const record: ProposalRecord = { number: 1, total: totalProposals, origin: 'working-tree', predictions };
+      await settle(record);
+      lastEvidence = record.runDir;
+    } else if (proposals > 0) {
+      // Nothing to decide: the run establishes the evidence the first round reads.
+      const { runDir } = await evaluate([]);
+      lastEvidence = runDir;
+      Logger.write(chalk.dim(`\n   Starting evidence measured at ${runDir}\n`));
+    }
 
-      if (isInconclusive(report, [CANDIDATE, INCUMBENT])) {
-        skillGit.restoreImplementation();
-        throw new ExecutionError(
-          `The comparison produced no comparable metric: a variant was left without a counted trial in some eval. ` +
-          `Nothing was committed and the skill implementation was restored. Evidence: ${runDir}`
-        );
-      }
+    const evalsSummary = summarizeExpectations(suite);
 
-      const decision = decide({ report, candidate: CANDIDATE, incumbent: INCUMBENT, predictions });
+    for (let round = 1; round <= proposals; round++) {
       const record: ProposalRecord = {
-        number: 1, total: 1, origin: 'working-tree', predictions, decision, runDir
+        number: records.length + 1, total: totalProposals, origin: 'optimizer', predictions: []
       };
 
-      if (decision.verdict === 'accepted') {
-        const message = buildCommitMessage(record, { skillName: suite.skill_name, executorAgent, judgeAgent });
-        record.sha = skillGit.shortSha(skillGit.commitImplementation(message));
+      // Everything the optimizer does is judged against the tree as it stands
+      // now, so what the author already had pending outside the skill is never
+      // mistaken for something the optimizer wrote.
+      const before = skillGit.snapshotWorkingTree();
+
+      Logger.write(chalk.dim(`\n   Asking the optimizer for proposal ${record.number}/${totalProposals}…\n`));
+      const run = await runOptimizer({
+        agent: optimizerAgent,
+        cwd: repo.repoRoot,
+        prompt: buildOptimizerPrompt({
+          reportPath: path.join(lastEvidence!, 'report.html'),
+          transcriptsDir: lastEvidence!,
+          skillImplPath: absoluteSkillPath,
+          evalsPath: path.join(absoluteSkillPath, EVALS_DIRNAME),
+          evalsSummary
+        }),
+        logPath: path.join(sessionDir, `optimizer-${round}.log`),
+        timeoutMs
+      });
+
+      let invalid: InvalidReason | undefined;
+
+      if (!run.ok) {
+        invalid = run.reason;
       } else {
-        skillGit.restoreImplementation();
+        const declaration = parseOptimizerDeclaration(run.text);
+        if (!declaration.declared) {
+          invalid = declaration.reason;
+        } else {
+          record.hypothesis = declaration.hypothesis;
+          try {
+            record.predictions = resolvePredictions(suite, declaration.predictions);
+          } catch {
+            invalid = 'unknown-expectation';
+          }
+        }
       }
 
-      records.push(record);
-      renderProposalOutcome(record);
-    } else {
-      // Nothing to decide: the run establishes the evidence a later round starts from.
-      const { runDir } = await evaluate([]);
-      Logger.write(chalk.dim(`\n   Starting evidence measured at ${runDir}\n`));
+      // Checked after every invocation, whatever the answer looked like.
+      const reverted = skillGit.revertOutOfScope(before);
+      if (!invalid && reverted.length > 0) invalid = 'out-of-scope';
+      if (!invalid && !skillGit.hasImplementationChanges()) invalid = 'no-change';
+
+      if (invalid) {
+        // Every overstep is treated alike: what fell outside is reverted, the
+        // candidate is not measured, the proposal is consumed, and the session
+        // goes on. The implementation goes back to the version in effect too,
+        // since the tree may only hold a candidate that is being measured.
+        record.invalidReason = describeInvalid(invalid, reverted);
+        skillGit.restoreImplementation();
+        records.push(record);
+        renderProposalOutcome(record);
+        continue;
+      }
+
+      await settle(record);
+      lastEvidence = record.runDir;
     }
   } catch (err) {
     failure = err;
