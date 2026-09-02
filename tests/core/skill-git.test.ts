@@ -151,3 +151,63 @@ test('backupWorkingTree preserves nothing when the tree is clean', () => {
     fs.rmSync(workspace, { recursive: true, force: true });
   }
 });
+
+test('revertOutOfScope undoes what appeared outside the implementation, and nothing else', () => {
+  const { workspace, skillGit } = makeRepo();
+
+  try {
+    // What the author already had pending when the session started.
+    fs.writeFileSync(path.join(workspace, 'README.md'), 'work the author had not committed\n');
+    fs.writeFileSync(path.join(workspace, 'untracked-note.md'), 'the author was taking notes\n');
+
+    const before = skillGit.snapshotWorkingTree();
+
+    // What an agent then did: a legitimate edit, and three oversteps.
+    fs.writeFileSync(path.join(workspace, 'my-skill', 'SKILL.md'), 'candidate implementation\n');
+    fs.writeFileSync(path.join(workspace, 'my-skill', 'evals', 'license.json'), '{"tampered":true}\n');
+    fs.writeFileSync(path.join(workspace, 'package.json'), '{"invented":true}\n');
+    fs.writeFileSync(path.join(workspace, 'README.md'), 'and then the agent rewrote it\n');
+
+    const reverted = skillGit.revertOutOfScope(before).sort();
+
+    assert.deepStrictEqual(reverted, ['README.md', 'my-skill/evals/license.json', 'package.json']);
+    assert.strictEqual(
+      fs.readFileSync(path.join(workspace, 'my-skill', 'SKILL.md'), 'utf-8'),
+      'candidate implementation\n',
+      'the implementation is the candidate and is not reverted here'
+    );
+    assert.strictEqual(
+      fs.readFileSync(path.join(workspace, 'my-skill', 'evals', 'license.json'), 'utf-8'),
+      '{"committed":true}\n',
+      'the evals are measuring apparatus and go back'
+    );
+    assert.ok(!fs.existsSync(path.join(workspace, 'package.json')), 'a file the agent invented is removed');
+    assert.ok(
+      fs.existsSync(path.join(workspace, 'untracked-note.md')),
+      "an untracked file the agent never touched is not the agent's to lose"
+    );
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test('revertOutOfScope leaves alone what was already dirty and untouched', () => {
+  const { workspace, skillGit } = makeRepo();
+
+  try {
+    fs.writeFileSync(path.join(workspace, 'README.md'), 'work the author had not committed\n');
+    fs.writeFileSync(path.join(workspace, 'untracked-note.md'), 'the author was taking notes\n');
+
+    const before = skillGit.snapshotWorkingTree();
+    fs.writeFileSync(path.join(workspace, 'my-skill', 'SKILL.md'), 'candidate implementation\n');
+
+    assert.deepStrictEqual(skillGit.revertOutOfScope(before), []);
+    assert.strictEqual(
+      fs.readFileSync(path.join(workspace, 'README.md'), 'utf-8'),
+      'work the author had not committed\n'
+    );
+    assert.ok(fs.existsSync(path.join(workspace, 'untracked-note.md')));
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});

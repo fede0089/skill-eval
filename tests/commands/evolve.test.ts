@@ -7,6 +7,8 @@ import * as os from 'os';
 import { evolveCommand } from '../../src/commands/evolve.js';
 import { EvalRunner } from '../../src/core/eval-runner.js';
 import { executor } from '../../src/utils/exec.js';
+import { GeminiCliRunner } from '../../src/runners/gemini-cli/index.js';
+import { Logger } from '../../src/utils/logger.js';
 import { AssertionResult } from '../../src/types/index.js';
 
 // Drives a whole session against real Git and a real skill on disk, with only the
@@ -202,6 +204,102 @@ test('a proposal whose prediction did not hold is restored and never committed',
       fs.existsSync(path.join(backup, sessions[0], 'backup', 'author-worktree.patch')),
       'the discarded candidate stays recoverable'
     );
+  } finally {
+    cleanUp(fixture);
+  }
+});
+
+/**
+ * Stands in for the optimizer: it writes what a real one would write and answers
+ * with the stream a runner produces. Each entry is one round, in order.
+ */
+function stubOptimizer(t: any, rounds: Array<{ edit: () => void; answer: string }>): { calls: number } {
+  const state = { calls: 0 };
+
+  t.mock.method(GeminiCliRunner.prototype, 'runPrompt', async () => {
+    const round = rounds[Math.min(state.calls, rounds.length - 1)];
+    state.calls++;
+    round.edit();
+    return {
+      response: [
+        JSON.stringify({ type: 'message', role: 'assistant', content: round.answer }),
+        JSON.stringify({ type: 'result', status: 'success' })
+      ].join('\n')
+    };
+  });
+
+  return state;
+}
+
+test('an optimizer that also edits the evals has its overstep reverted and its proposal consumed', async (t) => {
+  const fixture = makeFixture();
+  stubTrials(t, {
+    candidate: { 'A holds': true, 'B holds': true },
+    incumbent: { 'A holds': true, 'B holds': false }
+  });
+
+  const evalsFile = path.join(fixture.skillPath, 'evals', 'license.json');
+  const evalsBefore = fs.readFileSync(evalsFile, 'utf-8');
+
+  const optimizer = stubOptimizer(t, [
+    {
+      // Round 1 oversteps: it edits the implementation and the evals it is graded with.
+      edit: () => {
+        fs.writeFileSync(path.join(fixture.skillPath, 'SKILL.md'), '# first candidate\n');
+        fs.writeFileSync(evalsFile, JSON.stringify({
+          skill_name: 'evolving-skill',
+          evals: [{ id: 1, prompt: 'do the thing', expectations: ['A holds'] }]
+        }));
+      },
+      answer: '{"hypothesis": "loosen the rule", "predictions": [{"eval": 1, "expectation": "B holds"}]}'
+    },
+    {
+      edit: () => fs.writeFileSync(path.join(fixture.skillPath, 'SKILL.md'), '# second candidate\n'),
+      answer: '{"hypothesis": "spell out the rule", "predictions": [{"eval": 1, "expectation": "B holds"}]}'
+    }
+  ]);
+
+  try {
+    await evolveCommand({ ...SESSION(fixture, [], 2), optimizerAgent: 'gemini-cli' });
+
+    assert.strictEqual(optimizer.calls, 2, 'an invalid attempt consumes its proposal and the session goes on');
+    assert.strictEqual(fs.readFileSync(evalsFile, 'utf-8'), evalsBefore, 'the evals are put back');
+    assert.strictEqual(
+      git(fixture.workspace, ['rev-list', '--count', 'HEAD']).trim(), '2',
+      'only the second proposal reached a comparison and was committed'
+    );
+    assert.strictEqual(
+      fs.readFileSync(path.join(fixture.skillPath, 'SKILL.md'), 'utf-8'),
+      '# second candidate\n'
+    );
+  } finally {
+    cleanUp(fixture);
+  }
+});
+
+test('the working-tree proposal does not spend the optimizer budget', async (t) => {
+  const fixture = makeFixture();
+  dirtyTheTree(fixture);
+  stubTrials(t, {
+    candidate: { 'A holds': true, 'B holds': true },
+    incumbent: { 'A holds': true, 'B holds': false }
+  });
+  const optimizer = stubOptimizer(t, [{
+    edit: () => fs.writeFileSync(path.join(fixture.skillPath, 'SKILL.md'), '# optimizer candidate\n'),
+    answer: '{"hypothesis": "spell out the rule", "predictions": [{"eval": 1, "expectation": "B holds"}]}'
+  }]);
+
+  const printed: string[] = [];
+  t.mock.method(Logger, 'write', (line: string) => { printed.push(line); });
+
+  try {
+    await evolveCommand({ ...SESSION(fixture, ['1#2'], 1), optimizerAgent: 'gemini-cli' });
+
+    assert.strictEqual(optimizer.calls, 1, '--proposals is a ceiling on optimizer invocations');
+    const balance = printed.join('');
+    assert.match(balance, /proposals 2/, 'the working tree is a proposal of its own on top of the budget');
+    assert.match(balance, /Proposal 1\/2/);
+    assert.match(balance, /Proposal 2\/2/);
   } finally {
     cleanUp(fixture);
   }
