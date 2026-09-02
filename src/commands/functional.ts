@@ -10,7 +10,7 @@ import { AgentPool } from '../core/agent-pool.js';
 import { aggregatePassAtK, aggregateAssertionPassRate, aggregateTokenStats, aggregateDurationStats } from '../core/statistics.js';
 import { preflight } from '../core/preflight.js';
 import { resolveOutputDir } from '../core/output-location.js';
-import { freezeEvals, materializeImplementation } from '../core/skill-parts.js';
+import { adoptFrozenEvals, freezeEvals, materializeImplementation } from '../core/skill-parts.js';
 import { ConfigError } from '../core/errors.js';
 import { withRetry } from '../core/trial-utils.js';
 import { renderFunctionalTable, renderRunHeader } from '../utils/table-renderer.js';
@@ -19,6 +19,15 @@ import { HtmlReporter } from '../reporters/index.js';
 
 import chalk from 'chalk';
 import { git } from '../utils/git.js';
+
+export interface FunctionalRunOptions {
+  /**
+   * Evals a session already froze. When given, the run measures with them
+   * instead of freezing its own copy, and reads its suite from them too, so
+   * every round of a session decides against the same expectations.
+   */
+  frozenEvalsDir?: string;
+}
 
 export async function functionalCommand(
   executorAgent: string,
@@ -34,10 +43,15 @@ export async function functionalCommand(
   compareRefs: string[] = [],
   compareBaseline = false,
   evalFile?: string,
-  output?: string
-): Promise<void> {
+  output?: string,
+  options: FunctionalRunOptions = {}
+): Promise<EvalSuiteReport> {
   if (!injectedSuite) preflight(executorAgent, workspace, skillPath, judgeAgent);
-  const suite = injectedSuite || evalLoader.loadEvalSuite(skillPath, evalFile);
+  // A session's frozen copy is also where its suite comes from: what decides a
+  // commit must be the expectations that were frozen, not whatever is on disk
+  // when the round starts.
+  const suiteSource = options.frozenEvalsDir ? path.dirname(options.frozenEvalsDir) : skillPath;
+  const suite = injectedSuite || evalLoader.loadEvalSuite(suiteSource, evalFile);
 
   // Negative evals (should_trigger: false) only make sense for the trigger command:
   // this pass instructs the agent that it MUST use the skill, which contradicts them.
@@ -97,7 +111,11 @@ export async function functionalCommand(
   // suite means the tool was told not to read the skill from disk, so nothing is frozen
   // and nothing is cut — exactly as when preflight is skipped.
   const absoluteSkillPath = path.resolve(workspace, skillPath);
-  const frozenEvals = injectedSuite ? undefined : freezeEvals(absoluteSkillPath, runDir);
+  const frozenEvals = injectedSuite
+    ? undefined
+    : options.frozenEvalsDir
+      ? adoptFrozenEvals(options.frozenEvalsDir, absoluteSkillPath)
+      : freezeEvals(absoluteSkillPath, runDir);
 
   const variantRunners = new Map<string, EvalRunner>();
 
@@ -391,6 +409,7 @@ export async function functionalCommand(
     Logger.write('\n');
     reporter.generate(report, runDir);
 
+    return report;
   } finally {
     process.off('SIGINT', cleanup);
     process.off('SIGTERM', cleanup);

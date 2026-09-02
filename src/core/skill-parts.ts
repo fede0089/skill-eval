@@ -57,6 +57,25 @@ export function freezeEvals(skillPath: string, runDir: string): FrozenEvals {
 }
 
 /**
+ * Describes a frozen copy that already exists, without copying anything.
+ *
+ * An evolution session freezes once and every round of it measures with that
+ * same copy: freezing again per round would make the guarantee depend on nobody
+ * editing the evals between rounds.
+ */
+export function adoptFrozenEvals(dir: string, skillPath: string): FrozenEvals {
+  const resolved = path.resolve(dir);
+
+  if (!fs.existsSync(resolved)) {
+    throw new ConfigError(`No frozen evals found at '${resolved}'.`);
+  }
+
+  const evalFiles = fs.readdirSync(resolved).filter(file => file.endsWith('.json')).sort();
+
+  return { dir: resolved, source: path.resolve(skillPath, EVALS_DIRNAME), evalFiles };
+}
+
+/**
  * Copies the skill's implementation — everything except its evals — under
  * `targetDir`, and returns where it landed.
  *
