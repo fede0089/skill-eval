@@ -20,6 +20,15 @@ import { HtmlReporter } from '../reporters/index.js';
 import chalk from 'chalk';
 import { git } from '../utils/git.js';
 
+/**
+ * Where a run writes its report and its trial logs. Exported so a caller holding
+ * a returned report can find the evidence behind it without recomposing the
+ * naming convention on its own.
+ */
+export function runDirFor(artifactsDir: string, timestamp: string): string {
+  return path.resolve(artifactsDir, 'runs', timestamp.replace(/[:.]/g, '-'));
+}
+
 export interface FunctionalRunOptions {
   /**
    * Evals a session already froze. When given, the run measures with them
@@ -101,8 +110,7 @@ export async function functionalCommand(
 
   // Every run gets its own directory: trial logs and the report always land here.
   const startTime = new Date();
-  const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
-  const runDir = path.resolve(artifactsDir, 'runs', timestamp);
+  const runDir = runDirFor(artifactsDir, startTime.toISOString());
   fs.mkdirSync(runDir, { recursive: true });
 
   // The evals are frozen once, here, and every variant of the run is measured with
