@@ -1,0 +1,20 @@
+src/commands/evolve.ts
+  s_32ed2b5577667e::t_614269b6b7c2e5 85-92,94,100
+  s_32ed2b5577667e::t_fd3ee9b4aa6048 53-84,93,95-99,101-102,212-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "10f9b97b3b4cb9c23c89c9354c0c9fb19f67ca46",
+  "prompts": {},
+  "sessions": {
+    "s_32ed2b5577667e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4fb464f8-ca90-4283-831e-8958d02bf0ab",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Federico Mete <fedee.1989@gmail.com>"
+    }
+  }
+}
