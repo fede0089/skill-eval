@@ -53,6 +53,14 @@ entries land here first under `Unreleased`.
   the skill's implementation: the evals and anything you have staged or pending
   elsewhere are never touched, and no branch is switched, pushed or opened as a
   pull request.
+
+  `--proposals` asks a third agent role, `--optimizer-agent`, for that many
+  changes, one hypothesis at a time. It is handed the locations of the last
+  comparison's report and transcripts and reads them itself. Every proposal
+  consumes one invocation, so the cost of a session is known up front, and an
+  attempt that oversteps — out of time, no declaration, expectations that do not
+  exist, or an edit outside the implementation — is reverted and discarded
+  without being measured.
 - `--executor-agent <name>` on both commands: the agent that runs the evaluated
   task. Defaults to `gemini-cli`, as the positional argument did.
 - `--judge-agent <name>` on `functional`: the agent that grades the result.

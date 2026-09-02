@@ -104,6 +104,8 @@ skill-eval evolve --workspace <path> --skill <path> [options]
 | `--executor-agent <name>` | no | `gemini-cli` | Agent that runs the evaluated task |
 | `--judge-agent <name>` | no | the executor agent | Agent that grades the result (`functional` and `evolve`) |
 | `--predict <items...>` | on a dirty tree | — | Expectations an uncommitted change should improve, as `<evalId>#<n>` (`evolve` only) |
+| `--optimizer-agent <name>` | no | the executor agent | Agent that reads the evidence and proposes the change (`evolve` only) |
+| `--proposals <number>` | no | `3` | Ceiling of optimizer invocations (`evolve` only) |
 
 The two roles are chosen separately, so you can have one backend solve the task
 and another grade it:
@@ -131,8 +133,12 @@ frozen evals, so the only difference between them is the implementation — and
 keeps the candidate only when the evidence backs it.
 
 ```sh
-# you have been editing my-skill/SKILL.md and have not committed it
-skill-eval evolve --workspace . --skill ./my-skill --predict 1#3
+# leave it running: it asks the optimizer for three proposals, one at a time
+skill-eval evolve --workspace . --skill ./my-skill \
+  --executor-agent gemini-cli --optimizer-agent claude-code --proposals 3
+
+# or just measure what you have been editing yourself, with no optimizer
+skill-eval evolve --workspace . --skill ./my-skill --proposals 0 --predict 1#3
 ```
 
 A candidate is accepted only when three things hold at once:
@@ -162,9 +168,35 @@ kept as a recoverable patch under the session directory. Either way the session
 closes with a balance, and an accepted session measures itself end to end with a
 fresh comparison between the version it started on and the one it ended on.
 
+#### The optimizer
+
+`--proposals` is the ceiling of optimizer invocations, and **every proposal
+consumes one**, including the ones that end up discarded. That is deliberate: it
+makes the cost of a session predictable before you start it. Your uncommitted
+working tree, when you have one, is a proposal on top of that ceiling — it does
+not spend the optimizer's budget.
+
+Each round the optimizer is given *locations*, not material: the report and the
+trial transcripts of the last comparison, and the skill implementation. It reads
+what it wants to read, proposes one hypothesis, edits the implementation, and
+declares which expectations that hypothesis should improve.
+
+Everything it touches is checked afterwards against the tree as it stood before
+it ran. An attempt is discarded, without being measured, when the optimizer runs
+out of time, declares nothing, names expectations that do not exist, changes
+anything outside the implementation — the evals included — or changes nothing at
+all. What fell outside the boundary is reverted, the reason is reported, and the
+session moves to the next proposal.
+
+`--optimizer-agent` inherits the agent configuration of your repository, on
+purpose: its configuration is not measuring apparatus, so it is not part of the
+frozen evals. It runs under the same `--timeout` as the trials.
+
 Two things are your responsibility: **the branch** — commits land on whatever
 branch you left the session running on, and nothing switches branches, pushes or
-opens pull requests — and the agent configuration of your repository.
+opens pull requests — and **the agent configuration of your repository**. The
+optimizer has to be able to edit files without stopping to ask for confirmation;
+if it cannot, every proposal will run out its clock and be discarded.
 
 ### Skill directory structure
 
