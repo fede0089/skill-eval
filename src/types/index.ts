@@ -265,3 +265,62 @@ export interface PredictedExpectation {
  * - `total-regression` an expectation the incumbent passed in all its trials fails in all the candidate's.
  */
 export type ProposalVerdict = 'accepted' | 'not-better' | 'unattributable' | 'total-regression';
+
+/** How one declared expectation fared between the two variants. */
+export interface ExpectationOutcome {
+  prediction: PredictedExpectation;
+  candidateRate: number;
+  incumbentRate: number;
+  improved: boolean;
+}
+
+export interface ProposalDecision {
+  verdict: ProposalVerdict;
+  /** Effectiveness of both variants, unrounded: equal is not better. */
+  candidateEffectiveness: number;
+  incumbentEffectiveness: number;
+  /** One entry per declared expectation, in the order it was declared. */
+  predictionsMet: ExpectationOutcome[];
+  /** Expectations the incumbent passed in every trial and the candidate fails in every one. */
+  collapsed: PredictedExpectation[];
+}
+
+/** Where a proposal came from. The uncommitted working tree is a full proposal. */
+export type ProposalOrigin = 'working-tree' | 'optimizer';
+
+/**
+ * What the session did with one proposal. It is shown in the terminal and does
+ * not persist anywhere: the durable evolution history arrives with its own spec.
+ */
+export interface ProposalRecord {
+  /** 1-based, in the order the session ran them. */
+  number: number;
+  total: number;
+  origin: ProposalOrigin;
+  /** The single hypothesis behind the change. Absent for the working tree. */
+  hypothesis?: string;
+  predictions: PredictedExpectation[];
+  /** Absent when the attempt was invalid and never reached a comparison. */
+  decision?: ProposalDecision;
+  /** Why the attempt was invalid, when it was. */
+  invalidReason?: string;
+  /** Commit an accepted proposal produced. */
+  sha?: string;
+  /** Run directory that measured it. */
+  runDir?: string;
+}
+
+export interface SessionBalance {
+  proposals: number;
+  accepted: number;
+  rejected: number;
+  invalid: number;
+  initialSha: string;
+  finalSha: string;
+  /**
+   * End-to-end effectiveness, measured fresh between the session's initial and
+   * final versions. Absent when nothing was accepted, since there is nothing to
+   * compare.
+   */
+  endToEnd?: { initial: number; final: number };
+}

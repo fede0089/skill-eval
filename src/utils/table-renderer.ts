@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import * as path from 'path';
 import * as os from 'os';
-import { AggregatedTokenStats, EvalSuiteReport, EvalTrial } from '../types/index.js';
+import { AggregatedTokenStats, EvalSuiteReport, EvalTrial, ProposalRecord, ProposalVerdict, SessionBalance } from '../types/index.js';
 import { Logger } from './logger.js';
 import { computePassAtK } from '../core/statistics.js';
 
@@ -301,4 +301,140 @@ export function renderFunctionalTable(report: EvalSuiteReport): void {
       Logger.write(`\n   Time (${version}):     ${formatDuration(dStats.avgMs)} avg`);
     }
   }
+}
+
+export interface EvolveHeaderConfig {
+  skillName: string;
+  executorAgent: string;
+  judgeAgent: string;
+  /** Absent while the session has no optimizer to invoke. */
+  optimizerAgent?: string;
+  evals: number;
+  trials: number;
+  maxAgents: number;
+  /** Ceiling of optimizer invocations. Absent when the session runs none. */
+  proposals?: number;
+  timeoutMs?: number;
+  sessionDir: string;
+}
+
+/**
+ * Renders the compact summary of an evolution session before anything runs, in
+ * the same box the evaluation commands use: the author sees what is about to be
+ * measured, with which agents, and where the session writes.
+ */
+export function renderEvolveHeader(config: EvolveHeaderConfig): void {
+  const { skillName, executorAgent, judgeAgent, optimizerAgent, evals, trials, maxAgents, proposals, timeoutMs, sessionDir } = config;
+
+  let timeoutStr = 'None';
+  if (timeoutMs && timeoutMs > 0) {
+    const timeoutSec = timeoutMs / 1000;
+    timeoutStr = timeoutSec % 60 === 0 ? `${timeoutSec / 60}m` : `${timeoutSec}s`;
+  }
+
+  const maxOutputLen = BOX_INNER - 13;
+  const sessionStr = collapseHome(sessionDir);
+  const sessionLine = sessionStr.length > maxOutputLen
+    ? '…' + sessionStr.slice(sessionStr.length - (maxOutputLen - 1))
+    : sessionStr;
+
+  const titleLabel = 'skill-eval';
+  const dashes = '─'.repeat(BOX_INNER - titleLabel.length);
+  const top = chalk.gray('┌─ ') + chalk.bold(titleLabel) + ' ' + chalk.gray(dashes + '┐');
+  const bottom = chalk.gray('└' + '─'.repeat(BOX_INNER + 2) + '┘');
+
+  const title = chalk.bold.cyan(skillName) + chalk.gray('  ·  evolve');
+  const runLine = `${evals} eval${evals !== 1 ? 's' : ''}  ·  ${trials} trial${trials !== 1 ? 's' : ''}  ·  agents ${maxAgents}`;
+
+  process.stdout.write('\n');
+  process.stdout.write(top + '\n');
+  process.stdout.write(boxLine(title) + '\n');
+  process.stdout.write(boxLine() + '\n');
+  process.stdout.write(boxLabel('executor', executorAgent) + '\n');
+  process.stdout.write(boxLabel('judge', judgeAgent) + '\n');
+  if (optimizerAgent) process.stdout.write(boxLabel('optimizer', optimizerAgent) + '\n');
+  process.stdout.write(boxLabel('run', runLine) + '\n');
+  if (proposals !== undefined) process.stdout.write(boxLabel('proposals', String(proposals)) + '\n');
+  process.stdout.write(boxLabel('timeout', timeoutStr) + '\n');
+  process.stdout.write(boxLabel('session', sessionLine) + '\n');
+  process.stdout.write(bottom + '\n\n');
+}
+
+/** Formats an effectiveness as a percentage with one decimal. */
+function formatEffectiveness(rate: number): string {
+  return `${(rate * 100).toFixed(1)}%`;
+}
+
+const VERDICT_REASONS: Record<ProposalVerdict, string> = {
+  'accepted': 'the aggregate improved and the prediction held',
+  'not-better': 'the aggregate did not improve — equal is not better',
+  'unattributable': 'the aggregate improved but a declared expectation did not',
+  'total-regression': 'an expectation the incumbent always passed now always fails'
+};
+
+/**
+ * Renders what the session did with one proposal: what was predicted, what the
+ * comparison measured, and the decision with its reason. Rejections are shown in
+ * as much detail as acceptances — a session is evidence of what did not work too.
+ */
+export function renderProposalOutcome(record: ProposalRecord): void {
+  const origin = record.origin === 'working-tree' ? 'working tree' : 'optimizer';
+  Logger.write(`\n${chalk.bold(`Proposal ${record.number}/${record.total}`)}${chalk.gray(`  ·  ${origin}`)}\n`);
+
+  if (record.hypothesis) {
+    Logger.write(`   ${chalk.gray('hypothesis'.padEnd(13))}${record.hypothesis}\n`);
+  }
+
+  const decision = record.decision;
+
+  for (const [index, prediction] of record.predictions.entries()) {
+    const label = index === 0 ? 'predicted' : '';
+    const outcome = decision?.predictionsMet.find(o =>
+      o.prediction.evalId === prediction.evalId && o.prediction.expectation === prediction.expectation);
+    const rates = outcome
+      ? `  ${formatEffectiveness(outcome.incumbentRate)} → ${formatEffectiveness(outcome.candidateRate)} ${outcome.improved ? chalk.green('✓') : chalk.red('✗')}`
+      : '';
+    Logger.write(`   ${chalk.gray(label.padEnd(13))}eval #${prediction.evalId} · ${prediction.expectation}${rates}\n`);
+  }
+
+  if (!decision) {
+    Logger.write(`   ${chalk.yellow('INVALID')}  ${record.invalidReason ?? 'the attempt overstepped its scope'}\n`);
+    return;
+  }
+
+  Logger.write(
+    `   ${chalk.gray('effectiveness'.padEnd(13))}` +
+    `${formatEffectiveness(decision.incumbentEffectiveness)} → ${formatEffectiveness(decision.candidateEffectiveness)}\n`
+  );
+
+  if (decision.verdict === 'accepted') {
+    Logger.write(`   ${chalk.green('ACCEPTED')}  committed ${record.sha ?? ''}\n`);
+  } else {
+    Logger.write(`   ${chalk.red('REJECTED')}  ${VERDICT_REASONS[decision.verdict]}\n`);
+  }
+}
+
+/**
+ * Renders the balance of the session: how many proposals there were, how they
+ * ended, which version it started and ended on, and — only when something was
+ * accepted — the end-to-end effectiveness measured fresh between the two.
+ */
+export function renderSessionBalance(balance: SessionBalance): void {
+  Logger.write(`\nSESSION BALANCE\n`);
+  Logger.write(`──────────────────────────────────────────────────\n`);
+  Logger.write(
+    `   proposals ${balance.proposals}  ·  ` +
+    `${chalk.green(`accepted ${balance.accepted}`)}  ·  ` +
+    `${chalk.red(`rejected ${balance.rejected}`)}  ·  ` +
+    `${chalk.yellow(`invalid ${balance.invalid}`)}\n`
+  );
+  Logger.write(`   version   ${balance.initialSha} → ${balance.finalSha}\n`);
+
+  if (balance.endToEnd) {
+    Logger.write(
+      `   end-to-end ${formatEffectiveness(balance.endToEnd.initial)} → ` +
+      `${formatEffectiveness(balance.endToEnd.final)}  ${chalk.gray('(measured fresh under the frozen evals)')}\n`
+    );
+  }
+  Logger.write('\n');
 }

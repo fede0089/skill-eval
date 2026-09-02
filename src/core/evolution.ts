@@ -2,8 +2,9 @@ import {
   EvalSuite,
   EvalSuiteReport,
   EvalTrial,
+  ExpectationOutcome,
   PredictedExpectation,
-  ProposalVerdict,
+  ProposalDecision,
   TaskResult
 } from '../types/index.js';
 import { ValidationError } from './errors.js';
@@ -25,24 +26,6 @@ import { isCounted } from './trial-utils.js';
 export type DeclaredPrediction =
   | { evalId: number; index: number }
   | { evalId: number; expectation: string };
-
-export interface ExpectationOutcome {
-  prediction: PredictedExpectation;
-  candidateRate: number;
-  incumbentRate: number;
-  improved: boolean;
-}
-
-export interface ProposalDecision {
-  verdict: ProposalVerdict;
-  /** Effectiveness of both variants, unrounded: equal is not better. */
-  candidateEffectiveness: number;
-  incumbentEffectiveness: number;
-  /** One entry per declared expectation, in the order it was declared. */
-  predictionsMet: ExpectationOutcome[];
-  /** Expectations the incumbent passed in every trial and the candidate fails in every one. */
-  collapsed: PredictedExpectation[];
-}
 
 /** Identity of an expectation: the eval it belongs to and its exact text. */
 export function expectationKey(evalId: number, expectation: string): string {
