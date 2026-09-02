@@ -243,3 +243,40 @@ test('functionalCommand drops the transcript but keeps the trial summary in the 
     mock.reset();
   }
 });
+
+test('functionalCommand returns the same report it hands the reporter', async (t) => {
+  mock.method(fs, 'mkdirSync', () => {});
+  mock.method(fs, 'writeFileSync', () => {});
+  mock.method(fs, 'readdirSync', () => ['evals.json']);
+  mock.method(fs, 'existsSync', () => true);
+
+  const injectedSuite = {
+    skill_name: 'mock-skill',
+    tasks: [{ id: 1, prompt: 'test prompt', expectations: ['is correct'] }]
+  };
+
+  mock.method(EvalEnvironment.prototype, 'setup', async () => {});
+  mock.method(EvalEnvironment.prototype, 'teardown', async () => {});
+  mock.method(EvalRunner.prototype, 'runFunctionalTask', async () => ({
+    id: 1,
+    transcript: { response: 'ok' },
+    assertionResults: [{ assertion: 'is correct', passed: true, reason: 'yes' }],
+    trialPassed: true
+  }));
+
+  let captured: any;
+  const capturingReporter = { generate: (report: any) => { captured = report; } };
+
+  try {
+    // An evolution session decides on these numbers, so the report has to leave
+    // the command rather than only reaching disk.
+    const returned = await functionalCommand(
+      'gemini-cli', 'gemini-cli', process.cwd(), 'mock-skill', 1, injectedSuite, 1, capturingReporter
+    );
+
+    assert.strictEqual(returned, captured);
+    assert.strictEqual(returned.results[0].skillTrials['local'][0].trialPassed, true);
+  } finally {
+    mock.reset();
+  }
+});
